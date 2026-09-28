@@ -104,11 +104,11 @@ export const PATTERNS: Record<string, Pattern> = {
   // Columns fall with a gap that snakes left and right: thread the needle.
   thread: (c) => {
     let gx = c.box.x + c.box.w / 2, dir = 1;
-    return every(0.4 / Math.min(1.3, c.density), () => {
+    return every(0.52 / Math.min(1.2, c.density), () => {
       gx += dir * rnd(6, 14);
       if (gx < c.box.x + 22 || gx > c.box.x + c.box.w - 22) { dir = -dir; gx = Math.max(c.box.x + 22, Math.min(c.box.x + c.box.w - 22, gx)); }
       for (let x = c.box.x + 4; x < c.box.x + c.box.w; x += 11) {
-        if (Math.abs(x - gx) < 18) continue;
+        if (Math.abs(x - gx) < 20) continue;
         c.spawn(x, c.box.y - 4, 0, 48 * c.speed);
       }
     });

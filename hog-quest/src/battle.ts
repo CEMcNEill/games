@@ -43,6 +43,7 @@ const RULES: Record<string, string> = {
   laser: 'LINE = LASER SOON',
   squeeze: 'THE BOX SHRINKS',
   burst: 'X = IT POPS',
+  thread: 'FIND THE GAP',
 };
 
 /** What an enemy mutters as its turn starts, by mood (fixed kit text, short enough for the bubble). */
@@ -137,7 +138,8 @@ export class BattleScene extends Phaser.Scene {
     this.used = new Set();
     this.fx = { slow: false, shield: false, crit: false, short: false };
     this.boxNow = { ...TEXT_BOX };
-    this.puzzle = makePuzzle(this.def.name, this.isBoss || this.isMini ? 3 : 2 + heat().extraStep);
+    // Heat 0: the same puzzles every run (knowledge carries). Heat 1+: they reshuffle each run.
+    this.puzzle = makePuzzle(this.def.name, this.isBoss ? heat().bossSteps : this.isMini ? 3 : heat().steps, R.heat > 0 ? K.run.seed : 0);
     this.steps = enemySteps(this.enc, this.def.patterns);
     hooks.scene = 'Battle';
     hooks.state = 'battle';
@@ -453,7 +455,8 @@ export class BattleScene extends Phaser.Scene {
       this.mercy = this.progress >= steps ? 100 : Math.min(99, this.mercy + Math.ceil(100 / steps));
       if (this.mercy > before) floatText(this, 150, 26, `+${this.mercy - before}%`, 0xf8b800);
       const talk = this.def.talk?.length ? this.def.talk : ['It listens, sort of.'];
-      const line = talk[Math.min(this.progress - 1, talk.length - 1)];
+      // Spread the theme's lines over the sequence so the last right act gets the last (relief) line.
+      const line = talk[Math.max(0, Math.min(talk.length - 1, Math.ceil((this.progress / steps) * talk.length) - 1))];
       K.play('product', 0.6);
       punch(this.enemy, 0.08);
       const shift = this.isBoss && this.mercy < 100 ? ` Its mood shifts. It ${wantOf(this.puzzle.seq[this.progress])} now.` : '';
@@ -800,7 +803,9 @@ export class BattleScene extends Phaser.Scene {
    * the bugfix route (debug.route('bugfix')) and against the bullet-hell boss. */
   private botStep(dt: number) {
     this.botT += dt;
-    if (this.botT < 0.4) return;
+    // Humanized (debug.humanize): read at ~25 characters a second and think a second per menu.
+    const need = R.humanize ? (this.mode === 'result' || this.mode === 'end' ? 0.8 + this.tw.full.length / 25 : 1.2) : 0.4;
+    if (this.botT < need) return;
     if ((this.mode === 'result' || this.mode === 'end') && this.tw.done && this.next) {
       this.botT = 0;
       this.input_(true, false, false, false, false, false);
@@ -811,11 +816,12 @@ export class BattleScene extends Phaser.Scene {
       const solve = this.isBoss && this.progress >= 1 && prods.includes(this.def.solved_by) && !this.used.has(this.def.solved_by) && !this.solved;
       const healIdx = R.items.findIndex((id) => item(id)?.kind === 'heal');
       const want = R.hp < R.maxHp * 0.4 && healIdx >= 0 && !this.sparable() ? 3 : kill ? 0 : this.sparable() ? 4 : solve ? 2 : 1;
+      if (R.humanize && !this.checked && !kill && !this.sparable() && this.sel !== 1) { this.sel = 1; this.drawAll(); return; }
       if (this.sel !== want) { this.sel = want; this.drawAll(); return; }
       this.input_(true, false, false, false, false, false);
     } else if (this.mode === 'acts') {
       this.botT = 0;
-      const want = this.puzzle.seq[this.progress] ?? 'check';
+      const want = R.humanize && !this.checked ? 'check' : this.puzzle.seq[this.progress] ?? 'check';
       const i = this.choices.findIndex((c) => c.id === want);
       this.subSel = Math.max(0, i);
       this.input_(true, false, false, false, false, false);

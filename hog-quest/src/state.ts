@@ -10,14 +10,16 @@ export const DIFF = {
 };
 export type Diff = (typeof DIFF)['normal'];
 
-/** Heat 0-5 ("crunch time"): less HP, denser choreography, fewer free heals, stricter mercy. */
+/** Heat 0-5 ("crunch time"): less HP, denser choreography, fewer free heals, stricter mercy.
+ * steps / bossSteps = acts in each ACT puzzle: the first run (heat 0) wants one right act per enemy,
+ * so it is no longer than before; the sequences grow with heat. */
 export const HEAT = [
-  { hpLoss: 0, dens: 1, speed: 1, extraStep: 0, heal: 1, solve: 100 },
-  { hpLoss: 2, dens: 1.08, speed: 1.03, extraStep: 0, heal: 0.5, solve: 100 },
-  { hpLoss: 4, dens: 1.16, speed: 1.06, extraStep: 1, heal: 0.5, solve: 100 },
-  { hpLoss: 6, dens: 1.24, speed: 1.09, extraStep: 1, heal: 0, solve: 100 },
-  { hpLoss: 8, dens: 1.32, speed: 1.12, extraStep: 1, heal: 0, solve: 60 },
-  { hpLoss: 10, dens: 1.4, speed: 1.15, extraStep: 1, heal: 0, solve: 60 },
+  { hpLoss: 0, dens: 1, speed: 1, steps: 1, bossSteps: 2, heal: 1, solve: 100 },
+  { hpLoss: 2, dens: 1.08, speed: 1.03, steps: 2, bossSteps: 3, heal: 0.5, solve: 100 },
+  { hpLoss: 4, dens: 1.16, speed: 1.06, steps: 3, bossSteps: 3, heal: 0.5, solve: 100 },
+  { hpLoss: 6, dens: 1.24, speed: 1.09, steps: 3, bossSteps: 3, heal: 0, solve: 100 },
+  { hpLoss: 8, dens: 1.32, speed: 1.12, steps: 3, bossSteps: 3, heal: 0, solve: 60 },
+  { hpLoss: 10, dens: 1.4, speed: 1.15, steps: 3, bossSteps: 3, heal: 0, solve: 60 },
 ];
 export const heat = () => HEAT[Math.max(0, Math.min(5, R.heat))];
 
@@ -34,6 +36,7 @@ export const R = {
   debugged: 0,
   met: new Set<number>(),
   autopilot: false,
+  humanize: false, // debug.humanize(): the autopilot pauses to read, like a first-time player
   speed: 1,
   god: false,
   diff: DIFF.normal as Diff,

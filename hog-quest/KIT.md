@@ -4,7 +4,7 @@ The PostHog hedgehog walks 3-4 rooms of the prospect's "office", talks to their 
 four of their problems as monsters (3 enemies + a boss). Battles use FIGHT / ACT / POSTHOG / ITEM /
 SPARE; enemy turns are 4.5-6.5 s bullet-dodging rounds in a box. The intended route is pacifist:
 find the right ACTs (ACT > CHECK says which) or use the right PostHog product (`solved_by`), then
-SPARE. About 5-6 minutes for a first run on easy. Best for champions and top accounts: the most
+SPARE. About 4-5 minutes for a first run on easy (humanized autopilot: 4.2 min). Best for champions and top accounts: the most
 personal kit, since it is mostly their words.
 
 Replay: three endings (pacifist / neutral / bugfix), secrets in every room, a hidden miniboss,
@@ -24,8 +24,9 @@ heat 0-5, a boss rush, 14 achievements, and NPCs who remember your last run.
 
 ## Battles (src/battle.ts, acts.ts, choreo.ts, dodge.ts, patterns.ts)
 - ACT: CHECK + 3 verbs per enemy from a fixed table (LISTEN, ASK, JOKE, DEMO, PRAISE, COFFEE,
-  SKETCH, WAIT). Each enemy wants a hidden sequence (2 acts; boss and miniboss 3), seeded from its
-  name, so a given game always has the same puzzles. CHECK prints `pain` + the hint. A right act
+  SKETCH, WAIT). Each enemy wants a hidden sequence: heat 0 one act (boss 2), heat 1 two (boss 3),
+  heat 2+ three; the miniboss always 3. Heat 0 puzzles are seeded from the enemy's name (a given
+  game always has the same ones); heat 1+ reshuffles them every run. CHECK prints `pain` + the hint. A right act
   shows the next `talk` line and fills the MERCY meter; a wrong one makes it ANNOYED (denser,
   faster turns) until the next right act. Mood tag: CALM / ANNOYED / READY TO SPARE / FURIOUS.
 - POSTHOG: `solved_by` = instant full mercy (60% at heat 4+). Other products keep their effects
@@ -79,7 +80,8 @@ star x2, glint x2, cracked wall, open wall) and `miniboss` (32x32, 2 frames). Ne
 a prompt, so existing prospect manifests simply use the default art.
 
 ## Test hooks
-`__game.debug`: `autopilot` (pacifist through the right acts, buys Cold Brew, drinks it when low),
+`__game.debug`: `autopilot` (pacifist through the right acts, buys Cold Brew, drinks it when low;
+`humanize()` makes it read and CHECK like a first-timer, for run-length estimates),
 `speed`, `god`, `lose`, `win`, `room(i)`, `showcase()` (a battle with an 8 s dense turn, for the
 GIF), plus:
 - `battle(i)` fight encounter i now (0-2 enemies, 3 boss, 4 miniboss); `pattern(name)` showcase

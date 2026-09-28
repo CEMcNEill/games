@@ -9,7 +9,8 @@ TP) or teaches itself in one line (CHECK says what the enemy wants).
   submenu of CHECK + 3 verbs, picked per enemy from a fixed verb table (LISTEN, ASK, JOKE, DEMO,
   PRAISE, COFFEE, WHITEBOARD, WAIT...). Seeded by a hash of the enemy's name, so a given prospect
   game always has the same puzzle (knowledge carries between runs, like Undertale).
-- Each enemy has a hidden right sequence of 2 acts (boss 3). CHECK prints `pain` plus a hint
+- Each enemy has a hidden right sequence of acts (heat 0: 1 act, boss 2; heat 1: 2, boss 3;
+  heat 2+: 3; miniboss always 3). Heat 0 puzzles are fixed per game; heat 1+ reshuffles per run. CHECK prints `pain` plus a hint
   ("Wants to be heard first, then could use a laugh."), so a first-timer is never stuck.
   The right act shows the next theme `talk` line (they already build from confusion to relief)
   and fills the mercy meter. A wrong act shows fixed kit text and makes the enemy ANNOYED:
@@ -73,7 +74,8 @@ TP) or teaches itself in one line (CHECK says what the enemy wants).
 ## M7-M9: heat, boss rush, achievements, NPC memory
 - Title menu appears from the second visit on (first visit: clean title, Enter = story):
   MODE STORY / BOSS RUSH (unlocked by any win) and HEAT 0-5 (shared heatRow).
-- Heat per level: -2 max HP, +8% density, +3% bullet speed; heat 2+: enemy act sequence has 3 steps;
+- Heat per level: -2 max HP, +8% density, +3% bullet speed; act sequences 1 -> 2 -> 3 steps
+  (boss 2 -> 3) and reshuffled every run from heat 1;
   heat 3+: no free coffee; heat 4+: the solved_by product only fills the mercy meter to 60 (you
   still need one right act).
 - Boss rush: the four problems back to back, half a coffee between fights, clock in the battle HUD,
@@ -95,3 +97,15 @@ TP) or teaches itself in one line (CHECK says what the enemy wants).
 The bot is a strong dodger and never hesitates in menus. First-run length for a human is an
 estimate, not a measurement: the bot's pacifist run grew from 117 to ~170 game-seconds (+45%), so
 a first run that took 4 minutes before should now take roughly 5-6. Nobody has timed a human run.
+
+### First-run length (humanized autopilot, speed 1, so wall time = player time)
+`debug.humanize()` makes the autopilot read at ~25 characters a second, think 1.2 s per menu and
+CHECK every enemy once, like a curious first-timer. Same patch applied to the pre-overnight kit
+(13b37b4) for a baseline:
+| Build | First run (easy, pacifist) |
+| --- | --- |
+| Before tonight (TALK/product, no CHECK) | 186 s (3.1 min) |
+| First version tonight (2-act puzzles, boss 3) | ~306 game-s at speed 6 (too long) |
+| Now (heat 0: 1 act per enemy, boss 2) | 250 s (4.2 min) |
+The remaining +64 s is reading CHECK (free, once per battle) and the bot's vending machine detours:
+both optional. Depth (2-3 act sequences) now starts at heat 1.

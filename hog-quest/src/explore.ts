@@ -443,7 +443,8 @@ export class ExploreScene extends Phaser.Scene {
       this.dlg.tw.step(dt);
       if (R.autopilot && this.dlg.tw.done) {
         this.dlg.wait += dt;
-        if (this.dlg.wait > 0.35) this.advance();
+        const page = this.dlg.pages[this.dlg.i]?.text ?? '';
+        if (this.dlg.wait > (R.humanize ? 0.8 + page.length / 25 : 0.35)) this.advance();
       }
       this.player.anims.stop();
       return;
@@ -714,6 +715,9 @@ export class ExploreScene extends Phaser.Scene {
       autopilot: (on = true) => { R.autopilot = !!on; },
       speed: (n: number) => { R.speed = Math.max(1, Math.min(8, Math.round(n))); setJuiceSpeed(R.speed); },
       god: (on = true) => { R.god = !!on; },
+      // The autopilot reads like a person (~25 chars/s, a second per menu) and CHECKs each enemy:
+      // run it and read __game.elapsed for a first-run length estimate.
+      humanize: (on = true) => { R.humanize = !!on; },
       // Set this run's heat (0-5) now: HP, density and heals follow it.
       heat: (n: number) => {
         R.heat = Math.max(0, Math.min(5, Math.floor(Number(n) || 0)));
