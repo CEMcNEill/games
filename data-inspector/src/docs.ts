@@ -33,7 +33,7 @@ function plan(c: DocCtx): Line[] {
     out.push({ t: props.length ? props.join(', ') : '(no properties)', c: 'key', indent: 2 });
   }
   if (req.size) out.push({ t: '* required', c: 'key' });
-  if (c.day >= 3) out.push({ t: '$identify: a person profile. Event rules (names, required props) skip it.', c: 'new' });
+  if (c.day >= 3) out.push({ t: '$identify = person profile: event-name and required-prop rules skip it', c: 'new' });
   const has = (t: string) => c.rules.some((r) => r.type === t);
   if (has('currency_mismatch') && w.money) out.push({ t: `${w.money.prop}: always in ${w.money.cur}`, c: 'new' });
   if (has('pii_in_text')) out.push({ t: `${w.textProp}: free text, no emails/phones`, c: 'new' });

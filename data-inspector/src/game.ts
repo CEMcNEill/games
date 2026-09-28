@@ -123,6 +123,7 @@ export class GameScene extends Phaser.Scene {
   private patternEvent = '';
   private pickRng = rng(randomSeed());
   private firstWeek = false;
+  private pickerSeen = false;
 
   constructor() { super('Game'); }
 
@@ -151,7 +152,7 @@ export class GameScene extends Phaser.Scene {
       rec: null, broken: [], options: [], readyAt: 0, nextAt: -1, botT: 0, overlayT: 0, overlay: [], timers: [], lastTick: 0,
       simSpeed: 1, finished: false, credits: START_CREDITS, grades: [], adj: noAdj(), pending: noAdj(), request: null,
       choices: {}, corners: 0, integrity: 0, stress: 0, junk: 0, todayExempt: [], quotasMet: 0, finalCaught: false,
-      upgraded: new Set(), charges: new Map(), patternSeen: new Set(), patternNoted: 0,
+      upgraded: new Set(), charges: new Map(), patternSeen: new Set(), patternNoted: 0, pickerSeen: false,
     });
     this.patternEvent = r.pick(this.world.events).name;
     hooks.scene = 'Game';
@@ -430,6 +431,8 @@ export class GameScene extends Phaser.Scene {
       this.add_(text(this, 154, 50 + i * 13, v, { color: c ?? ui.textInt, depth: 102 }));
     });
     this.add_(text(this, 290, 46, 'GRADE', { color: ui.dimInt, depth: 102 }));
+    const judged = s.processed - s.skipped;
+    this.add_(text(this, 360, 62, `${judged ? Math.round((100 * s.correct) / judged) : 0}% right, ${s.processed}/${this.quota}`, { color: ui.dimInt, depth: 102 }));
     this.add_(text(this, 330, 42, g, { scale: 3, color: gradeColor(g), depth: 102, shadow: ui.panelInt }));
     this.add_(text(this, 360, 50, `+${this.dayCredits} CREDITS`, { color: GOLD, depth: 102 }));
     if (last) {
@@ -618,6 +621,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.options = opts;
     this.sel = 0;
+    if (!this.pickerSeen) {
+      this.pickerSeen = true;
+      this.say('Pick the rule it breaks (1-4). Right reason = bonus.', K.ui.accentInt);
+    }
     this.prevMode = this.mode;
     this.mode = 'reason';
     hooks.state = 'reason';
@@ -959,7 +966,8 @@ export class GameScene extends Phaser.Scene {
     capture('ending_reached', { ending: ending?.id ?? 'none', grade: weekGrade, heat: this.heatN, mode: this.runMode });
     this.time.delayedCall(won ? 300 : 700, () => this.scene.start('End', {
       won, score: this.score, headline,
-      stats: [['Records checked', this.total.processed], ['Accuracy', `${acc}%`], ['Week grade', won ? weekGrade : '-']],
+      stats: [['Records checked', this.total.processed], ['Accuracy', `${acc}%`],
+        ['Week grade', won ? `${weekGrade}  (days ${this.grades.map((g) => g.g).join('')})` : '-']],
       props: { day: this.day + 1, accuracy: acc, quality: Math.round(this.quality), tools: this.tools, ending: ending?.id ?? null,
         grade: weekGrade, heat: this.heatN, mode: this.runMode },
     }));
