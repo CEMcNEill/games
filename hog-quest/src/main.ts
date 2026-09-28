@@ -33,10 +33,11 @@ startKit({
     scene.add.sprite(W / 2 - 150, 162, spr('player'), 6).setScale(3);
     [0, 1, 2].forEach((i) => scene.add.sprite(W / 2 + 86 + i * 44, 166 - (i % 2) * 12, spr(`enemy_${i + 1}`)).play(anim(`enemy_${i + 1}`)));
     // Returning players see which endings they have found.
-    const found = hq().endings;
+    const save = hq(), found = save.endings;
     if (found.length) {
       const parts = ENDINGS.map((e) => (found.includes(e) ? e.toUpperCase() : '???'));
-      text(scene, W / 2, 16, `ENDINGS ${found.length}/3: ${parts.join('  ')}`, { align: 'center', color: K.ui.accentInt, depth: 10 });
+      const rush = save.rushBest ? `   RUSH BEST ${save.rushBest.toFixed(1)}s` : '';
+      text(scene, W / 2, 16, `ENDINGS ${found.length}/3: ${parts.join('  ')}${rush}`, { align: 'center', color: K.ui.accentInt, depth: 10 });
     }
   },
   // The first visit gets a clean title (Enter starts the story); after that: mode and heat.

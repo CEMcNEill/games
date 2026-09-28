@@ -45,6 +45,14 @@ const RULES: Record<string, string> = {
   burst: 'X = IT POPS',
 };
 
+/** What an enemy mutters as its turn starts, by mood (fixed kit text, short enough for the bubble). */
+const BUBBLES: Record<string, string[]> = {
+  calm: ['...', 'Hmm?', 'Is this a demo?', 'Not now.', 'Works for me.', 'Ticket?'],
+  annoyed: ['Rude.', 'Hmph!', 'I was FINE.', 'Wow. OK.', 'Seriously?'],
+  ready: ['...thanks.', 'I feel seen.', 'Oh. Nice.', 'Maybe...'],
+  furious: ['NO.', 'REBOOT!', '404!', 'ROLLBACK!', 'Why?!'],
+};
+
 const EFFECTS: Record<string, string> = {
   session_replay: 'You replay its last move. You can see the next one coming.',
   feature_flags: 'You flag off its worst feature. Its next attack does half damage.',
@@ -441,7 +449,9 @@ export class BattleScene extends Phaser.Scene {
       this.progress++;
       this.annoyed = false;
       const steps = this.puzzle.seq.length;
+      const before = this.mercy;
       this.mercy = this.progress >= steps ? 100 : Math.min(99, this.mercy + Math.ceil(100 / steps));
+      if (this.mercy > before) floatText(this, 150, 26, `+${this.mercy - before}%`, 0xf8b800);
       const talk = this.def.talk?.length ? this.def.talk : ['It listens, sort of.'];
       const line = talk[Math.min(this.progress - 1, talk.length - 1)];
       K.play('product', 0.6);
@@ -613,8 +623,20 @@ export class BattleScene extends Phaser.Scene {
       this.dodge.start(step.pats, { speed, density, boss: this.isBoss });
       this.live = true;
       this.caption.setText(rule).setVisible(!!rule);
+      this.bubble(pick(BUBBLES[this.mood()] ?? BUBBLES.calm, this.turn + this.enc));
       if (rule) blinkOnce(this, this.caption);
     });
+  }
+
+  /** A speech bubble to the right of the enemy for a moment. */
+  private bubble(str: string) {
+    const x = W / 2 + (this.isBoss ? 58 : 44), y = 16;
+    const t = text(this, x + 6, y + 5, str, { color: 0x000000, shadow: null, depth: 26 });
+    const w = t.textWidth + 12;
+    const g = this.add.graphics().setDepth(25);
+    g.fillStyle(0x000000, 1).fillRect(x - 1, y - 1, w + 2, 19).fillStyle(0xfcfcfc, 1).fillRect(x, y, w, 17)
+      .fillTriangle(x, y + 6, x, y + 12, x - 6, y + 11);
+    this.time.delayedCall(1500, () => { t.destroy(); g.destroy(); });
   }
 
   private tweenBox(to: Box, done: () => void) {
@@ -694,6 +716,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private hitSoul() {
+    if (this.finished) return;
     let dmg = R.diff.dmg + (this.isBoss ? 1 : 0);
     if (this.fx.shield) dmg = Math.ceil(dmg / 2);
     R.hits++;
@@ -727,6 +750,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private lose() {
+    if (this.finished) return;
     this.finished = true;
     R.over = true;
     this.live = false;
@@ -807,6 +831,8 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 }
+
+const pick = <T>(arr: T[], n: number) => arr[((n % arr.length) + arr.length) % arr.length];
 
 function blinkOnce(scene: Phaser.Scene, t: PixelText) {
   t.setAlpha(1);

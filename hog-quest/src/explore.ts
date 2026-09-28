@@ -16,7 +16,7 @@ import { addEnding, hq, HQSave } from './save';
 import { achieve } from '@shared/meta';
 import { Typewriter, paginate } from './typewriter';
 import { preloadMusic } from './music';
-import { setJuiceSpeed } from '@shared/juice';
+import { setJuiceSpeed, shake } from '@shared/juice';
 
 interface Page { speaker?: string; text: string }
 interface NpcPlace { i: number; room: number; spot: Spot }
@@ -241,7 +241,7 @@ export class ExploreScene extends Phaser.Scene {
 
   private syncPlayer() {
     this.player.setPosition(Math.round(this.pos.x), Math.round(this.pos.y - 5)).setDepth(this.pos.y + 1);
-    this.hud?.hp.setText(`HP ${Math.ceil(R.hp)}/${R.maxHp}  ${R.gold}G`);
+    this.hud?.hp.setText(`${R.heat ? `HEAT ${R.heat}  ` : ''}HP ${Math.ceil(R.hp)}/${R.maxHp}  ${R.gold}G`);
   }
 
   // ---------------------------------------------------------------- collision
@@ -341,7 +341,7 @@ export class ExploreScene extends Phaser.Scene {
     if (R.doorOpen) { this.say([{ text: 'Just an empty cupboard now. It smells of old sticky notes.' }], () => {}); return; }
     this.say([{ text: 'This wall sounds hollow. You knock. Something knocks back.' }], () => {
       R.doorOpen = true;
-      this.cameras.main.shake(300, 0.006);
+      shake(this, 3, 300);
       K.play('boss', 0.6);
       this.drawProps();
       this.time.delayedCall(350, () => this.encounter(MINI));
@@ -554,7 +554,7 @@ export class ExploreScene extends Phaser.Scene {
       R.continues++;
       this.enterRoom(R.checkpoint.room, this.ext(R.checkpoint.room).save);
       this.onSave = true;
-      this.say([{ text: `You wake up by the save star. Stay determined. (${Math.max(0, MAX_CONTINUES - R.continues)} retries left)` }], () => {});
+      this.say([{ text: `You wake up by the save star. Stay determined. (${Math.max(0, MAX_CONTINUES - R.continues)} ${MAX_CONTINUES - R.continues === 1 ? 'retry' : 'retries'} left)` }], () => {});
       return;
     }
     if (K.run.mode === 'rush') { this.rushNext(data.how, data.enc); return; }
