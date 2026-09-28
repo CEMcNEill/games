@@ -15,7 +15,7 @@ Details and design reasoning: `DESIGN-NOTES.md`. How it plays now: `KIT.md`.
 | e4ad69b | Battle text tables moved to `battletext.ts`; `overnight-shots/` |
 | 81b609c | NPCs react when you talk to them again (spared vs debugged so far); a guilty line for debugging a problem that was ready to be spared |
 | 76c7494 | Fixes from a code review: checkpoint/retries reset per run, shop blocks walking, autopilot FIGHT strikes on crossing (was able to miss forever at low fps), humanized bot menu flip, timers; music resumes after a retry |
-| (final) | Second review fixes: blue bullets only punish movement you choose (not the box squeezing you or falling); the boss never combines gravity/stoplight with lasers or the squeeze; god-mode rush runs don't set records; heat3 achievement also from rush; losing a rush doesn't change NPC memory. Final docs |
+| e6cffc0 | Second review fixes: blue bullets only punish movement you choose (not the box squeezing you or falling); the boss never combines gravity/stoplight with lasers or the squeeze; god-mode rush runs don't set records; heat3 achievement also from rush; losing a rush doesn't change NPC memory. Final docs |
 
 ## Cut or changed
 - Nothing from the brief was cut. Two things were changed after measuring:
