@@ -20,5 +20,19 @@
   {"id": "icon_speed", "w": 16, "h": 16, "frames": 1},
   {"id": "icon_magnet", "w": 16, "h": 16, "frames": 1},
   {"id": "icon_maxhp", "w": 16, "h": 16, "frames": 1},
-  {"id": "icon_cooldown", "w": 16, "h": 16, "frames": 1}
+  {"id": "icon_cooldown", "w": 16, "h": 16, "frames": 1},
+  {"id": "coin", "w": 8, "h": 8, "frames": 1},
+  {"id": "chest", "w": 16, "h": 16, "frames": 2},
+  {"id": "food", "w": 12, "h": 12, "frames": 1},
+  {"id": "hotfix", "w": 16, "h": 16, "frames": 1},
+  {"id": "vacuum", "w": 16, "h": 16, "frames": 1},
+  {"id": "crate", "w": 16, "h": 16, "frames": 1},
+  {"id": "hat", "w": 12, "h": 10, "frames": 5},
+  {"id": "icon_armour", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_area", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_amount", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_crit", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_growth", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_luck", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_revive", "w": 16, "h": 16, "frames": 1}
 ]
