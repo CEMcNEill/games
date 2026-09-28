@@ -89,6 +89,10 @@ export function resetRun() {
   R.doorOpen = false;
   R.mini = '';
   R.secretsFound = 0;
+  R.checkpoint = null;
+  R.continues = 0;
+  R.itemsUsed = 0;
+  R.rush = -1;
 }
 
 export const MAX_CONTINUES = 2;

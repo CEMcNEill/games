@@ -15,7 +15,7 @@ import { addSecret, patchHq } from './save';
 import { addEnding, hq, HQSave } from './save';
 import { achieve } from '@shared/meta';
 import { Typewriter, paginate } from './typewriter';
-import { preloadMusic } from './music';
+import { preloadMusic, stopBattleMusic } from './music';
 import { setJuiceSpeed, shake } from '@shared/juice';
 
 interface Page { speaker?: string; text: string }
@@ -42,6 +42,7 @@ export class ExploreScene extends Phaser.Scene {
   private busy = false; // room transition or battle launch in progress
   private shop: Shop | null = null;
   private props: Phaser.GameObjects.GameObject[] = [];
+  private propTimers: Phaser.Time.TimerEvent[] = [];
   private onSave = false; // standing on this room's save star (it triggers once per step onto it)
   private memory: HQSave | null = null;
   private bot = { path: [] as Spot[], goal: '' as string, push: null as null | { x: number; y: number }, stuckT: 0, lastX: 0, lastY: 0, talkTo: -1,
@@ -164,6 +165,8 @@ export class ExploreScene extends Phaser.Scene {
   private drawProps() {
     this.props.forEach((o) => o.destroy());
     this.props = [];
+    this.propTimers.forEach((t) => t.remove(false));
+    this.propTimers = [];
     const e = this.ext(), i = this.roomIdx, key = spr('props');
     const at = (sp: Spot, f: number) => {
       const im = this.add.image(OX + sp.col * TILE, OY + sp.row * TILE, key, f).setOrigin(0).setDepth(cellY(sp.row) - 1);
@@ -175,14 +178,15 @@ export class ExploreScene extends Phaser.Scene {
     if (!R.secretIds.has(this.room.layout)) {
       const gl = at(e.secret.spot, 3).setDepth(900).setAlpha(0);
       // A glint every few seconds: enough to make you wonder, easy to miss.
-      this.props.push(this.time.addEvent({ delay: 2600, loop: true, callback: () => {
+      this.propTimers.push(this.time.addEvent({ delay: 2600, loop: true, callback: () => {
+        if (!gl.active) return;
         gl.setFrame(3).setAlpha(1);
-        this.time.delayedCall(140, () => gl.setFrame(4));
-        this.time.delayedCall(300, () => gl.setAlpha(0));
-      } }) as unknown as Phaser.GameObjects.GameObject);
+        this.time.delayedCall(140, () => { if (gl.active) gl.setFrame(4); });
+        this.time.delayedCall(300, () => { if (gl.active) gl.setAlpha(0); });
+      } }));
     }
     const star = at(e.save, 1).setDepth(cellY(e.save.row) - 2);
-    this.props.push(this.time.addEvent({ delay: 380, loop: true, callback: () => star.setFrame(star.frame.name === '1' || String(star.frame.name) === '1' ? 2 : 1) }) as unknown as Phaser.GameObjects.GameObject);
+    this.propTimers.push(this.time.addEvent({ delay: 380, loop: true, callback: () => star.setFrame(String(star.frame.name) === '1' ? 2 : 1) }));
   }
 
   private enterRoom(i: number, at: Spot) {
@@ -344,7 +348,8 @@ export class ExploreScene extends Phaser.Scene {
       shake(this, 3, 300);
       K.play('boss', 0.6);
       this.drawProps();
-      this.time.delayedCall(350, () => this.encounter(MINI));
+      this.busy = true; // nothing else may start a battle in the next 350 ms
+      this.time.delayedCall(350, () => { this.busy = false; this.encounter(MINI); });
     });
   }
 
@@ -462,6 +467,7 @@ export class ExploreScene extends Phaser.Scene {
       return;
     }
     if (this.busy) return;
+    if (this.shop) { this.player.anims.stop(); return; } // the vending machine menu has the arrow keys
     const k = this.keys;
     let dx = (k.RIGHT.isDown || k.D.isDown ? 1 : 0) - (k.LEFT.isDown || k.A.isDown ? 1 : 0);
     let dy = (k.DOWN.isDown || k.S.isDown ? 1 : 0) - (k.UP.isDown || k.W.isDown ? 1 : 0);
@@ -565,6 +571,7 @@ export class ExploreScene extends Phaser.Scene {
       // Lost a battle after a save star: back to the star, as things were.
       restore(R.checkpoint.snap);
       R.continues++;
+      stopBattleMusic(this, true); // the lost battle left the exploration track paused
       this.enterRoom(R.checkpoint.room, this.ext(R.checkpoint.room).save);
       this.onSave = true;
       this.say([{ text: `You wake up by the save star. Stay determined. (${Math.max(0, MAX_CONTINUES - R.continues)} ${MAX_CONTINUES - R.continues === 1 ? 'retry' : 'retries'} left)` }], () => {});

@@ -648,6 +648,7 @@ export class BattleScene extends Phaser.Scene {
     hooks.elapsed += dt;
     this.tw.step(dt);
     if (this.mode === 'fight') {
+      const prev = this.fightX;
       this.fightX += dt * 330;
       const b = TEXT_BOX;
       const g = this.fightG.clear();
@@ -660,7 +661,8 @@ export class BattleScene extends Phaser.Scene {
       g.fillStyle(0xfcfcfc, 1).fillRect(cx - 1, b.y + 16, 2, b.h - 32);
       g.fillStyle(0x000000, 1).fillRect(this.fightX - 3, b.y + 10, 6, b.h - 20);
       g.fillStyle(0xfcfcfc, 1).fillRect(this.fightX - 2, b.y + 11, 4, b.h - 22);
-      if (R.autopilot && Math.abs(this.fightX - cx) < 3) this.strike();
+      // The bot strikes as the cursor crosses the centre (a fixed window can be skipped at low fps).
+      if (R.autopilot && prev < cx && this.fightX >= cx) { this.fightX = cx; this.strike(); }
       else if (this.fightX > b.x + b.w - 8) this.miss();
       this.drawAll();
       return;
@@ -779,8 +781,8 @@ export class BattleScene extends Phaser.Scene {
       const kill = this.hell || (R.forceRoute === 'bugfix' && !this.isBoss);
       const solve = this.isBoss && this.progress >= 1 && prods.includes(this.def.solved_by) && !this.used.has(this.def.solved_by) && !this.solved;
       const healIdx = R.items.findIndex((id) => item(id)?.kind === 'heal');
-      const want = R.hp < R.maxHp * 0.4 && healIdx >= 0 && !this.sparable() ? 3 : kill ? 0 : this.sparable() ? 4 : solve ? 2 : 1;
-      if (R.humanize && !this.checked && !kill && !this.sparable() && this.sel !== 1) { this.sel = 1; this.drawAll(); return; }
+      const want = R.hp < R.maxHp * 0.4 && healIdx >= 0 && !this.sparable() ? 3 : kill ? 0 : this.sparable() ? 4
+        : R.humanize && !this.checked ? 1 : solve ? 2 : 1;
       if (this.sel !== want) { this.sel = want; this.drawAll(); return; }
       this.input_(true, false, false, false, false, false);
     } else if (this.mode === 'acts') {
