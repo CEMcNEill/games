@@ -151,3 +151,17 @@ Smart bot, normal, no shop (n=6-8, lots of noise: run-to-run variance dominates 
 | 2 | 5/6 | 131 l, 218-262 w (before the pack change) |
 | 3 | 5/8 | 74 l, 113 l, 204 l, 217-246 w |
 | 5 | 3/8 | 83-128 l (5), 265-283 w |
+
+### ~01:45: fixes from a read-only code review (subagent)
+- A won run could still end in GAME OVER: during the 1.6 s win delay, boss shots and fresh spawns could land.
+  Now `hurt` ignores hits once won, spawning stops, and hostile shots are cleared.
+- Two chests picked up in one frame left a stuck modal overlay. Now one chest opens at a time.
+- A dying splitter was pooled before its loot dropped, so its own mini reused the object: wrong XP, no Stack
+  Trace chains off splitters. Now the dead bug is pooled last.
+- `offscreenPoint` put ~37% of spawns inside the view, and could spawn next to the hog at a wall. Now spawns land on
+  the view's edge, mirrored when that side is past the wall.
+- Snack Break healed 40 instead of 20. Grid cells are reused (no per-step allocation). Homing retargets are
+  throttled to every 0.15 s. The death tint no longer gets cleared.
+Crumbling boss also speeds up toward the hog's pace (x3.2 max), so kiting can't stall a fight (3-product novice runs
+had a 529 s outlier). Crumble cap x4 -> x8.
+3-product theme (Surveys/Flags/Analytics), novice, normal, n=8: 6/8 wins, 224-329 s.

@@ -70,6 +70,7 @@ interface Proj {
   homing?: Enemy | null;
   speed?: number;
   chain?: number;
+  rt?: number; // homing retarget timer
   src: string;
   hit: Set<Enemy>;
   hostile?: boolean;
@@ -594,6 +595,7 @@ export class GameScene extends Phaser.Scene {
   private heatDmg() { return 1 + 0.08 * this.heat; }
 
   private spawn(dt: number) {
+    if (this.won) return;
     const t = this.elapsed;
     const R = this.R;
     while (this.evQueue.length && t >= this.evQueue[0].at) this.startEvent(this.evQueue.shift()!.id);
@@ -621,10 +623,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** A point just outside the camera view; if that side is beyond the arena wall, the opposite side. */
   offscreenPoint(): [number, number] {
+    const cam = this.cameras.main;
+    const cx = cam.scrollX + W / 2, cy = cam.scrollY + H / 2;
+    const edge = (ang: number): [number, number] => {
+      const c = Math.cos(ang), s = Math.sin(ang);
+      const k = 1 / Math.max(Math.abs(c) / (W / 2 + 24), Math.abs(s) / (H / 2 + 24));
+      return [cx + c * k, cy + s * k];
+    };
     const a = this.R.next() * Math.PI * 2;
-    const x = this.player.x + Math.cos(a) * (W / 2 + 24);
-    const y = this.player.y + Math.sin(a) * (H / 2 + 24);
+    let [x, y] = edge(a);
+    if (x < 8 || y < 8 || x > WORLD_W - 8 || y > WORLD_H - 8) [x, y] = edge(a + Math.PI);
     return [Phaser.Math.Clamp(x, 8, WORLD_W - 8), Phaser.Math.Clamp(y, 8, WORLD_H - 8)];
   }
 
@@ -749,7 +759,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildGrid() {
-    this.grid.clear();
+    for (const cell of this.grid.values()) cell.length = 0; // reuse cell arrays (no per-step allocation)
     for (const e of this.enemies) {
       const k = ((e.s.x >> 5) << 8) | (e.s.y >> 5);
       const cell = this.grid.get(k);
@@ -954,8 +964,7 @@ export class GameScene extends Phaser.Scene {
       { colours: [...cols.slice(1), 0xfcfcfc], speed: e.boss ? 200 : e.elite ? 150 : 100 });
     if (e.boss) { this.bossDown(e); return; }
     e.s.setActive(false).setVisible(false).stop();
-    this.pool.push(e);
-    if (e.arch === 'crate') { this.crateLoot(e.s.x, e.s.y); return; }
+    if (e.arch === 'crate') { this.pool.push(e); this.crateLoot(e.s.x, e.s.y); return; }
     this.kills++;
     this.sfx('kill', 0.5, 50);
     if (e.elite) {
@@ -975,6 +984,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     if (e.arch !== 'runner' || !blast) this.dropLoot(e);
+    this.pool.push(e); // last: the splitter's minis must not reuse this object before its loot is dropped
   }
 
   private crateLoot(x: number, y: number) {
@@ -1108,6 +1118,7 @@ export class GameScene extends Phaser.Scene {
         it.s.y += (dy / (d || 1)) * Math.min(sp, d);
       }
       if (it.kind === 'chest') it.s.setFrame(Math.floor(this.time.now / 250) % 2);
+      if (it.kind === 'chest' && this.modal) continue; // one chest at a time
       if (d < (it.kind === 'chest' ? 14 : 10)) {
         it.s.destroy();
         this.items.splice(i, 1);
@@ -1292,7 +1303,6 @@ export class GameScene extends Phaser.Scene {
     } else if (c.kind === 'passive') {
       const id = c.id as PassiveId;
       this.passives.set(id, Math.min(PASSIVES[id].max, (this.passives.get(id) ?? 0) + 1));
-      if (id === 'maxhp') this.hp += 20;
     } else if (c.kind === 'heal') {
       this.hp += 30;
     } else {
@@ -1458,7 +1468,11 @@ export class GameScene extends Phaser.Scene {
       const pr = this.projs[i];
       pr.life -= dt;
       if (pr.homing !== undefined) {
-        if (!pr.homing || !pr.homing.alive) pr.homing = this.nearest(pr.s.x, pr.s.y, 200);
+        if (!pr.homing || !pr.homing.alive) {
+          pr.rt = (pr.rt ?? 0) - dt;
+          pr.homing = null;
+          if (pr.rt <= 0) { pr.rt = 0.15; pr.homing = this.nearest(pr.s.x, pr.s.y, 200); }
+        }
         if (pr.homing) {
           const a = Math.atan2(pr.homing.s.y - pr.s.y, pr.homing.s.x - pr.s.x);
           const cur = Math.atan2(pr.vy, pr.vx);
@@ -1504,7 +1518,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   hurt(dmg: number, src = '') {
-    if (this.invuln > 0 || this.over) return;
+    if (this.invuln > 0 || this.over || this.won) return;
     this.invuln = 0.55;
     const d = dmg * Math.max(0.3, 1 - this.st.armour);
     this.run.hurtBy[src] = Math.round((this.run.hurtBy[src] ?? 0) + d);
@@ -1512,7 +1526,7 @@ export class GameScene extends Phaser.Scene {
     this.sfx('hurt', 0.8);
     shake(this, 2.5, 120);
     this.player.setTintFill(0xf83800);
-    this.time.delayedCall(90, () => this.heroTint());
+    this.time.delayedCall(90, () => { if (!this.over) this.heroTint(); });
     if (this.hp <= 0) {
       if (this.st.revives > 0) this.revive();
       else this.finish(false);
@@ -1561,11 +1575,11 @@ export class GameScene extends Phaser.Scene {
     this.bossAttack(b);
   }
 
-  /** A long boss fight wears the boss down: from 50 s it takes more and more damage (max x4), so a weak first-run
+  /** A long boss fight wears the boss down: from 50 s it takes more and more damage (+5%/s, max x8), so a weak first-run
    * build still finishes in good time. */
   private bossVuln() {
     const t = this.elapsed - this.bossAt - 50;
-    return t > 0 ? Math.min(4, 1 + t / 25) : 1;
+    return t > 0 ? Math.min(8, 1 + t / 20) : 1;
   }
 
   /** Boss movement: walk, telegraphed dash, spiral spin. */
@@ -1593,7 +1607,9 @@ export class GameScene extends Phaser.Scene {
       }
       if (b.t <= 0) b.mode = 0;
     } else if (this.bossPhase > 0) {
-      const sp = b.speed * b.slow * (this.bossPhase >= 2 ? 1.5 : 1);
+      // Angry: 1.5x. Crumbling (long fight): keeps speeding up toward the hog's pace so kiting can't stall the fight.
+      const crumble = Math.max(0, this.elapsed - this.bossAt - 50);
+      const sp = b.speed * b.slow * (this.bossPhase >= 2 ? 1.5 : 1) * Math.min(3.2, 1 + crumble / 40);
       b.s.x += (dx / d) * sp * dt;
       b.s.y += (dy / d) * sp * dt;
     }
@@ -1709,6 +1725,11 @@ export class GameScene extends Phaser.Scene {
 
   private winNow() {
     this.won = true;
+    for (let i = this.projs.length - 1; i >= 0; i--) {
+      if (!this.projs[i].hostile) continue;
+      this.projs[i].s.destroy();
+      this.projs.splice(i, 1);
+    }
     for (const e of [...this.enemies]) if (!e.boss) this.kill(e);
     this.time.delayedCall(1600, () => this.finish(true));
   }

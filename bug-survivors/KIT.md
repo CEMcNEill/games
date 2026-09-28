@@ -51,7 +51,8 @@ without re-rendering.
   hotfix bomb (clears the screen, chips the boss). Breakable crates are the steady source of food.
 - **Hazards:** tech-debt puddles spread and slow the hog to 55%.
 - **Boss:** attack library of ring, telegraphed charge, spiral (heat 2+ or angry) and summon (angry). Angry at
-  50% HP or after 50 s; at heat 5 it rages at 25%.
+  50% HP or after 50 s (then 1.5x faster); at heat 5 it rages at 25%. From 50 s it also "crumbles": +5% damage taken
+  per second (max x8), so weak first-run builds still finish near 4-5 minutes.
 - **Juice:** merged damage numbers (N toggles, saved), crit numbers in gold, white hit flash, knockback,
   hitstop on elite/boss kills and big crit kills, death pops in each bug's own sprite colours, level-up burst +
   slow-mo, gem pitch climbs as the XP bar fills, vacuum "whoop", boss arrival/death shake + flash.
