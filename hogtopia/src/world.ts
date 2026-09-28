@@ -364,7 +364,8 @@ export class World {
     f.named++;
     if (o === 0) return this.names.cities[(f.named - 1) % this.names.cities.length] || `City ${f.named}`;
     const n = ` ${f.named}`;
-    return `${this.names.rivalShort} Node`.slice(0, 14 - n.length).trim() + n; // keep the number when the name is long
+    const full = `${this.names.rivalShort} Node${n}`;
+    return full.length <= 14 ? full : `${this.names.rivalShort}`.slice(0, 14 - n.length).trim() + n; // keep the number when the name is long
   }
 
   canHarvest(o: Owner, x: number, y: number) {

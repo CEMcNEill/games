@@ -777,11 +777,16 @@ export class MapScene extends Phaser.Scene {
     else if (w.turn === MAX_TURNS) this.say('advisor', 'Last turn! Grab every point you can.');
     else if (w.turn % 3 === 0 && tips.length) this.say('advisor', tips[(w.turn / 3) % tips.length | 0]);
     const rname = String(K.theme.game.rival.name);
-    const sum = this.summary.length ? `${rname.length > 16 ? 'Rival' : rname} ${[...new Set(this.summary)].slice(0, 3).join(', ')}.` : '';
+    const who = rname.length > 16 ? 'Rival' : rname;
+    // Most important first: fights and captures, then growth news.
+    const big = /^(took|defeated|is attacking|is massing)/;
+    const items = [...new Set(this.summary)].sort((a, b) => Number(big.test(b)) - Number(big.test(a)));
+    const sum = items.length ? `${who} ${items.slice(0, 3).join(', ')}.` : '';
     this.msg.setText(`Turn ${w.turn}: +${w.income(0)} stars. ${sum || (w.turn === 1 ? 'Press T to research PostHog tech.' : '')}`);
-    if (sum && !this.fast() && this.summary.some((s) => /^(took|defeated|is attacking|is massing)/.test(s))) this.banner(sum);
-    const mass = this.summary.find((s) => s.startsWith('is massing') || s.startsWith('is attacking'));
-    if (mass && !first) this.say('advisor', `Heads up: rival units are gathering near ${mass.replace(/.* near /, '')}. Guard it from cities and forests.`);
+    const loud = items.filter((s) => big.test(s)).slice(0, 2);
+    if (loud.length && !this.fast()) this.banner(`${who} ${loud.join(', ')}.`);
+    const mass = this.summary.some((s) => s.startsWith('is massing') || s.startsWith('is attacking'));
+    if (mass && !first && w.cities[this.warned]) this.say('advisor', `Heads up: rival units are gathering near ${w.cities[this.warned].name}. Guard it from cities and forests.`);
     this.summary = [];
     this.redraw();
     // P2: at turn 8 the rival offers a truce (not in the first game, and not on your very first turns).
@@ -802,7 +807,7 @@ export class MapScene extends Phaser.Scene {
     if (!tgt || tgt.owner !== 0) return;
     const near = w.units.filter((u) => u.owner > 0 && cheb(u.x, u.y, tgt.x, tgt.y) <= 4).length;
     if (near >= 2 && (this.warned !== tgt.id || r.ai.assault)) {
-      this.summary.unshift(`${r.ai.assault ? 'is attacking' : 'is massing'} ${near} units near ${tgt.name}`);
+      this.summary.unshift(r.ai.assault ? `is attacking ${tgt.name} with ${near} units` : `is massing ${near} units near ${tgt.name}`);
       this.warned = tgt.id;
     }
   }
@@ -810,8 +815,8 @@ export class MapScene extends Phaser.Scene {
   /** Rival turn summary, big enough to notice. */
   private banner(s: string) {
     const ui = K.ui;
-    const t = text(this, this.ox + (this.w.W * T) / 2, MY + 80, s, { align: 'center', color: 0xfcfcfc, depth: 41, maxWidth: 260, maxLines: 2 });
-    const bw = Math.min(280, t.textWidth + 20), bh = t.textHeight + 10;
+    const t = text(this, this.ox + (this.w.W * T) / 2, MY + 80, s, { align: 'center', color: 0xfcfcfc, depth: 41, maxWidth: 270, maxLines: 3 });
+    const bw = Math.min(284, t.textWidth + 14), bh = t.textHeight + 10;
     const b = box(this, Math.round(t.x - bw / 2), MY + 75, Math.round(bw), bh, ui.bgInt, 0xf83800, ui.panelInt).setDepth(40);
     this.tweens.add({ targets: [t, b], alpha: 0, delay: 1500, duration: 400, onComplete: () => { t.destroy(); b.destroy(); } });
   }
