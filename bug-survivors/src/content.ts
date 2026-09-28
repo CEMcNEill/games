@@ -172,7 +172,7 @@ export interface HeroDef {
 export const HEROES: HeroDef[] = [
   { id: 'max', name: 'Max', line: 'Starts with your main product', tint: null, hat: -1, weapons: [], passive: null, unlock: null },
   { id: 'sprinter', name: 'Sprinter', line: 'Fast feet, replay orbs', tint: 0xa8d8f8, hat: 0,
-    weapons: ['session_replay', 'experiments'], passive: 'speed', unlock: 'kills_500' },
+    weapons: ['session_replay', 'experiments'], passive: 'speed', unlock: 'kills_2000' },
   { id: 'wizard', name: 'Wizard', line: 'Big area, pulses', tint: 0xd8b8f8, hat: 1,
     weapons: ['product_analytics', 'feature_flags'], passive: 'area', unlock: 'evolve' },
   { id: 'hacker', name: 'Hacker', line: 'Crits and homing bolts', tint: 0xb8f8b8, hat: 2,
@@ -183,7 +183,7 @@ export const HEROES: HeroDef[] = [
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first_win', name: 'First Squash', desc: 'Win a run' },
-  { id: 'kills_500', name: 'Exterminator', desc: 'Squash 500 bugs in total (unlocks Sprinter)' },
+  { id: 'kills_2000', name: 'Exterminator', desc: 'Squash 2000 bugs in total (unlocks Sprinter)' },
   { id: 'evolve', name: 'Evolved', desc: 'Evolve a weapon (unlocks Wizard)' },
   { id: 'heat2', name: 'Feeling The Heat', desc: 'Win on heat 2 (unlocks Hacker)' },
   { id: 'level20', name: 'Senior Engineer', desc: 'Reach level 20 in one run' },

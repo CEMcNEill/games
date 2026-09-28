@@ -61,10 +61,10 @@ without re-rendering.
   Heat n unlocks by winning heat n-1 (shared meta).
 - **Heat (stacking):** 1 more bugs, 2 faster bugs, 3 elites early (4 lone elites), 4 no regen + half food,
   5 boss rage phase + 45 s overtime after the boss. Each level also adds +8% bug HP, +6% damage, +6% spawns.
-  Gold x(1 + 0.25 heat), score x(1 + 0.2 heat).
+  Gold x(1 + 0.1 heat), score x(1 + 0.2 heat).
 - **SHOP** (title choice): UPGRADES (might, max HP, speed, magnet, luck, reroll, skip+banish, rollback), HEROES,
-  RECORDS (achievements, evolution codex, lifetime totals). Gold per win is roughly 60-110 at heat 0 and 150-400 at heat 3.
-- **Heroes:** Max (theme start weapon), Sprinter (Session Replay + speed, unlocked by 500 kills), Wizard (Product
+  RECORDS (achievements, evolution codex, lifetime totals). Gold per run is roughly 60-110 at heat 0 and ~110 at heat 3; the full shop costs ~2900, so about 15-25 runs.
+- **Heroes:** Max (theme start weapon), Sprinter (Session Replay + speed, unlocked by 2000 lifetime kills), Wizard (Product
   Analytics + area, by evolving a weapon), Hacker (Error Tracking + crit, by winning heat 2). A hero's weapon is used only
   if the theme features it, else the theme's starting product.
 - **Endless:** boss returns every 2:00 (HP x2 each time); bugs ramp hard after 5:00; score = time + kills + bosses.

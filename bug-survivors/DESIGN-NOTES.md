@@ -108,3 +108,10 @@ Crates (fixed kit art) appear every 22 s from 0:20, 110-180 px away, max 3. Any 
 (halved at heat 4+), 12% vacuum magnet, 6% hotfix, else 3 coins. They're the reliable "floor food" source.
 Tech-debt puddles: every 30 s from 1:15, 120-200 px away, max 4. They grow over 15 s to 34 px (+3 per heat),
 last 45 s, and slow the hog to 55% while it stands in them. Bugs ignore them. The autopilot steers around them.
+
+### ~23:55: shop vs skill
+Normal h5 with might 3, HP 3, luck 2, reroll 1 (~545 gold, ~5 runs): 4/4 wins, ~600 gold per run. The shop
+was replacing skill and paying for itself. Changes: heat gold bonus +25% -> +10% per level; Sprinter unlock
+500 -> 2000 lifetime kills (a heat-0 win is ~1100 kills, so 500 unlocked it, and the Wizard, in run one).
+After: normal h3 (no shop) 3/4 wins, 107 gold avg. Normal h5 with might 2 + HP 2 (~165 gold): 1/4 wins
+(deaths at 74, 120, 187 s; the win snowballed to level 55 and 4 evolutions). Full shop ~2900 gold = ~15-25 runs.

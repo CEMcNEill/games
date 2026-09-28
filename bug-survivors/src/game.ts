@@ -1094,7 +1094,7 @@ export class GameScene extends Phaser.Scene {
     const p = this.player;
     switch (it.kind) {
       case 'coin': {
-        const v = Math.max(1, Math.round((1 + this.heat * 0.25) * (it.big ? 10 : 1)));
+        const v = Math.max(1, Math.round((1 + this.heat * 0.1) * (it.big ? 10 : 1)));
         this.gold += v;
         this.sfx('coin', 0.4, 50);
         punchText(this.hud.gold);
@@ -1337,7 +1337,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (!lines.length) { this.hp = this.st.maxHp; lines.push(['Full heal', 'Back to full HP', 0x58d854]); }
     }
-    const g = Math.round((big ? 40 : 10 + R.int(0, 12)) * this.st.luck * (1 + this.heat * 0.25));
+    const g = Math.round((big ? 40 : 10 + R.int(0, 12)) * this.st.luck * (1 + this.heat * 0.1));
     this.gold += g;
     lines.push([`+${g} gold`, '', 0xf8d878]);
     persist();
@@ -1699,7 +1699,7 @@ export class GameScene extends Phaser.Scene {
       achieve('daily');
     }
     persist();
-    if (sv.kills >= 500) achieve('kills_500');
+    if (sv.kills >= 2000) achieve('kills_2000');
     if (sv.gold >= 500) achieve('rich');
     if (won) achieve('first_win');
     if (won && this.heat >= 2) achieve('heat2');
