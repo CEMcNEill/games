@@ -45,10 +45,19 @@ const emptyStats = (): DayStats => ({ processed: 0, correct: 0, caught: 0, misse
 interface Adj { clock: number; charges: number; quality: number; notes: string[] }
 const noAdj = (): Adj => ({ clock: 0, charges: 0, quality: 0, notes: [] });
 
-interface BotPlan { requests: 'yes' | 'no'; bills: 'all' | 'none'; pattern: boolean; pace: number; accuracy: number; reasons: number }
+interface BotPlan { requests: 'yes' | 'no' | string[]; bills: 'all' | 'none'; pattern: boolean; pace: number; accuracy: number; reasons: number }
 
 export interface KitSave extends Record<string, unknown> { endings: string[]; bestGrade: Record<string, string>; endlessBest: number }
-export const kitSave = () => meta.kitData<KitSave>({ endings: [], bestGrade: {}, endlessBest: 0 });
+/** This kit's save space in meta (endings found, best grade per heat, endless best), repaired if storage held junk. */
+export function kitSave(): KitSave {
+  const s = meta.kitData<KitSave>({ endings: [], bestGrade: {}, endlessBest: 0 });
+  if (!Array.isArray(s.endings)) s.endings = [];
+  s.endings = s.endings.filter((e) => typeof e === 'string').slice(0, 20);
+  if (!s.bestGrade || typeof s.bestGrade !== 'object' || Array.isArray(s.bestGrade)) s.bestGrade = {};
+  for (const [k, v] of Object.entries(s.bestGrade)) if (!/^[0-5]$/.test(k) || typeof v !== 'string' || !'SABCD'.includes(v) || v.length !== 1) delete s.bestGrade[k];
+  if (typeof s.endlessBest !== 'number' || !Number.isFinite(s.endlessBest)) s.endlessBest = 0;
+  return s;
+}
 
 /** What the End screen's kit lines need (set by finish()). */
 export const lastEnd = { ending: null as Ending | null, grade: '', endless: false, records: 0, newBestGrade: false, names: {} as Record<string, string> };
@@ -872,7 +881,10 @@ export class GameScene extends Phaser.Scene {
     this.botT += dt;
     if (['intro', 'request', 'summary', 'finalintro'].includes(this.mode) && this.overlayT > 0.6) {
       if (this.mode === 'intro') this.afterIntro();
-      else if (this.mode === 'request') this.answerRequest(this.plan.requests === 'yes'); // by default the bot plays it straight
+      else if (this.mode === 'request') { // by default the bot plays it straight
+        const q = this.plan.requests;
+        this.answerRequest(q === 'yes' || (Array.isArray(q) && !!this.request && q.includes(this.request.id)));
+      }
       else if (this.mode === 'summary') {
         if (this.quality <= 0) return;
         if (this.day + 1 < DAYS) {
