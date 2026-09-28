@@ -8,7 +8,7 @@ import { text, box, bar, PixelText, W, H } from '@shared/ui';
 import { MAP } from './map';
 import { WYRM, WYRM_NAME, MIMIC } from './battle';
 import {
-  publishStats, R, BOSS, ENCOUNTERS, GATES, CHESTS, ITEMS, ItemId, resetRun, endData, relicName, levelUp, theName, productName, stat,
+  publishStats, R, BOSS, ENCOUNTERS, GATES, CHESTS, ITEMS, ItemId, resetRun, endData, relicName, levelUp, theName, productName, stat, SKILLS,
 } from './state';
 import { ShopMenu } from './shop';
 import { SECRETS, SECRET_TEXT, SecretId, QUEST, WYRM_LINES, chestContents, rollEvents, RunEvents, MERCHANT, MIMIC as MIMIC_DEF } from './world';
@@ -685,7 +685,7 @@ export class ExploreScene extends Phaser.Scene {
       objs.push(text(this, W - 50, y, m.row === 'back' ? 'BACK' : 'FRONT', { fixed: true, depth: 961, align: 'right', color: m.row === 'back' ? ui.dimInt : ui.accentInt }));
       objs.push(text(this, 76, y + 10, `HP ${m.hp}/${m.maxHp}  MP ${m.mp}/${m.maxMp}  ATK ${stat(m, 'atk')} DEF ${stat(m, 'def')} MAG ${stat(m, 'mag')}`,
         { fixed: true, depth: 961, color: ui.dimInt }));
-      objs.push(text(this, 76, y + 20, m.skills.map((s) => (s === 'coffee_run' ? 'Coffee Run' : productName(s))).join(', '), { fixed: true, depth: 961, color: ui.dimInt, maxWidth: W - 130, maxLines: 1 }));
+      objs.push(text(this, 76, y + 20, m.skills.map((s) => (SKILLS[s].product ? productName(s) : SKILLS[s].name)).join(', '), { fixed: true, depth: 961, color: ui.dimInt, maxWidth: W - 130, maxLines: 1 }));
       const gear = (['weapon', 'armor', 'charm'] as const).map((k) => gearDef(m.gear[k] ?? '')?.name ?? '-').join(' / ');
       objs.push(text(this, 76, y + 30, gear, { fixed: true, depth: 961, color: 0xf8b800, maxWidth: W - 130, maxLines: 1 }));
     });

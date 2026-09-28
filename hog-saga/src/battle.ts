@@ -515,7 +515,7 @@ export class BattleScene extends Phaser.Scene {
     m.skills.forEach((id, i) => {
       const s = SKILLS[id];
       const ok = m.mp >= s.mp;
-      const y = MENU_Y + i * ROW2;
+      const y = MENU_Y + i * this.skillStep();
       const nm = (featured(id) ? '*' : '') + (s.name.length > 15 ? s.name.replace('Analytics', 'Anlytcs') : s.name);
       this.menuObjs.push(text(this, 22, y, nm, { depth: 101, color: ok ? ui.textInt : 0x7c7c7c }));
       if (s.kind) {
@@ -527,6 +527,9 @@ export class BattleScene extends Phaser.Scene {
     this.ui.sel = 0;
     this.drawCursor();
   }
+
+  /** Two text lines per skill; tighter when a member knows four (LV 7+). */
+  private skillStep() { return (this.ui.member?.skills.length ?? 0) > 3 ? 22 : ROW2; }
 
   private openItems() {
     this.clearMenu();
@@ -571,7 +574,7 @@ export class BattleScene extends Phaser.Scene {
     const ui = K.ui;
     const { mode, sel } = this.ui;
     if (mode === 'cmd' || mode === 'skill' || mode === 'item' || mode === 'combo') {
-      const step = mode === 'combo' || mode === 'skill' ? ROW2 : ROW;
+      const step = mode === 'skill' ? this.skillStep() : mode === 'combo' ? ROW2 : ROW;
       const y = MENU_Y + 1 + sel * step;
       c.fillStyle(ui.accentInt).fillTriangle(12, y, 12, y + 8, 17, y + 4);
       if (mode === 'skill') {
@@ -990,6 +993,24 @@ export class BattleScene extends Phaser.Scene {
               if (Math.random() < (isBossLike(f) ? 0.4 : 0.8)) f.status.throttled = STATUS.throttled.turns;
               this.drawFoeBar(f);
             }
+            break;
+          case 'code_review': {
+            const f = tgt(act.target as Foe);
+            this.lunge(m);
+            this.msg.setText(`${m.name} runs a Code Review on ${f.name}: nitpick, then the real finding!`);
+            this.hitFoe(f, this.physBy(m, atk, f.def), 'strike', { crit: this.crit(m) });
+            this.time.delayedCall(220 / R.speed, () => { if (!this.over && f.alive) { this.lunge(m); this.hitFoe(f, this.physBy(m, atk, f.def), 'strike', { crit: true }); } });
+            break;
+          }
+          case 'dashboards':
+            this.msg.setText(`${m.name} ships the Dashboards. Every weak spot is on screen!`);
+            this.chartBlast();
+            for (const f of this.aliveFoes()) { R.known.add(`${f.key}:weak`); R.known.add(`${f.key}:resist`); }
+            this.aliveFoes().forEach((f) => this.hitFoe(f, this.magic(mag, 1.3 * gearMagic(m), f.def), 'magic'));
+            break;
+          case 'standup':
+            this.msg.setText(`${m.name} runs a quick Standup. The party is FOCUSED!`);
+            for (const p of this.aliveParty()) { p.status.focused = 3; this.healMember(p, mag * 0.6 * gearHeal(m)); }
             break;
           case 'coffee_run':
             this.msg.setText(`${m.name} does a Coffee Run. Everyone feels better!`);

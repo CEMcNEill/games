@@ -30,19 +30,23 @@ secrets and a superboss.
     hits) or harden; casters cure/focus their friends, storm the party or leak one member. The boss
     telegraphs MASS OUTAGE a turn ahead (DEFEND or Feature Flags!), moves its weak spot at 50% HP, and
     on heat 3+ gets a phase 3 at 25% (weak spot moves again, one ROLLBACK heal, more double hits).
-- Skills (fixed in code; a star marks the prospect's own products):
+- Skills (fixed in code; a star marks the prospect's own products). LV 7 skills come with optional
+  content or New Game+:
 
 | Member | Skill (product) | Kind | Effect | Learned |
 |---|---|---|---|---|
 | Hedgehog (fighter) | Error Tracking | DATA | big hit, target takes +30% for 3 rounds | LV 1 |
 | | Experiments | STRIKE | A/B strike: two hits on random foes | LV 2 |
 | | Feature Flags | - | party takes half damage and no new statuses for 3 rounds | LV 4 |
+| | Code Review (not a product) | STRIKE | two strikes on one foe, the second always crits | LV 7 |
 | Analyst (mage) | Web Analytics | MAGIC | strong single-target magic, reveals the target | LV 1 |
 | | Product Analytics | MAGIC | chart blast on every foe | LV 2 |
 | | Data Warehouse | DATA | magic hit, party regains 4 MP | LV 4 |
+| | Dashboards (not a product) | MAGIC | magic on every foe, reveals every weak spot | LV 7 |
 | Support (healer) | Session Replay | - | heal and cure one ally, or revive a knocked-out one | LV 1 |
 | | Surveys | - | foes deal 30% less and are SLOWed | LV 3 |
 | | Coffee Run (not a product) | - | heal and cure the whole party | LV 5 |
+| | Standup (not a product) | - | party FOCUSED for 3 rounds, small heal | LV 7 |
 
 | Combo (pair) | Effect |
 |---|---|

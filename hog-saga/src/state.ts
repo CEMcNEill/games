@@ -9,7 +9,7 @@ import { saga } from './save';
 
 export type ClassId = 'hero' | 'analyst' | 'support';
 export type SkillId = 'error_tracking' | 'experiments' | 'feature_flags' | 'web_analytics' | 'product_analytics'
-  | 'data_warehouse' | 'session_replay' | 'surveys' | 'coffee_run';
+  | 'data_warehouse' | 'session_replay' | 'surveys' | 'coffee_run' | 'code_review' | 'dashboards' | 'standup';
 export type Target = 'enemy' | 'enemies' | 'ally' | 'party';
 export type ItemId = 'potion' | 'ether' | 'hotfix';
 export type Arch = 'swarm' | 'fast' | 'brute' | 'tank' | 'caster';
@@ -29,11 +29,11 @@ interface ClassDef {
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   hero: { base: { hp: 38, mp: 8, atk: 11, def: 7, mag: 4, spd: 9 }, grow: { hp: 8, mp: 2, atk: 3, def: 2, mag: 1, spd: 1 },
-    learn: [[1, 'error_tracking'], [2, 'experiments'], [4, 'feature_flags']] },
+    learn: [[1, 'error_tracking'], [2, 'experiments'], [4, 'feature_flags'], [7, 'code_review']] },
   analyst: { base: { hp: 27, mp: 18, atk: 6, def: 4, mag: 12, spd: 10 }, grow: { hp: 5, mp: 4, atk: 1, def: 1, mag: 3, spd: 1 },
-    learn: [[1, 'web_analytics'], [2, 'product_analytics'], [4, 'data_warehouse']] },
+    learn: [[1, 'web_analytics'], [2, 'product_analytics'], [4, 'data_warehouse'], [7, 'dashboards']] },
   support: { base: { hp: 31, mp: 16, atk: 7, def: 6, mag: 9, spd: 11 }, grow: { hp: 6, mp: 3, atk: 2, def: 2, mag: 2, spd: 1 },
-    learn: [[1, 'session_replay'], [3, 'surveys'], [5, 'coffee_run']] },
+    learn: [[1, 'session_replay'], [3, 'surveys'], [5, 'coffee_run'], [7, 'standup']] },
 };
 
 export interface SkillDef { name: string; product: string | null; mp: number; target: Target; line: string; sfx: string; kind?: Kind }
@@ -48,6 +48,10 @@ export const SKILLS: Record<SkillId, SkillDef> = {
   session_replay: { name: 'Session Replay', product: 'session_replay', mp: 4, target: 'ally', line: 'Heal, cure or revive one ally', sfx: 'heal' },
   surveys: { name: 'Surveys', product: 'surveys', mp: 5, target: 'enemies', line: 'Foes weaken and slow down', sfx: 'debuff' },
   coffee_run: { name: 'Coffee Run', product: null, mp: 9, target: 'party', line: 'Heal and cure the whole party', sfx: 'heal' },
+  // LV 7 skills (reached with optional content or New Game+). Not products, like Coffee Run.
+  code_review: { name: 'Code Review', product: null, mp: 7, target: 'enemy', line: 'Two strikes; the second always crits', sfx: 'crit', kind: 'strike' },
+  dashboards: { name: 'Dashboards', product: null, mp: 8, target: 'enemies', line: 'Magic on all; reveals every weak spot', sfx: 'magic', kind: 'magic' },
+  standup: { name: 'Standup', product: null, mp: 8, target: 'party', line: 'Party FOCUSED and healed a little', sfx: 'heal' },
 };
 
 export const ITEMS: Record<ItemId, { name: string; line: string; target: Target }> = {

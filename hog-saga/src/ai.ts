@@ -125,6 +125,17 @@ function attackOptions(m: Member, foes: Foe[]): Option[] {
         score: cap(f, magEst(mag, 1.2, f.def) * knownMult(f, 'data')) + breakBonus(f, 'data') + (needMp ? 12 : 0) - 3 });
     }
   }
+  for (const f of foes) {
+    if (can('code_review')) {
+      out.push({ act: { kind: 'skill', id: 'code_review', target: f },
+        score: cap(f, physEst(atk, f.def) * 2.6 * knownMult(f, 'strike')) + breakBonus(f, 'strike', 2) - 6 });
+    }
+  }
+  if (can('dashboards') && foes.length >= 1) {
+    const unknown = foes.some((f) => !knows(f.key, 'weak'));
+    const s = foes.reduce((a, f) => a + cap(f, magEst(mag, 1.3, f.def) * knownMult(f, 'magic')) + breakBonus(f, 'magic'), 0);
+    out.push({ act: { kind: 'skill', id: 'dashboards' }, score: s + (unknown ? 10 : 0) - 6 });
+  }
   if (can('product_analytics') && foes.length >= 2) {
     const s = foes.reduce((a, f) => a + cap(f, magEst(mag, 1.1, f.def) * knownMult(f, 'magic')) + breakBonus(f, 'magic'), 0);
     out.push({ act: { kind: 'skill', id: 'product_analytics' }, score: s - 4 });
@@ -229,6 +240,8 @@ export function partyMove(v: BattleView, m: Member): Act {
     return { kind: 'scan', target: unknown[0] };
   if (m.cls === 'support' && (foes.length >= 2 || v.boss) && can('surveys') && !foes.some((f) => f.weak > 0))
     return { kind: 'skill', id: 'surveys' };
+  if (m.cls === 'support' && worth && can('standup') && !party.some((p) => (p.status.focused ?? 0) > 0))
+    return { kind: 'skill', id: 'standup' };
   if (m.cls === 'hero' && v.boss && can('feature_flags') && v.shield <= 0 && m.mp >= 12) return { kind: 'skill', id: 'feature_flags' };
   const opts = attackOptions(m, foes);
   opts.sort((a, b) => b.score - a.score);
