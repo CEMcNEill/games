@@ -67,12 +67,12 @@ const errorTracking: Fn = (g, w, dt) => {
   const s = g.st, p = g.player, L = w.level;
   const target = g.nearest(p.x, p.y, w.evo ? 320 : 260);
   if (!target) { w.timer = 0.2; return; }
-  w.timer = (w.evo ? 0.6 : 1.3 - 0.15 * L) * s.cd;
+  w.timer = (w.evo ? 0.6 : 1.05 - 0.1 * L) * s.cd; // was 1.3 - 0.15L: too weak as a starting weapon
   const n = (w.evo ? 3 : L >= 5 ? 2 : 1) + s.amount;
   const sp = w.evo ? 210 : 150 + 15 * L;
   for (let i = 0; i < n; i++) {
     const a = Math.atan2(target.s.y - p.y, target.s.x - p.x) + (i - (n - 1) / 2) * 0.6;
-    const pr = g.shoot('homing', p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, w.evo ? 42 : 16 + 6 * L, 2.4, w.evo ? 2 : L >= 3 ? 3 : 1,
+    const pr = g.shoot('homing', p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, w.evo ? 42 : 16 + 6 * L, 2.4, w.evo ? 2 : L >= 3 ? 3 : 2,
       'error_tracking');
     pr.homing = target; pr.speed = sp;
     if (w.evo) { pr.chain = 2; pr.s.setTint(GOLD); }

@@ -136,7 +136,7 @@ export class GameScene extends Phaser.Scene {
   RD: Rng = rng(2);  // drops and chests
   RC: Rng = rng(3);  // level-up cards
   dmgBy: Record<string, number> = {};
-  run = { elites: 0, chests: 0, evolutions: [] as string[], hotfixes: 0, crits: 0 };
+  run = { elites: 0, chests: 0, evolutions: [] as string[], hotfixes: 0, crits: 0, hurtBy: {} as Record<string, number> };
   numBudget = 10;
   numbers = true;
   fx!: Phaser.GameObjects.Graphics;
@@ -166,7 +166,7 @@ export class GameScene extends Phaser.Scene {
       elapsed: 0, spawnAcc: 0, boss: null, bossTimer: 0, bossPhase: 0, bossKills: 0, bossLast: '', nextBossAt: BOSS_AT, overtime: -1,
       won: false, over: false, paused: false, modal: null, pendingLevels: 0, slowmo: 0, banners: [], bannerBusy: false, bannerObjs: [],
       simSpeed: 1, stampede: null, puddles: [], blasts: [], hazT: { crate: HAZARDS.crateFrom, puddle: HAZARDS.puddleFrom }, revivesUsed: 0, superNova: false, dmgBy: {}, numBudget: 10, hat: null,
-      run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0 },
+      run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {} },
     });
     setJuiceSpeed(1);
     this.weapons = new Map();
@@ -456,6 +456,7 @@ export class GameScene extends Phaser.Scene {
       player: { x: Math.round(this.player.x), y: Math.round(this.player.y) },
       gold: this.gold, heat: this.heat, mode: this.mode, hero: this.hero.id, elites: this.run.elites, chests: this.run.chests,
       evolutions: this.run.evolutions, bossKills: this.bossKills, superNova: this.superNova, rerolls: this.rerolls,
+      hurtBy: this.run.hurtBy,
       dmg: Object.fromEntries(Object.entries(this.dmgBy).map(([k, v]) => [k, Math.round(v)])),
     };
   }
@@ -869,7 +870,7 @@ export class GameScene extends Phaser.Scene {
     this.blasts.push({ x, y, r: R, t: 0 });
     shake(this, 2, 120);
     this.sfx('explode', 0.35, 80);
-    if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < R + 6) this.hurt(16 * this.diff.dmg);
+    if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < R + 6) this.hurt(16 * this.diff.dmg, 'blast');
     this.kill(e, false, true);
     // Chain reactions: the blast hurts other bugs too.
     for (const o of this.near(x, y, R)) if (o !== e && !o.boss) this.damage(o, 20, 0, 0, 'blast');
@@ -887,6 +888,7 @@ export class GameScene extends Phaser.Scene {
     if (!e.alive) return;
     const crit = !quiet && Math.random() < this.st.crit;
     let d = dmg * this.st.might * e.armour * (crit ? 2 : 1);
+    if (e.boss) d *= this.bossVuln();
     d = Math.min(d, Math.max(0, e.hp) + 1);
     e.hp -= d;
     this.dmgBy[src] = (this.dmgBy[src] ?? 0) + d;
@@ -1434,7 +1436,7 @@ export class GameScene extends Phaser.Scene {
       pr.s.y += pr.vy * dt;
       let dead = pr.life <= 0 || pr.s.x < -20 || pr.s.y < -20 || pr.s.x > WORLD_W + 20 || pr.s.y > WORLD_H + 20;
       if (!dead && pr.hostile) {
-        if (Phaser.Math.Distance.Between(pr.s.x, pr.s.y, p.x, p.y) < 9) { this.hurt(pr.dmg); dead = true; }
+        if (Phaser.Math.Distance.Between(pr.s.x, pr.s.y, p.x, p.y) < 9) { this.hurt(pr.dmg, pr.src); dead = true; }
       } else if (!dead) {
         for (const e of this.near(pr.s.x, pr.s.y, 3)) {
           if (pr.hit.has(e)) continue;
@@ -1461,15 +1463,17 @@ export class GameScene extends Phaser.Scene {
     if (this.invuln > 0) return;
     for (const e of this.near(this.player.x, this.player.y, 7)) {
       if (e.dmg <= 0) continue;
-      this.hurt(e.dmg);
+      this.hurt(e.dmg, e.boss ? 'boss' : e.elite ? 'elite' : e.arch);
       break;
     }
   }
 
-  hurt(dmg: number) {
+  hurt(dmg: number, src = '') {
     if (this.invuln > 0 || this.over) return;
     this.invuln = 0.55;
-    if (!this.god) this.hp -= dmg * Math.max(0.3, 1 - this.st.armour);
+    const d = dmg * Math.max(0.3, 1 - this.st.armour);
+    this.run.hurtBy[src] = Math.round((this.run.hurtBy[src] ?? 0) + d);
+    if (!this.god) this.hp -= d;
     this.sfx('hurt', 0.8);
     shake(this, 2.5, 120);
     this.player.setTintFill(0xf83800);
@@ -1508,6 +1512,10 @@ export class GameScene extends Phaser.Scene {
       this.bossPhase = 2;
       this.banner(`${K.theme.game.boss.name.toUpperCase()} IS ANGRY!`, 'It is calling in more bugs');
     }
+    if (!b.hitAt.crumble && this.elapsed - this.bossAt > 70) {
+      b.hitAt.crumble = 1;
+      this.banner(`${K.theme.game.boss.name.toUpperCase()} IS CRUMBLING!`, 'Your fixes are landing. Keep going!');
+    }
     if (this.bossPhase === 2 && this.heat >= 5 && b.hp < b.maxHp * 0.25) {
       this.bossPhase = 3;
       this.banner(`${K.theme.game.boss.name.toUpperCase()} RAGES!`, 'Faster attacks. Hang in there!');
@@ -1516,6 +1524,13 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.bossTimer > 0) return;
     this.bossAttack(b);
+  }
+
+  /** A long boss fight wears the boss down: from 70 s it takes more and more damage (max x4), so a weak first-run
+   * build still finishes in good time. */
+  private bossVuln() {
+    const t = this.elapsed - this.bossAt - 70;
+    return t > 0 ? Math.min(4, 1 + t / 25) : 1;
   }
 
   /** Boss movement: walk, telegraphed dash, spiral spin. */

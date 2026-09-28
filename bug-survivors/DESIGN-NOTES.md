@@ -115,3 +115,15 @@ was replacing skill and paying for itself. Changes: heat gold bonus +25% -> +10%
 500 -> 2000 lifetime kills (a heat-0 win is ~1100 kills, so 500 unlocked it, and the Wizard, in run one).
 After: normal h3 (no shop) 3/4 wins, 107 gold avg. Normal h5 with might 2 + HP 2 (~165 gold): 1/4 wins
 (deaths at 74, 120, 187 s; the win snowballed to level 55 and 4 evolutions). Full shop ~2900 gold = ~15-25 runs.
+
+### ~00:30: prospect themes with 3-4 products (Nimbus Grocer: Error Tracking start, no Flags/Analytics)
+Added `stats.hurtBy` (damage taken by source) to find what kills runs. Nimbus normal, novice bot: early deaths at
+118-153 s with very few kills. Error Tracking as a *starting* weapon killed ~1 bug per 1.15 s, about half the default
+Experiments start, while spawns reach ~3/s by 1:00. Buff: cooldown 1.3-0.15L -> 1.05-0.1L, pierce 2 from level 1.
+Some boss fights ran 100-260 s for weak builds. Added "IS CRUMBLING": from 70 s the boss takes +4%/s more damage
+(max x4), with a banner.
+| Nimbus theme | wins | game s |
+|---|---|---|
+| normal novice, before | 2/4 | 125 (lose), 128 (lose), 248, 385 |
+| normal novice, after both fixes | 5/6 | 186 (lose), 230, 226, 271, 302, 318 |
+| easy novice, after | 6/6 | 219-272 |

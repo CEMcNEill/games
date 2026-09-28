@@ -88,7 +88,7 @@ async def one(browser, url, a, i):
             "game_s": round(last.get("e", 0)), "score": end["score"], "level": s.get("level"), "kills": s.get("kills"),
             "hp": s.get("hp"), "bossKills": s.get("bossKills"), "gold": s.get("gold"), "chests": s.get("chests"), "elites": s.get("elites"),
             "evolutions": s.get("evolutions"), "weapons": s.get("weapons"), "passives": s.get("passives"),
-            "dmg": s.get("dmg"), "fps": last.get("fps"), "bank": end["meta"]["coins"], "errors": errors,
+            "dmg": s.get("dmg"), "hurtBy": s.get("hurtBy"), "fps": last.get("fps"), "bank": end["meta"]["coins"], "errors": errors,
             "run": last.get("run")}
 
 
@@ -126,7 +126,7 @@ async def main():
                 r = await one(browser, url, a, i)
                 ev = ",".join(r["evolutions"] or [])
                 print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
-                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} evo [{ev}] fps {r['fps']} err {len(r['errors'])}", flush=True)
+                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} evo [{ev}] fps {r['fps']} err {len(r['errors'])} hurt {r['hurtBy']}", flush=True)
                 results.append(r)
         await asyncio.gather(*(guarded(i) for i in range(a.n)))
         await browser.close()
