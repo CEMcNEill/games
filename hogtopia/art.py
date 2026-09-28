@@ -411,6 +411,69 @@ def _star(pal):
     ], pal)]
 
 
+GIANT = [
+    "....kkkkkkkk....",
+    "...kbbbbbbbbk...",
+    "...kbttttttbk...",
+    "...kttkttkttk...",
+    "...kttttttttk...",
+    "....kttkkttk....",
+    "..kkk111111kkk..",
+    ".k1111111111111k",
+    ".k11k111111k111k",
+    ".k1kk111111kk11k",
+    ".ktk.k1111k.ktk.",
+    ".kk..k4444k..kk.",
+    ".....k44k44k....",
+    ".....k44kk44k...",
+    "....kkkk.kkkk...",
+    "................",
+]
+
+
+def _extra(pal):
+    """Fixed kit art: 0 giant (yours), 1 giant (rival), 2 boat hull, 3 monument, 4 city wall, 5 park,
+    6 veteran chevron, 7 rival-turn marker (skull-ish bug), 8 catapult (yours), 9 catapult (rival)."""
+    from sprites import render
+    riv = rival_colour(pal)
+    rpal = dict(pal, **{"1": riv, "4": shade(riv, 0.55)})
+    rival_giant = [r.replace("t", "l").replace("b", "g") for r in GIANT]
+    rival_giant[3] = "...kllRllRllk..."
+    frames = [render(GIANT, pal), render(rival_giant, rpal)]
+    frames.append(render([
+        "................", "................", "................", "................", "................",
+        "................", "................", "................", "................", "................",
+        "k..............k", "kbbbbbbbbbbbbbbk", ".kboooooooooobk.", "..kbbbbbbbbbbk..", "...kkkkkkkkkk...", "................"], pal))
+    frames.append(render([
+        ".......kk.......", "......k33k......", "......k33k......", ".......kk.......", "......kwwk......",
+        ".....kwllwk.....", ".....kwllwk.....", ".....kwllwk.....", ".....kwllwk.....", "....kwwllwwk....",
+        "....kwllllwk....", "...kwwllllwwk...", "...kwllllllwk...", "..kkkkkkkkkkkk..", "..k1111111111k..", "..kkkkkkkkkkkk.."], pal))
+    frames.append(render([
+        "kkk.kkk..kkk.kkk", "kgk.kgk..kgk.kgk", "kgkkkgkkkkgkkkgk", "kglglglglglglglk", "kkkkkkkkkkkkkkkk",
+        "k..............k", "................", "................", "................", "................",
+        "................", "................", "................", "................", "................", "................"], pal))
+    frames.append(render([
+        "................", "......kkkk......", ".....keeeek.....", "....keeGeeek....", "....keGeeeek....", ".....keeeek.....",
+        "......kbbk......", "..kk...kbk...kk.", ".keek..kbk..keek", ".kGek..kbk..kGek", "..kk...kbk...kk.",
+        "...k..kkkkk..k..", "..kyk.......kIk.", "...k.........k..", "................", "................"], pal))
+    frames.append(render([
+        "kkkkkk..........", "kyyyyk..........", "kykkyk..........", "kk..kk..........", "kkkkkk..........",
+        "kyyyyk..........", "kykkyk..........", "kk..kk..........", "................", "................",
+        "................", "................", "................", "................", "................", "................"], pal))
+    cat = [
+        "................", "................", "............kk..", "...........kyyk.", "..........kkyyk.", ".........kok....",
+        "........kok.....", ".......kok......", "......kok.......", ".kkkkkkokkkkkkk.", ".k1111111111111k", ".k4444444444444k",
+        ".kkkkkkkkkkkkkk.", "..kgk......kgk..", "..kkk......kkk..", "................"]
+    frames.append(render(cat, pal))
+    frames.append(render(cat, rpal))
+    frames.append(render([
+        "................", "................", "...kk......kk...", "..kRRk....kRRk..", "...kRRkkkkRRk...", "....kRRRRRRk....",
+        "...kRRkRRkRRk...", "...kRRRRRRRRk...", "....kRkRRkRk....", "...kRk.kk.kRk...", "................",
+        "................", "................", "................", "................", "................"], pal))
+    frames[7:10] = [frames[9], frames[7], frames[8]]  # keep 7 = marker; catapults at 8 and 9
+    return frames
+
+
 SPRITES = {k: [v] for k, v in ICONS.items()}
 PROCEDURAL = {"terrain": _terrain, "res": _res, "city": _city, "units": _units, "hq": _hq, "rival": _rival,
-              "advisor": _advisor, "star": _star}
+              "advisor": _advisor, "star": _star, "extra": _extra}

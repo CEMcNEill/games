@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { startKit, spr } from '@shared/kit';
+import { startKit, spr, heatRow, meta } from '@shared/kit';
 import { W } from '@shared/ui';
 import schema from '../theme.schema.json';
 import defaultTheme from '../themes/default.json';
 import slots from '../slots.json';
 import sfx from '../audio/sfx.json';
 import { MapScene, productName } from './scene';
+import { ACHIEVEMENTS, endSummary } from './progress';
 
 startKit({
   id: 'hogtopia',
@@ -20,8 +21,15 @@ startKit({
     `Lead ${t.game.faction.name} from ${t.game.faction.capital}. ${t.game.rival.name} wants the same land. Take its capital, or out-grow it in 24 turns.`,
     'ARROWS move the cursor. ENTER selects a unit, then ENTER on a lit tile to move or on a red one to attack.',
     'Park a unit on a village for a turn, then press C to capture it. ENTER on your city trains units or invests; ENTER on a resource harvests it.',
-    `T opens research: ${t.products.slice(0, 3).map(productName).join(', ')} and more PostHog tech. E ends the turn.`,
+    `T opens research: ${t.products.slice(0, 3).map(productName).join(', ')} and more PostHog tech. E ends the turn. Growing cities earn a reward.`,
   ],
+  // Returning players pick the next map or today's daily map, and a HEAT level. A first visit shows no menu.
+  titleMenu: () => (meta.data.runs > 0 ? [
+    { key: 'mode', label: 'MAP', choices: [{ label: 'NEXT', value: 'standard' }, { label: 'DAILY', value: 'daily' }] },
+    heatRow(5),
+  ] : []),
+  endSummary: (d) => endSummary(d),
+  achievements: ACHIEVEMENTS,
   titleArt: (scene: Phaser.Scene) => {
     scene.add.image(W / 2 - 120, 150, spr('hq')).setScale(2);
     scene.add.image(W / 2 - 78, 158, spr('advisor')).setScale(2);

@@ -6,6 +6,10 @@ PostHog products as its tech tree. An AI rival, the prospect's biggest generic p
 the other side of the map. The player wins by taking the rival's capital or by out-scoring it.
 The PostHog hedgehog is the player's advisor and speaks the tips. A game lasts about 6-10 minutes.
 The map, rules and AI are fixed code; you only write names and lines.
+Each game the rival also plays one of four fixed personalities (Aggressor, Expander, Turtle,
+Opportunist) with a few fixed kit lines of its own, so write taunts that fit any temperament. Cities
+earn a reward each time they level up, and each product also unlocks a second-tier feature in the
+research menu; tips may mention either, but never promise a specific map or rival.
 
 What you write, and where the player sees it:
 - title (max 30): e.g. "Acme: Rise of the Rockets", "Ledgerly Empire". tagline (max 48): usually
