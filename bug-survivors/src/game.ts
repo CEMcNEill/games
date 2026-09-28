@@ -109,6 +109,7 @@ export class GameScene extends Phaser.Scene {
   eliteQueue: number[] = [];
   stampede: { dx: number; dy: number; t: number; waves: number } | null = null;
   puddles: { x: number; y: number; r: number; age: number }[] = [];
+  blasts: { x: number; y: number; r: number; t: number }[] = [];
   hazT = { crate: 0, puddle: 0 };
   hazG!: Phaser.GameObjects.Graphics;
   seen = new Set<string>();
@@ -164,7 +165,7 @@ export class GameScene extends Phaser.Scene {
       hp: 100, invuln: 0, enemies: [], pool: [], projs: [], gems: [], items: [], level: 1, xp: 0, xpNext: 5, kills: 0, gold: 0,
       elapsed: 0, spawnAcc: 0, boss: null, bossTimer: 0, bossPhase: 0, bossKills: 0, bossLast: '', nextBossAt: BOSS_AT, overtime: -1,
       won: false, over: false, paused: false, modal: null, pendingLevels: 0, slowmo: 0, banners: [], bannerBusy: false, bannerObjs: [],
-      simSpeed: 1, stampede: null, puddles: [], hazT: { crate: HAZARDS.crateFrom, puddle: HAZARDS.puddleFrom }, revivesUsed: 0, superNova: false, dmgBy: {}, numBudget: 10, hat: null,
+      simSpeed: 1, stampede: null, puddles: [], blasts: [], hazT: { crate: HAZARDS.crateFrom, puddle: HAZARDS.puddleFrom }, revivesUsed: 0, superNova: false, dmgBy: {}, numBudget: 10, hat: null,
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0 },
     });
     setJuiceSpeed(1);
@@ -844,15 +845,28 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(1, 0xf83800, on ? 0.9 : 0.4).lineBetween(e.s.x, e.s.y, e.s.x + e.vx * 110, e.s.y + e.vy * 110);
         if (on) e.s.setTintFill(0xf87858); else this.restoreTint(e);
       }
+      if (e.arch === 'exploder' && e.mode === 3 && Math.floor(e.t * 10) % 2 === 0) {
+        g.lineStyle(1, 0xf83800, 0.8).strokeCircle(e.s.x, e.s.y, 36);
+      }
       if (e.elite === 'shield') g.lineStyle(1, 0x78c8f8, 0.8).strokeCircle(e.s.x, e.s.y, e.r + 3);
       if (e.elite && Math.floor(this.time.now / 300) % 2) g.fillStyle(0xf8d878, 1).fillRect(e.s.x - 1, e.s.y - e.r - 6, 3, 3);
+    }
+  }
+
+  private drawBlasts(dt: number) {
+    for (let i = this.blasts.length - 1; i >= 0; i--) {
+      const b = this.blasts[i];
+      b.t += dt;
+      const k = b.t / 0.25;
+      if (k >= 1) { this.blasts.splice(i, 1); continue; }
+      this.fx.fillStyle(k < 0.3 ? 0xfcfcfc : 0xf8b800, 0.6 * (1 - k)).fillCircle(b.x, b.y, b.r * (0.6 + 0.4 * k));
     }
   }
 
   private explode(e: Enemy) {
     const x = e.s.x, y = e.s.y, R = 36;
     burst(this, x, y, 0xf8b800, 22, { speed: 170, colours: [0xf83800, 0xfcfcfc] });
-    this.fx.fillStyle(0xf8b800, 0.5).fillCircle(x, y, R);
+    this.blasts.push({ x, y, r: R, t: 0 });
     shake(this, 2, 120);
     this.sfx('explode', 0.35, 80);
     if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < R + 6) this.hurt(16 * this.diff.dmg);
@@ -1655,6 +1669,7 @@ export class GameScene extends Phaser.Scene {
     drawWeapons(this, this.fx, this.auraG);
     this.drawHazards();
     this.drawEnemyFx();
+    this.drawBlasts(hitstopped(this) ? 0 : 1 / 60);
     if (this.invuln > 0) this.player.setAlpha(Math.floor(this.time.now / 60) % 2 ? 0.4 : 1);
     else this.player.setAlpha(1);
   }
@@ -1778,7 +1793,8 @@ export class GameScene extends Phaser.Scene {
       },
       win: () => { this.heat = Math.min(this.heat, 4); this.mode = this.mode === 'endless' ? 'standard' : this.mode;
         this.elapsed = Math.max(this.elapsed, this.nextBossAt); this.runBoss(0);
-        if (this.boss) this.damage(this.boss, this.boss.maxHp * 2, 0, 0, 'debug', true); },
+        if (this.boss) this.damage(this.boss, this.boss.maxHp * 2, 0, 0, 'debug', true);
+        else if (!this.won) this.winNow(); },
       unlockAll: () => { const r = sharedDebug.unlockAll?.(); return r; },
     };
   }
