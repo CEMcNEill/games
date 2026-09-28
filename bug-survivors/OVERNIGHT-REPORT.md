@@ -22,8 +22,9 @@ Gate 2 passes on both real prospects (nimbus-grocer, tidewater-logistics).
 | Fixes from a read-only code review: win-then-GAME-OVER, stacked chest modals, splitter pooling, on-screen spawns, double heal; the boss can't be kited forever | 55449a3 | |
 | **Crash fix**: a shot killing the boss spliced the projectile array mid-loop (page error, run froze) | aff8685 | caught by sims, not by Gate 1 |
 | Records page shows recipes of found evolutions | 889b367 | |
-| Second review pass: stale game hooks unreachable from the shop, `winNow` runs once, no level-up on the victory beat, quit-from-pause banks gold, no Meltdown in endless | (see git log) | |
-| Report update, refreshed shots | (final commit) | |
+| Second review pass: stale game hooks unreachable from the shop, `winNow` runs once, no level-up on the victory beat, quit-from-pause banks gold, no Meltdown in endless | ba93e1e | |
+| Pause screen lists each weapon's evolution status (EVOLVED / READY / what it needs) | 27ba728 | |
+| Report update, refreshed shots, final Gate 1 + Gate 2 | (this commit) | Nimbus Gate 2 bot run: win at 4:12 on normal |
 
 P2 status: arena hazards done; secret super evolution done (Rage Click Vortex + Stack Trace Storm + a chest =
 **Full Stack Nova**, hidden achievement); boss pattern library done (ring, telegraphed charge, spiral, summon;
