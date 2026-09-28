@@ -83,14 +83,14 @@ export function pickEnding(e: EndingInput): Ending | null {
 }
 
 /** Heat 0-5 on top of the theme's difficulty. */
-export interface Heat { len: number; quota: number; subtle: number; bad: number; tools: number; bills: number; final2: boolean; deskOn5: boolean }
+export interface Heat { len: number; quota: number; subtle: number; bad: number; tools: number; bills: number; pen: number; final2: boolean; deskOn5: boolean }
 export const HEAT: Heat[] = [
-  { len: 0, quota: 0, subtle: 0, bad: 0, tools: 4, bills: 1, final2: false, deskOn5: false },
-  { len: -4, quota: 1, subtle: 0.1, bad: 0.03, tools: 4, bills: 1, final2: false, deskOn5: false },
-  { len: -6, quota: 1, subtle: 0.25, bad: 0.05, tools: 4, bills: 1.2, final2: false, deskOn5: true },
-  { len: -8, quota: 2, subtle: 0.35, bad: 0.06, tools: 3, bills: 1.2, final2: false, deskOn5: true },
-  { len: -10, quota: 2, subtle: 0.45, bad: 0.08, tools: 3, bills: 1.4, final2: false, deskOn5: true },
-  { len: -12, quota: 3, subtle: 0.55, bad: 0.1, tools: 2, bills: 1.5, final2: true, deskOn5: true },
+  { len: 0, quota: 0, subtle: 0, bad: 0, tools: 4, bills: 1, pen: 1, final2: false, deskOn5: false },
+  { len: -4, quota: 1, subtle: 0.1, bad: 0.03, tools: 4, bills: 1, pen: 1.1, final2: false, deskOn5: false },
+  { len: -6, quota: 1, subtle: 0.25, bad: 0.05, tools: 4, bills: 1.2, pen: 1.2, final2: false, deskOn5: true },
+  { len: -8, quota: 2, subtle: 0.35, bad: 0.06, tools: 3, bills: 1.2, pen: 1.35, final2: false, deskOn5: true },
+  { len: -10, quota: 2, subtle: 0.45, bad: 0.08, tools: 3, bills: 1.4, pen: 1.5, final2: false, deskOn5: true },
+  { len: -12, quota: 3, subtle: 0.55, bad: 0.1, tools: 2, bills: 1.5, pen: 1.7, final2: true, deskOn5: true },
 ];
 
 /** Day grade from accuracy (0-1) and quota progress (0-1+). */

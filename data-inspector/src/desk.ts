@@ -15,6 +15,8 @@ export const RED = 0xf83800;
 export const GREEN = 0x00b800;
 export const GOLD = 0xf8b800;
 export const GREY = 0x7c7c7c;
+const PERSON_PAPER = 0xc8e0f0;
+const PERSON_HEAD = 0x0058f8;
 export const productColor = (id: string) => parseInt(((products as Record<string, { color: string }>)[id]?.color ?? '#fcfcfc').slice(1), 16);
 
 const CARD = { x: 4, y: 21, w: 236, h: 197 };
@@ -163,41 +165,59 @@ export class Desk {
     const { w, h } = CARD;
     const c = s.add.container(CARD.x, -h - 10).setDepth(10);
     const g = s.add.graphics();
+    const paper = rec.person ? PERSON_PAPER : PAPER;
     g.fillStyle(0x000000, 0.35).fillRect(3, 3, w, h);
-    g.fillStyle(PAPER, 1).fillRect(0, 0, w, h);
+    g.fillStyle(paper, 1).fillRect(0, 0, w, h);
     g.lineStyle(1, INK, 1).strokeRect(0.5, 0.5, w - 1, h - 1);
-    g.fillStyle(o.final ? GOLD : ui.panelInt, 1).fillRect(1, 1, w - 2, 13);
+    g.fillStyle(o.final ? GOLD : rec.person ? PERSON_HEAD : ui.panelInt, 1).fillRect(1, 1, w - 2, 13);
     if (o.final) g.lineStyle(2, GOLD, 1).strokeRect(-2, -2, w + 4, h + 4);
     c.add(g);
-    const head = o.final ? 0x000000 : ui.onPanelInt;
+    const head = o.final ? 0x000000 : rec.person ? 0xfcfcfc : ui.onPanelInt;
     c.add(text(s, 6, 3, o.final ? 'FINAL RECORD' : `RECORD #${rec.n}`, { color: head, shadow: null }));
-    c.add(text(s, w - 6, 3, 'EVENT', { align: 'right', color: head, shadow: null }));
-    // Sender portrait, top right.
-    g.fillStyle(INK, 1).fillRect(w - 38, 17, 34, 34);
-    c.add(s.add.image(w - 37, 18, o.portrait).setOrigin(0));
+    c.add(text(s, w - 6, 3, rec.person ? 'PERSON PROFILE' : 'EVENT', { align: 'right', color: head, shadow: null }));
     this.cardLines.clear();
-    const rows: [string, string][] = [
-      ['EVENT', rec.event], ['ID', rec.id], ['USER', o.persona.name], ['EMAIL', rec.email], ['SOURCE', rec.source], ['TIME', rec.time],
-    ];
-    rows.forEach(([k, v], i) => {
-      const y = 19 + i * 11;
-      this.cardLines.set(k, y);
-      c.add(text(s, 6, y, k, { color: INK_KEY, shadow: null }));
-      c.add(text(s, 46, y, v, { color: INK, shadow: null, maxWidth: (i < 3 ? w - 88 : w - 50) + (i === 0 ? 36 : 0), maxLines: 1 }));
-    });
+    const row = (key: string, label: string, v: string, y: number, maxW: number) => {
+      this.cardLines.set(key, y);
+      c.add(text(s, 6, y, label, { color: INK_KEY, shadow: null }));
+      c.add(text(s, 46, y, v, { color: INK, shadow: null, maxWidth: maxW, maxLines: 1 }));
+    };
+    let propY: number;
+    if (rec.person) {
+      // Person layout: a big photo and name, then who they are, then their person properties.
+      g.fillStyle(INK, 1).fillRect(5, 17, 66, 66);
+      c.add(s.add.image(6, 18, o.portrait).setOrigin(0).setScale(2));
+      this.cardLines.set('USER', 22);
+      c.add(text(s, 78, 20, o.persona.name, { scale: 2, color: INK, shadow: null, maxWidth: w - 84, maxLines: 1 }));
+      if (o.persona.role) c.add(text(s, 78, 42, o.persona.role, { color: INK_KEY, shadow: null, maxWidth: w - 84, maxLines: 1 }));
+      c.add(text(s, 78, 56, `EVENT ${rec.event}`, { color: INK_KEY, shadow: null }));
+      row('EMAIL', 'EMAIL', rec.email, 87, w - 50);
+      row('ID', 'ID', rec.id, 98, w - 50);
+      row('SOURCE', 'SOURCE', rec.source, 109, w - 50);
+      row('TIME', 'SEEN', rec.time, 120, w - 50);
+      propY = 132;
+    } else {
+      // Sender portrait, top right.
+      g.fillStyle(INK, 1).fillRect(w - 38, 17, 34, 34);
+      c.add(s.add.image(w - 37, 18, o.portrait).setOrigin(0));
+      const rows: [string, string][] = [
+        ['EVENT', rec.event], ['ID', rec.id], ['USER', o.persona.name], ['EMAIL', rec.email], ['SOURCE', rec.source], ['TIME', rec.time],
+      ];
+      rows.forEach(([k, v], i) => row(k, k, v, 19 + i * 11, (i < 3 ? w - 88 : w - 50) + (i === 0 ? 36 : 0)));
+      propY = 86;
+    }
     g.fillStyle(INK_KEY, 1);
-    for (let x = 6; x < w - 6; x += 3) g.fillRect(x, 86, 1, 1);
-    c.add(text(s, 6, 89, 'PROPERTIES', { color: INK_KEY, shadow: null }));
-    if (!rec.props.length) c.add(text(s, 14, 100, '(none)', { color: INK_KEY, shadow: null }));
-    rec.props.slice(0, 8).forEach(([k, v], i) => {
-      const y = 100 + i * 10;
+    for (let x = 6; x < w - 6; x += 3) g.fillRect(x, propY, 1, 1);
+    c.add(text(s, 6, propY + 3, rec.person ? 'PERSON PROPERTIES' : 'PROPERTIES', { color: INK_KEY, shadow: null }));
+    if (!rec.props.length) c.add(text(s, 14, propY + 14, '(none)', { color: INK_KEY, shadow: null }));
+    rec.props.slice(0, rec.person ? 4 : 8).forEach(([k, v], i) => {
+      const y = propY + 14 + i * 10;
       this.cardLines.set(k, y);
       c.add(text(s, 10, y, k, { color: INK_KEY, shadow: null, maxWidth: 100, maxLines: 1 }));
       c.add(text(s, 110, y, v, { color: INK, shadow: null, maxWidth: w - 114, maxLines: 1 }));
     });
     if (o.exempt) {
-      g.fillStyle(GOLD, 1).fillRect(w - 64, 72, 58, 11);
-      c.add(text(s, w - 35, 74, `DEAL`, { color: INK, shadow: null, align: 'center' }));
+      g.fillStyle(GOLD, 1).fillRect(w - 64, rec.person ? 108 : 72, 58, 11);
+      c.add(text(s, w - 35, rec.person ? 110 : 74, 'DEAL', { color: INK, shadow: null, align: 'center' }));
     }
     // Stamp strip.
     g.fillStyle(INK_KEY, 1).fillRect(4, h - 17, w - 8, 1);
@@ -247,7 +267,7 @@ export class Desk {
   highlight(field: string) {
     const y = this.cardLines.get(field);
     if (!this.hl || y === undefined) return false;
-    this.hl.clear().lineStyle(1, RED, 1).strokeRect(3.5, y - 2.5, CARD.w - 7, y >= 100 ? 11 : 12);
+    this.hl.clear().lineStyle(1, RED, 1).strokeRect(3.5, y - 2.5, CARD.w - 7, 12);
     return true;
   }
 

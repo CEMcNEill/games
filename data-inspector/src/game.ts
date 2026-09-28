@@ -38,6 +38,7 @@ const DIFF = {
 };
 const DAYS = 5;
 const ENDLESS_STEP = 6; // records per new rule in the endless shift
+const PERSON_DAY = 3;   // 0-based day person profiles start landing
 
 interface DayStats { processed: number; correct: number; caught: number; missed: number; falseFlags: number; skipped: number }
 const emptyStats = (): DayStats => ({ processed: 0, correct: 0, caught: 0, missed: 0, falseFlags: 0, skipped: 0 });
@@ -121,6 +122,7 @@ export class GameScene extends Phaser.Scene {
   private patternNoted = 0;
   private patternEvent = '';
   private pickRng = rng(randomSeed());
+  private firstWeek = false;
 
   constructor() { super('Game'); }
 
@@ -132,6 +134,7 @@ export class GameScene extends Phaser.Scene {
     this.heat = HEAT[this.heatN];
     const r = rng(this.runMode === 'daily' ? dailySeed() : run.seed || randomSeed());
     const firstWeek = meta.data.runs === 0 && this.heatN === 0 && this.runMode === 'week';
+    this.firstWeek = firstWeek;
     const kinds = r.shuffle([...DESK_TYPES]);
     const desk: (RuleType | null)[] = this.runMode === 'endless' ? kinds
       : firstWeek ? ['email_mismatch', 'source_outage', 'flag_before_release', null]
@@ -282,6 +285,10 @@ export class GameScene extends Phaser.Scene {
     }
     const before = new Set(this.day > 0 ? this.world.docs(this.day - 1) : []);
     const newDocs = this.world.docs(this.day).filter((d) => this.day > 0 && !before.has(d));
+    if (this.day === PERSON_DAY) {
+      this.add_(text(this, 118, ry + 2, 'NEW: PERSON PROFILES ($identify) land on the desk too.', { color: GOLD, depth: 102, maxWidth: W - 150, maxLines: 1 }));
+      ry += 12;
+    }
     if (newDocs.length) {
       this.add_(text(this, 118, ry + 2, `NEW ON YOUR DESK: ${newDocs.map((d) => TABS[d]).join(', ')} (TAB)`, { color: GOLD, depth: 102, maxWidth: W - 150, maxLines: 1 }));
       ry += 12;
@@ -378,7 +385,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.stats;
     const missingQuota = Math.max(0, this.quota - s.processed);
     const quotaMet = missingQuota === 0;
-    if (quotaMet) { this.score += 250; this.quotasMet++; } else this.hitQuality(missingQuota * 4 * this.diff.pen);
+    if (quotaMet) { this.score += 250; this.quotasMet++; } else this.hitQuality(missingQuota * 4 * this.diff.pen * this.heat.pen);
     const judged = s.processed - s.skipped;
     const g = grade(judged > 0 ? s.correct / judged : 0, s.processed / this.quota);
     this.grades.push(g);
@@ -540,7 +547,8 @@ export class GameScene extends Phaser.Scene {
     this.desk.discard(!this.lastFlag);
     const w = this.world, r = w.r;
     const active = w.active(this.day);
-    const rec = w.baseline();
+    // From day 4 some records are person profiles ($identify): a different card, and only some rules apply.
+    const rec = !final && this.day >= PERSON_DAY && r.chance(this.firstWeek ? 0.15 : 0.25) ? w.personBaseline() : w.baseline();
     const endless = this.runMode === 'endless';
     const badChance = final ? 1 : endless ? Math.min(0.6, 0.4 + this.total.processed * 0.004) : 0.35 + this.day * 0.04 + this.heat.bad;
     const exempt = [...w.exempt];
@@ -584,7 +592,7 @@ export class GameScene extends Phaser.Scene {
     const persona = w.personas - 1;
     const fresh = w.baseline(ev);
     Object.assign(rec, { event: fresh.event, props: fresh.props.filter(([k]) => k !== FLAG_PROP), persona,
-      email: w.directory[persona] ?? rec.email, pattern: true });
+      email: w.directory[persona] ?? rec.email, pattern: true, person: false });
     w.setTime(rec, 0, 180 + w.r.int(0, 40));
   }
 
@@ -679,7 +687,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.streak = 0;
       if (bad) { this.stats.missed++; this.total.missed++; } else { this.stats.falseFlags++; this.total.falseFlags++; }
-      const cost = (rec.final ? 30 : bad ? 8 : 5) * this.diff.pen * (this.runMode === 'endless' ? 1.5 : 1);
+      const cost = (rec.final ? 30 : bad ? 8 : 5) * this.diff.pen * this.heat.pen * (this.runMode === 'endless' ? 1.5 : 1);
       if (this.shield && !rec.final) {
         this.shield = false;
         this.say('AUTO-CATCH saved you: that call was wrong, no harm done.', GOLD);
@@ -1013,13 +1021,13 @@ export class GameScene extends Phaser.Scene {
           w.newDay(d);
           const active = w.active(d);
           for (let i = 0; i < n; i++) {
-            const rec = w.baseline();
+            const rec = i % 4 === 3 ? w.personBaseline() : w.baseline();
             records++;
             for (const v of w.violations(rec, active)) baseBad[v.type] = (baseBad[v.type] ?? 0) + 1;
             w.shown(rec);
           }
           for (const rule of active) for (let i = 0; i < 20; i++) {
-            const rec = w.baseline();
+            const rec = i % 4 === 3 ? w.personBaseline() : w.baseline();
             if (!w.breakRule(rec, rule, i % 2 === 0)) { breakFail[rule.type] = (breakFail[rule.type] ?? 0) + 1; continue; }
             if (!w.violations(rec, active).includes(rule)) breakMiss[rule.type] = (breakMiss[rule.type] ?? 0) + 1;
           }

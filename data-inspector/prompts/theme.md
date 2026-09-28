@@ -6,6 +6,11 @@ the desk one at a time; the player APPROVES good data or FLAGS bad data against 
 every day. Almost everything on screen is your text, so this kit is the most personal one: use the
 prospect's real product, users and problems.
 
+The kit adds its own generic content around your text: reference documents built from your events,
+sources and personas (tracking plan, user directory, source health, release log), manager requests
+between days, bills, grades and 5 endings. You don't write those; they use game.manager.name,
+prospect.name and desk.name, so keep those short and friendly.
+
 What you write, and where the player sees it:
 - title (max 30), tagline (max 48): title screen, e.g. "Acme Telemetry Inspector".
 - game.desk.name (max 28): the player's workplace in their world ("Mission Control Data Desk").
@@ -28,6 +33,10 @@ What you write, and where the player sees it:
     property_equals    flag one forbidden value. property + value.
     future_timestamp   flag events stamped in the future. No params.
     duplicate_id       flag an event ID the player already saw today. No params.
+  Optional (the kit already adds one of these per day from day 2, with a document; use one only if it
+  fits a real pain point): email_mismatch (no params), source_outage (no params), flag_before_release
+  (no params), pii_in_text (property: a free-text prop, optional), currency_mismatch (property: a numeric
+  money prop + value: a 3-letter currency code, both optional).
   Each type at most once, except property rules on different properties. Use at most one of
   property_in_set / value_in_range / property_equals per property. The rule text must say exactly
   what the code checks, with the real names and numbers ("amount_usd must be between 1 and 5000").

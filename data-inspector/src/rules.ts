@@ -42,6 +42,7 @@ export interface Rec {
   dupe: boolean;          // id was shown earlier today
   props: [string, string][];
   final?: boolean;
+  person?: boolean;       // a person profile ($identify) instead of an event: a different card layout
   pattern?: boolean;      // part of the hidden 3-record story (breaks no rule)
 }
 
@@ -58,6 +59,10 @@ const FALLBACK_RULES: Omit<Rule, 'day'>[] = [
   { type: 'blocked_source', text: 'Flag events from staging or localhost', values: ['staging', 'localhost'] },
 ];
 export const FLAG_PROP = '$feature_flag';
+export const PERSON_EVENT = '$identify';
+/** Rule kinds a person profile can break (the rest don't apply to it). */
+const PERSON_RULES: RuleType[] = ['internal_user', 'email_mismatch', 'duplicate_id', 'future_timestamp', 'blocked_source',
+  'source_outage', 'property_in_set', 'value_in_range', 'property_equals'];
 const FLAG_NAMES = ['new-checkout', 'dark-mode', 'beta-export', 'fast-search', 'smart-alerts', 'bulk-edit', 'quick-share', 'new-onboarding'];
 const COMMENTS = ['love it', 'too slow', 'where is export?', 'great support', 'bug on step 2', 'pls add dark mode', 'works now, thx',
   'confusing menu', 'more charts pls', 'nice update'];
@@ -382,10 +387,34 @@ export class World {
     return rec;
   }
 
+  /** A person profile ($identify) that obeys the week's rules: who they are plus a few person properties. */
+  personBaseline(): Rec {
+    const r = this.r;
+    const rec = this.baseline();
+    const skip = new Set([this.textProp, this.money?.prop, this.money?.curProp, FLAG_PROP]);
+    const uniq = this.events.flatMap((e) => e.props).filter((p, i, a) => a.findIndex((q) => q.name === p.name) === i && !skip.has(p.name));
+    const personish = uniq.filter((p) => !MONEY.test(p.name)); // plan, referrer... not amounts
+    const defs = r.shuffle(personish.length ? personish : uniq);
+    rec.event = PERSON_EVENT;
+    rec.person = true;
+    rec.props = defs.slice(0, 3).map((p) => [p.name, this.legalValue(p)] as [string, string]);
+    if (rec.day === 0) {
+      for (const o of this.outages) if (this.activeHas('source_outage') && rec.source === o.source && rec.mins >= o.from && rec.mins <= o.to) this.setTime(rec, -1, rec.mins);
+    }
+    return rec;
+  }
+
   /** Break one rule in a record; returns false if this rule can't be broken right now. */
   breakRule(rec: Rec, rule: Rule, subtle = false): boolean {
     const r = this.r;
+    if (rec.person && !PERSON_RULES.includes(rule.type)) return false;
     const withProp = (name: string) => {
+      if (rec.person) {
+        const def = this.propDef(name);
+        if (!def) return false;
+        if (!rec.props.some((p) => p[0] === name)) rec.props.push([name, this.legalValue(def)]);
+        return true;
+      }
       const evs = this.events.filter((e) => e.props.some((p) => p.name === name));
       if (!evs.length) return false;
       if (!rec.props.some((p) => p[0] === name)) {
@@ -496,7 +525,7 @@ export class World {
     const defFor = this.events.find((e) => e.name === rec.event);
     return rules.filter((r) => {
       switch (r.type) {
-        case 'unknown_event': return !this.events.some((e) => e.name === rec.event);
+        case 'unknown_event': return !(rec.person && rec.event === PERSON_EVENT) && !this.events.some((e) => e.name === rec.event);
         case 'future_timestamp': return rec.future;
         case 'duplicate_id': return rec.dupe;
         case 'blocked_source': return r.values!.includes(rec.source);
