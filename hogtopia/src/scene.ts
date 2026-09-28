@@ -406,7 +406,12 @@ export class MapScene extends Phaser.Scene {
         lines.push(`${c.name}${c.capital ? ' (capital)' : ''}`, this.ownerName(c.owner));
         if (c.owner !== -1) lines.push(`Level ${c.level}  pop ${c.pop}/${w.popNeeded(c)}  +${w.cityIncome(c)}/turn`);
         else lines.push('Stand a unit here a turn', 'to capture it.');
-        if (c.perks.length) lines.push(c.perks.map((p) => LEVEL_REWARDS[[2, 3, 4, 5].find((l) => LEVEL_REWARDS[l].some((r) => r.id === p))!]?.find((r) => r.id === p)?.name ?? p).join(', '));
+        if (c.capital && c.owner > 0 && w.turn >= 2) lines.push(`Style: ${w.f[c.owner].persona.name}`);
+        if (c.perks.length) {
+          const names = c.perks.map((p) => Object.values(LEVEL_REWARDS).flat().find((r) => r.id === p)?.name ?? p);
+          const str = names.join(', ');
+          lines.push(str.length > 27 ? `${str.slice(0, 25)}..` : str); // one line in the side panel
+        }
       } else {
         const names = { plain: 'Plains', forest: 'Forest (+defence)', mountain: 'Mountains (climb: +def)', water: 'Water' };
         const mon = t.monument ? MONUMENTS.find((m) => m.id === t.monument) : null;
@@ -599,7 +604,7 @@ export class MapScene extends Phaser.Scene {
     const g = K.theme.game;
     if (e === 'capture') {
       const c: City = d.city;
-      K.play(d.by === 0 ? 'capture' : 'lost');
+      K.play(d.by === 0 ? 'fanfare' : 'lost');
       if (d.by === 0) {
         this.say('advisor', c.capital ? String(g.rival.defeat || 'Their capital is ours!') : `${c.name} joins ${g.faction.name}! More stars every turn.`);
         if (d.from > 0) this.taunt(2);
@@ -634,7 +639,7 @@ export class MapScene extends Phaser.Scene {
       const u: Unit = d.u;
       this.float(u.x, u.y - 1, 'VETERAN!', 0xf8b800);
       if (!this.fast() && w.tile(u.x, u.y).seen) burst(this, this.px(u.x) + 8, this.py(u.y) + 8, 0xf8b800, 12, { gravity: -40 });
-      if (u.owner === 0) { K.play('levelup', 0.7); this.say('advisor', `Your ${this.unitName(u)} is a veteran now: healed and tougher!`); }
+      if (u.owner === 0) { K.play('veteran', 0.8); this.say('advisor', `Your ${this.unitName(u)} is a veteran now: healed and tougher!`); }
       else this.summary.push('promoted a veteran');
     } else if (e === 'monument') {
       const m = MONUMENTS.find((x) => x.id === d.id)!;
@@ -800,6 +805,7 @@ export class MapScene extends Phaser.Scene {
     this.msg.setText(`Turn ${w.turn}: +${w.income(0)} stars. ${sum || (w.turn === 1 ? 'Press T to research PostHog tech.' : '')}`);
     const loud = items.filter((s) => big.test(s)).slice(0, 2);
     if (loud.length && !this.fast()) this.banner(`${who} ${loud.join(', ')}.`);
+    if (loud.length) K.play('warn', 0.7);
     const mass = this.summary.some((s) => s.startsWith('is massing') || s.startsWith('is attacking'));
     if (mass && !first && w.cities[this.warned]) this.say('advisor', `Heads up: rival units are gathering near ${w.cities[this.warned].name}. Guard it from cities and forests.`);
     this.summary = [];

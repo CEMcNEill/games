@@ -4,6 +4,7 @@ import type { AchievementDef } from '@shared/meta';
 import type { EndData } from '@shared/scenes';
 import { World, Over } from './world';
 import { MAX_TURNS, PERSONALITY_IDS } from './data';
+import { MAP_ROTATION, MAP_TYPES } from './mapgen';
 import type { RunSetup } from './setup';
 
 /** Final score (with the domination speed bonus) to a letter. A loss tops out at C. */
@@ -74,7 +75,10 @@ export function endSummary(d: EndData): string[] {
     beaten = Array.isArray(kd.beaten) ? kd.beaten.length : 0;
     best = typeof kd.bestGrade === 'string' ? kd.bestGrade : '';
   } catch { beaten = 0; }
-  const next = top > 0 ? `next: a new map, or HEAT ${top}` : 'next: a new map and rival';
+  // The next NEXT-mode run's map (meta.data.runs already counts this run).
+  let nextMap = 'a new map';
+  try { const i = Math.max(1, meta.data.runs); nextMap = `${MAP_TYPES[MAP_ROTATION[(i - 1) % MAP_ROTATION.length]].name} map`; } catch { /* keep generic */ }
+  const next = top > 0 ? `next: ${nextMap}, or HEAT ${top}` : `next: ${nextMap}, new rival`;
   lines.push(d.won ? `Rivals beaten ${beaten}/${PERSONALITY_IDS.length}${best ? ` - best grade ${best}` : ''} - ${next}` : 'Tip: gather 3 units before you attack a city');
   return lines;
 }

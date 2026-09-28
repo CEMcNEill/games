@@ -75,7 +75,7 @@ export class World {
       const n = this.freeNeighbour(rc.x, rc.y);
       if (n) this.addUnit(1, 'warrior', n[0], n[1]);
     }
-    if (H0.rival2) this.addSecondRival(s);
+    if (H0.rival2 && this.cities.length >= 8) this.addSecondRival(s); // map size allowing (not on Skirmish)
     this.updateFog();
     for (const t of this.tiles) t.fog = t.seen ? 0 : 1;
   }
