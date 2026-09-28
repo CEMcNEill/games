@@ -18,6 +18,7 @@ import {
 } from './rules';
 import { foeMove, partyMove, randomVictim, BattleView, FoeMove } from './ai';
 import { FOE_MOVES, SELF_MOVES } from './foemoves';
+import { COMBO_FX } from './combos';
 import { onWin, onBattleEnd, tip } from './progress';
 import { hasFx } from './gear';
 import { MIMIC as MIMIC_DEF } from './world';
@@ -1036,21 +1037,17 @@ export class BattleScene extends Phaser.Scene {
     cutIn(this, sprites, def.name, 0xf8b800, () => {
       if (this.over) return;
       const all = [m, ...partners];
-      const atk = Math.max(...all.map((p) => stat(p, 'atk'))), mag = Math.max(...all.map((p) => stat(p, 'mag')));
-      const hits: [number, () => void][] = [];
-      if (id === 'launch_day') {
-        (['strike', 'magic', 'data'] as Kind[]).forEach((k, i) => hits.push([i * 220, () => this.aliveFoes().forEach((f) =>
-          this.hitFoe(f, k === 'strike' ? this.phys(atk, f.def) : this.magic(mag, 1.0, f.def), k))]));
-      } else if (id === 'hotfix_rush') {
-        const f = this.guardOf(target && target.alive ? target : [...this.aliveFoes()].sort((a, b) => b.hp - a.hp)[0]);
-        hits.push([0, () => this.hitFoe(f, Math.round(this.phys(atk, f.def) * 3), 'strike', { crit: true })]);
-        hits.push([260, () => { for (const p of R.party) { if (p.hp <= 0) p.hp = 1; this.healMember(p, p.maxHp * 0.5); this.cure(p); } this.refreshRows(); }]);
-      } else if (id === 'insight_loop') {
-        hits.push([0, () => this.aliveFoes().forEach((f) => this.hitFoe(f, this.magic(mag, 1.6, f.def), 'magic'))]);
-        hits.push([260, () => { for (const p of this.aliveParty()) { p.status.focused = 3; p.mp = Math.min(p.maxMp, p.mp + Math.round(p.maxMp * 0.4)); } this.refreshRows(); }]);
-      } else {
-        for (let i = 0; i < 3; i++) hits.push([i * 200, () => this.aliveFoes().forEach((f) => this.hitFoe(f, this.phys(atk, f.def), 'strike'))]);
-      }
+      const hits = COMBO_FX[id]({
+        atk: Math.max(...all.map((p) => stat(p, 'atk'))), mag: Math.max(...all.map((p) => stat(p, 'mag'))), target,
+        foes: () => this.aliveFoes(),
+        hit: (f, dmg, kind, crit) => { this.hitFoe(f, dmg, kind, { crit }); },
+        phys: (a, d) => this.phys(a, d),
+        magic: (mg, pw, d) => this.magic(mg, pw, d),
+        guardOf: (f) => this.guardOf(f),
+        heal: (p, n) => this.healMember(p, n),
+        cure: (p) => this.cure(p),
+        refresh: () => this.refreshRows(),
+      });
       shake(this, 4, 250);
       hits.forEach(([t, fn]) => this.time.delayedCall(t / R.speed, () => { if (!this.over) fn(); }));
       this.wait(hits[hits.length - 1][0] + 700, () => { this.refreshRows(); this.afterAction(); });
