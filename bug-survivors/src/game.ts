@@ -225,9 +225,13 @@ export class GameScene extends Phaser.Scene {
     this.recalc();
     this.hp = this.st.maxHp;
     this.refreshIcons();
-    // Events at 1:00/2:00/3:00: fixed order on a first run, shuffled on heat or daily runs.
+    // Events at 1:00/2:00/3:00: fixed order on a first run; ring and stampede swap on heat or daily runs.
+    // The elite pack always comes last (an early pack is a coin-flip death for a young build).
     const order = [...EVENT_ORDER];
-    if (this.heat > 0 || this.mode === 'daily') this.R.shuffle(order);
+    if (this.heat > 0 || this.mode === 'daily') {
+      const head = this.R.shuffle(order.filter((e) => e !== 'pack'));
+      order.splice(0, order.length, ...head, ...EVENT_ORDER.filter((e) => e === 'pack'));
+    }
     this.evQueue = EVENT_TIMES.map((at, i) => ({ at, id: order[i] }));
     this.eliteQueue = [...(this.heat >= 3 ? [45, 85, 125, 165] : ELITES_AT)];
     void ELITES_EARLY;
@@ -562,12 +566,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- spawning
-  // Named heat modifiers stack (1 more, 2 faster, 3 elites early, 4 less healing, 5 boss rage + overtime); on top,
-  // every heat level adds general pressure: +8% bug HP, +6% damage, +6% spawns.
-  private heatSpawn() { return (this.heat >= 1 ? 1.3 : 1) * (1 + 0.06 * this.heat); }
+  // Named heat modifiers stack (1 more, 2 faster, 3 elites early, 4 less healing, 5 boss rage + overtime). On top, heat
+  // adds pressure that ramps in over the first 2:30 (x1.5 by 3:45), so the opening stays fair and the snowball is tested:
+  // per level up to +15% bug HP and +10% spawns, plus a flat +8% damage.
+  private heatRamp() { return Math.min(1.5, this.elapsed / 150); }
+  private heatSpawn() { return (this.heat >= 1 ? 1.3 : 1) * (1 + 0.1 * this.heat * this.heatRamp()); }
   private heatSpeed() { return this.heat >= 2 ? 1.18 : 1; }
-  private heatHp() { return 1 + 0.08 * this.heat; }
-  private heatDmg() { return 1 + 0.06 * this.heat; }
+  private heatHp() { return 1 + 0.15 * this.heat * this.heatRamp(); }
+  private heatDmg() { return 1 + 0.08 * this.heat; }
 
   private spawn(dt: number) {
     const t = this.elapsed;

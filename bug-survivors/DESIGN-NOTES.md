@@ -139,3 +139,15 @@ Some boss fights ran 100-260 s for weak builds. Added "IS CRUMBLING": from 70 s 
 Changes: Session Replay gets 2+L orbs (3 at level 1), hit every 0.3 s. Boss base HP 1100 -> 900; crumbling starts at 50 s.
 After: session_replay 3/4 (221-238 s wins). Experiments normal novice, n=8: 7/8 (219-295 s). Default easy novice, n=8:
 8/8 (222-303 s).
+
+### ~01:20: heat curve after the start-weapon buffs
+Flat pressure (+10% HP, +8% dmg, +8% spawns per level): h1 6/6, h3 6/6, h5 1/6 with deaths at 50-60 s. A cliff:
+it crushed the opening and did little once the build snowballed. Now the HP and spawn pressure ramps in over 2:30
+(up to +15% HP, +10% spawns per level, x1.5 by 3:45); damage stays a flat +8%/level. The elite pack is always the
+3:00 event (heat/daily runs only swap ring and stampede), since a 1:00 pack was a coin-flip death.
+Smart bot, normal, no shop (n=6-8, lots of noise: run-to-run variance dominates at n<10):
+| heat | wins | game s (sorted, l = loss) |
+|---|---|---|
+| 2 | 5/6 | 131 l, 218-262 w (before the pack change) |
+| 3 | 5/8 | 74 l, 113 l, 204 l, 217-246 w |
+| 5 | 3/8 | 83-128 l (5), 265-283 w |
