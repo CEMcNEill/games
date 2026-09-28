@@ -85,6 +85,7 @@ TP) or teaches itself in one line (CHECK says what the enemy wants).
   (secrets, other endings).
 
 ## Balance (autopilot, tools/botbatch.py, speed 6; game_s = in-game seconds)
+Measured mid-night, before the heat-0 puzzle change; final numbers are in OVERNIGHT-REPORT.md.
 | Setting | Win rate | Avg game_s | Notes |
 | --- | --- | --- | --- |
 | Pacifist, easy / normal / hard, heat 0 | 3/3 each | 164-175 | before: 117 s (fewer turns per battle) |

@@ -118,7 +118,8 @@ export class Dodge {
     s.x = Phaser.Math.Clamp(s.x, box.x + 6, box.x + box.w - 6);
     s.y = Phaser.Math.Clamp(s.y, box.y + 6, box.y + box.h - 6);
     if (s.y <= box.y + 6 && this.vy < 0) this.vy = 0;
-    this.moved = Math.hypot(s.x - ox, s.y - oy) > 0.05;
+    // Only movement the player chooses counts for blue bullets: not the box squeezing you, not falling.
+    this.moved = (dx !== 0 || (!this.heavy && dy !== 0) || this.vy < 0) && Math.hypot(s.x - ox, s.y - oy) > 0.05;
     this.invuln = Math.max(0, this.invuln - dt);
     s.setAlpha(this.invuln > 0 && Math.floor(this.invuln * 14) % 2 ? 0.25 : 1);
     this.stepBullets(dt);

@@ -742,7 +742,7 @@ export class BattleScene extends Phaser.Scene {
         this.cameras.main.once('camerafadeoutcomplete', () => { this.scene.stop(); this.scene.wake('Explore', { continue: true }); });
         return;
       }
-      patchHq({ lastLost: true });
+      if (K.run.mode !== 'rush') patchHq({ lastLost: true });
       this.scene.stop('Explore');
       this.scene.start('End', endData(false));
     });

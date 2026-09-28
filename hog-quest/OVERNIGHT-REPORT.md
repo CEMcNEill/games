@@ -14,7 +14,8 @@ Details and design reasoning: `DESIGN-NOTES.md`. How it plays now: `KIT.md`.
 | 75e217e | First run kept short: heat 0 = 1 right act per enemy (boss 2); sequences grow with heat and reshuffle per run from heat 1. `debug.humanize()` for run-length measurement. Looser "thread" pattern |
 | e4ad69b | Battle text tables moved to `battletext.ts`; `overnight-shots/` |
 | 81b609c | NPCs react when you talk to them again (spared vs debugged so far); a guilty line for debugging a problem that was ready to be spared |
-| (final) | Music resumes after a checkpoint retry; review fixes; report |
+| 76c7494 | Fixes from a code review: checkpoint/retries reset per run, shop blocks walking, autopilot FIGHT strikes on crossing (was able to miss forever at low fps), humanized bot menu flip, timers; music resumes after a retry |
+| (final) | Second review fixes: blue bullets only punish movement you choose (not the box squeezing you or falling); the boss never combines gravity/stoplight with lasers or the squeeze; god-mode rush runs don't set records; heat3 achievement also from rush; losing a rush doesn't change NPC memory. Final docs |
 
 ## Cut or changed
 - Nothing from the brief was cut. Two things were changed after measuring:
@@ -29,10 +30,11 @@ Details and design reasoning: `DESIGN-NOTES.md`. How it plays now: `KIT.md`.
 ## Balance (tools/botbatch.py; game_s = in-game seconds at speed 6)
 | Setting | Result |
 | --- | --- |
-| Pacifist autopilot, easy / normal / hard, heat 0 | 2/2 wins each, ~149 game_s (before tonight: 117) |
-| Example themes (acme-rockets, ledgerly 3 rooms, pawprint), normal | win each, 169-176 game_s (before the heat-0 change) |
-| Bugfix route (`debug.route('bugfix')`), easy / normal | 3/3, 3/3 (normal uses the save-star retries) |
-| Bugfix route, hard (boss at 90 HP) | 0/3 (hard is meant to be hard) |
+| Pacifist autopilot, easy / normal / hard, heat 0 | 3/3 wins each, ~149 game_s (before tonight: 117) |
+| Example themes (acme-rockets, ledgerly 3 rooms, pawprint), normal | win each |
+| Bugfix route (`debug.route('bugfix')`), easy / normal | 2/2 (139 game_s) / 2/2 (149-180 game_s) |
+| Bugfix route, hard | 0/3 at the final 80 HP boss (0/3 at 90 HP too): hard is meant to be hard |
+| Humanized, heat 3, normal (no free coffee, 3-act puzzles) | win, 345 game_s, ends with 14 HP |
 | Heat 2 / heat 4, normal | 2/2 / 2/2, ends with 11-20 HP |
 | Heat 5, easy / hard | 2/2 / 0/2 (hard heat 5 = 10 max HP) |
 | Boss rush, easy / hard | 2/2 each, 114 game_s |
@@ -68,6 +70,11 @@ is reading CHECK and the bot's vending machine visits, both optional.
 3. A shared way to load and switch extra music tracks (battle/boss).
 4. A `titleLines()` hook for kit lines on the title (hog-quest draws endings via titleArt).
 5. `cleanText` collapses runs of spaces (columns need separate texts).
+
+## Known limits left
+- The rush best time is one number for all heats and difficulties (a heat-0 time can stand over a heat-5 attempt).
+- Turning on the autopilot while the vending machine menu is open leaves the menu open (debug-only).
+- Enemy turn tweens and the stripe transition ignore the reduced-motion setting (shake, punch and particles honour it).
 
 ## New hooks (all on `__game.debug`)
 `battle(i)`, `pattern(name)`, `flood()`, `route(r)`, `outcomes('sds')`, `heat(n)`, `humanize()`,

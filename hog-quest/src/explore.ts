@@ -107,9 +107,11 @@ export class ExploreScene extends Phaser.Scene {
       R.rushTime = Math.round(hooks.elapsed * 10) / 10;
       R.ending = '';
       const best = hq().rushBest;
-      if (!best || R.rushTime < best) patchHq({ rushBest: R.rushTime });
+      const counts = !R.god; // god-mode (test) runs don't set records
+      if (counts && (!best || R.rushTime < best)) patchHq({ rushBest: R.rushTime });
       achieve('rush');
-      this.say([{ text: `Rush cleared in ${R.rushTime.toFixed(1)} seconds.${!best || R.rushTime < best ? ' A new best time!' : ''}` }], () => this.finish(true));
+      if (R.heat >= 3) achieve('heat3');
+      this.say([{ text: `Rush cleared in ${R.rushTime.toFixed(1)} seconds.${counts && (!best || R.rushTime < best) ? ' A new best time!' : ''}` }], () => this.finish(true));
       return;
     }
     R.cleared.add(enc);

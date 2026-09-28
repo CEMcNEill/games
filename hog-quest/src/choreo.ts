@@ -38,7 +38,9 @@ export function enemyStep(steps: Step[], n: number): Step {
 /** Boss turn: alternate its own patterns with the phase signature; the bugfix boss always combines. */
 export function bossStep(themePats: unknown, phase: number, n: number, hell: boolean): Step {
   const p = known(themePats);
-  const own = p.length ? p[n % p.length] : 'spiral';
+  // Blue and heavy-soul rules don't mix with lasers or a shrinking box: swap them for rain in the boss's combos.
+  const raw = p.length ? p[n % p.length] : 'spiral';
+  const own = hell || phase >= 2 ? (raw === 'gravity' || raw === 'stoplight' ? 'rain' : raw) : raw;
   const sig = BOSS_SIGNATURE[Math.max(0, Math.min(2, phase))];
   if (hell) return { pats: [sig, own], busy: 0.95 + phase * 0.1 };
   if (n % 2 === 0) return { pats: [sig], busy: 1 + phase * 0.1 };
