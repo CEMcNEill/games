@@ -102,3 +102,9 @@ after 50 s (not only at 50% HP) and moves 1.5x when angry; the autopilot only ke
 Endless: bugs toughen 1 + t/150 + (minutes past 5:00)^2, +8%/min speed (max x1.8), +25%/min damage; boss HP x2 per
 return. The smart bot still survives 15:00 at normal (level ~90, 3-5 bosses); pressure is visibly building by 12:00.
 Human players will die well before that; left as is.
+
+## P2 arena hazards
+Crates (fixed kit art) appear every 22 s from 0:20, 110-180 px away, max 3. Any weapon breaks them: 40% food
+(halved at heat 4+), 12% vacuum magnet, 6% hotfix, else 3 coins. They're the reliable "floor food" source.
+Tech-debt puddles: every 30 s from 1:15, 120-200 px away, max 4. They grow over 15 s to 34 px (+3 per heat),
+last 45 s, and slow the hog to 55% while it stands in them. Bugs ignore them. The autopilot steers around them.

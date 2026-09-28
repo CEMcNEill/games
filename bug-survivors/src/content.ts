@@ -76,7 +76,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
 
 // ---------------------------------------------------------------- enemies
 
-export type ArchId = 'swarmer' | 'splitter' | 'tank' | 'exploder' | 'charger' | 'spitter' | 'mini' | 'runner';
+export type ArchId = 'swarmer' | 'splitter' | 'tank' | 'exploder' | 'charger' | 'spitter' | 'mini' | 'runner' | 'crate';
 
 export interface ArchDef {
   sprite: number;      // theme enemy index (0-2): name, pain, sprite
@@ -86,6 +86,7 @@ export interface ArchDef {
   armour?: number;     // damage taken multiplier
   kb?: number;         // knockback taken multiplier
   trick?: string;      // one-time banner line for variants ({n} = plural bug name)
+  key?: string;        // fixed kit sprite instead of the theme enemy (crates)
 }
 
 export const ARCH: Record<ArchId, ArchDef> = {
@@ -97,6 +98,7 @@ export const ARCH: Record<ArchId, ArchDef> = {
   spitter: { sprite: 2, hp: 26, speed: 30, dmg: 9, xp: 4, r: 7, tint: 0xb8f818, trick: '{n} that spit from range: close in' },
   mini: { sprite: 1, hp: 5, speed: 60, dmg: 5, xp: 1, r: 5, scale: 0.65 },
   runner: { sprite: 1, hp: 14, speed: 125, dmg: 9, xp: 1, r: 7, tint: 0xf8d878 },
+  crate: { sprite: 0, hp: 10, speed: 0, dmg: 0, xp: 0, r: 7, kb: 0, key: 'crate' },
 };
 
 /** Spawn weights by time (heat 0). The last row whose `at` has passed is used. */
@@ -194,3 +196,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'heat5', name: 'Meltdown', desc: 'Win on heat 5' },
   { id: 'super', name: 'Full Stack Nova', desc: 'Fuse two evolved weapons', hidden: true },
 ];
+
+// ---------------------------------------------------------------- arena hazards
+
+/** Breakable crates (food, coins, pickups) and spreading tech-debt puddles that slow the hog. */
+export const HAZARDS = {
+  crateEvery: 22, crateFrom: 20, crateMax: 3,
+  puddleEvery: 30, puddleFrom: 75, puddleMax: 4, puddleLife: 45, puddleGrow: 15, puddleR: 34, puddleSlow: 0.55,
+};

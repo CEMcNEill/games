@@ -10,7 +10,7 @@ import { text, box, bar, clock, PixelText, W, H } from '@shared/ui';
 import products from '../../shared/products.json';
 import {
   ProductId, PassiveId, ArchId, EliteMod, EventId, Stats, baseStats, WEAPONS, PASSIVES, ARCH, SPAWN_TABLE, ELITE_MODS,
-  ELITES_AT, ELITES_EARLY, EVENTS, EVENT_TIMES, EVENT_ORDER, OVERTIME_S, BOSS_AT, MAX_LEVEL, SUPER, HEROES, HeroDef,
+  ELITES_AT, ELITES_EARLY, HAZARDS, EVENTS, EVENT_TIMES, EVENT_ORDER, OVERTIME_S, BOSS_AT, MAX_LEVEL, SUPER, HEROES, HeroDef,
 } from './content';
 import { WState, newWeapon, WEAPON_FNS, drawWeapons, aura, resetVisuals } from './weapons';
 import { Card, Build, drawCards, botRank, partnersOf } from './cards';
@@ -108,6 +108,9 @@ export class GameScene extends Phaser.Scene {
   evQueue: { at: number; id: EventId }[] = [];
   eliteQueue: number[] = [];
   stampede: { dx: number; dy: number; t: number; waves: number } | null = null;
+  puddles: { x: number; y: number; r: number; age: number }[] = [];
+  hazT = { crate: 0, puddle: 0 };
+  hazG!: Phaser.GameObjects.Graphics;
   seen = new Set<string>();
   boss: Enemy | null = null;
   bossTimer = 0;
@@ -161,7 +164,7 @@ export class GameScene extends Phaser.Scene {
       hp: 100, invuln: 0, enemies: [], pool: [], projs: [], gems: [], items: [], level: 1, xp: 0, xpNext: 5, kills: 0, gold: 0,
       elapsed: 0, spawnAcc: 0, boss: null, bossTimer: 0, bossPhase: 0, bossKills: 0, bossLast: '', nextBossAt: BOSS_AT, overtime: -1,
       won: false, over: false, paused: false, modal: null, pendingLevels: 0, slowmo: 0, banners: [], bannerBusy: false, bannerObjs: [],
-      simSpeed: 1, stampede: null, revivesUsed: 0, superNova: false, dmgBy: {}, numBudget: 10, hat: null,
+      simSpeed: 1, stampede: null, puddles: [], hazT: { crate: HAZARDS.crateFrom, puddle: HAZARDS.puddleFrom }, revivesUsed: 0, superNova: false, dmgBy: {}, numBudget: 10, hat: null,
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0 },
     });
     setJuiceSpeed(1);
@@ -191,6 +194,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(K.ui.bg);
     this.add.tileSprite(0, 0, WORLD_W, WORLD_H, spr('tile')).setOrigin(0).setDepth(-10);
     this.add.graphics().setDepth(-9).lineStyle(4, K.ui.panelInt, 1).strokeRect(-2, -2, WORLD_W + 4, WORLD_H + 4);
+    this.hazG = this.add.graphics().setDepth(-6);
     this.auraG = this.add.graphics().setDepth(-5);
     this.fx = this.add.graphics().setDepth(20);
     this.warnG = this.add.graphics().setDepth(UI + 85).setScrollFactor(0);
@@ -468,6 +472,7 @@ export class GameScene extends Phaser.Scene {
     this.invuln = Math.max(0, this.invuln - dt);
     const regen = this.heat >= 4 ? 0 : this.diff.regen;
     this.hp = Math.min(this.st.maxHp, this.hp + regen * dt);
+    this.runHazards(dt);
     this.movePlayer(dt);
     this.spawn(dt);
     this.buildGrid();
@@ -500,8 +505,9 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.player.anims.timeScale = 0.25;
     }
-    this.player.x = Phaser.Math.Clamp(this.player.x + dx * this.st.speed * dt, 12, WORLD_W - 12);
-    this.player.y = Phaser.Math.Clamp(this.player.y + dy * this.st.speed * dt, 12, WORLD_H - 12);
+    const sp = this.st.speed * this.puddleSlow();
+    this.player.x = Phaser.Math.Clamp(this.player.x + dx * sp * dt, 12, WORLD_W - 12);
+    this.player.y = Phaser.Math.Clamp(this.player.y + dy * sp * dt, 12, WORLD_H - 12);
   }
 
   /** Test bot: flee the local crowd, drift toward gems and pickups, stay away from walls. */
@@ -509,6 +515,7 @@ export class GameScene extends Phaser.Scene {
     const p = this.player;
     let fx = 0, fy = 0;
     for (const e of this.enemies) {
+      if (e.arch === 'crate') continue;
       const dx = p.x - e.s.x, dy = p.y - e.s.y;
       const d2 = dx * dx + dy * dy;
       const reach = e.boss ? (this.hp < this.st.maxHp * 0.5 || e.mode >= 1 ? 160 : 70) : e.mode === 3 ? 70 : e.arch === 'runner' || e.mode >= 1 ? 120 : 90;
@@ -521,6 +528,10 @@ export class GameScene extends Phaser.Scene {
       if (!pr.hostile) continue;
       const dx = p.x - pr.s.x, dy = p.y - pr.s.y, d2 = dx * dx + dy * dy;
       if (d2 < 60 * 60 && d2 > 1) { fx += (dx * 2) / d2; fy += (dy * 2) / d2; }
+    }
+    for (const q of this.puddles) {
+      const dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy) || 1;
+      if (d < q.r + 20) { fx += (dx / d) * 0.02; fy += (dy / d) * 0.02; }
     }
     const danger = Math.hypot(fx, fy);
     // Targets: chests and hotfixes first, food when hurt, then the nearest gem.
@@ -602,15 +613,15 @@ export class GameScene extends Phaser.Scene {
     const late = over ** 2;
     const scale = 1 + this.elapsed / 150 + late;
     let e = this.pool.pop();
-    const key = spr(`enemy_${type + 1}`);
+    const key = A.key ? spr(A.key) : spr(`enemy_${type + 1}`);
     if (!e) {
       e = { s: this.add.sprite(x, y, key), arch, type, hp: 0, maxHp: 0, speed: 0, dmg: 0, xp: 0, r: 0, kx: 0, ky: 0, flash: 0, slow: 1,
         hitAt: {}, alive: true, elite: null, mode: 0, t: 0, vx: 0, vy: 0, acc: 0, accT: 0, accCrit: false, armour: 1, kb: 1, tint: null };
     }
     const sc = (A.scale ?? 1) * (elite ? 1.6 : 1);
     e.s.setTexture(key).setPosition(x, y).setActive(true).setVisible(true).setDepth(elite ? 6 : 5).setScale(sc).setAlpha(1);
-    e.s.play(anim(`enemy_${type + 1}`));
-    e.s.anims.setProgress(Math.random());
+    if (A.key) e.s.stop().setFrame(0);
+    else { e.s.play(anim(`enemy_${type + 1}`)); e.s.anims.setProgress(Math.random()); }
     const tint = elite ? ELITE_MODS[elite].tint : A.tint ?? null;
     const speed = A.speed * Phaser.Math.FloatBetween(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1) * Math.min(1.8, 1 + 0.08 * over);
     Object.assign(e, { arch, type, hp: A.hp * this.diff.hp * scale * this.heatHp() * (elite ? 9 : 1), speed, dmg: A.dmg * this.diff.dmg * this.heatDmg() * (elite ? 1.4 : 1) * (1 + 0.25 * over),
@@ -625,7 +636,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private announce(arch: ArchId, type: number) {
-    if (arch === 'mini' || arch === 'runner') return;
+    if (arch === 'mini' || arch === 'runner' || arch === 'crate') return;
     const A = ARCH[arch];
     if (!A.trick) {
       if (this.seen.has(`t${type}`)) return;
@@ -739,7 +750,7 @@ export class GameScene extends Phaser.Scene {
   nearest(x: number, y: number, maxR = 400): Enemy | null {
     let best: Enemy | null = null, bd = maxR * maxR;
     for (const e of this.enemies) {
-      if (!e.alive || e.arch === 'runner' && e.t > 8.5) continue;
+      if (!e.alive || e.arch === 'crate' || e.arch === 'runner' && e.t > 8.5) continue;
       const d = (e.s.x - x) ** 2 + (e.s.y - y) ** 2;
       if (d < bd) { bd = d; best = e; }
     }
@@ -761,6 +772,9 @@ export class GameScene extends Phaser.Scene {
       if (e.elite === 'regen') e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.03 * dt);
       let mx = dx, my = dy, sp = e.speed;
       switch (e.arch) {
+        case 'crate':
+          sp = 0; mx = 0; my = 0;
+          break;
         case 'runner':
           mx = e.vx; my = e.vy;
           e.t -= dt;
@@ -794,7 +808,7 @@ export class GameScene extends Phaser.Scene {
       // Separation from neighbours in the same cell keeps swarms readable.
       let sx = 0, sy = 0;
       const cell = this.grid.get(((e.s.x >> 5) << 8) | (e.s.y >> 5));
-      if (cell && cell.length > 1 && e.mode !== 2) {
+      if (cell && cell.length > 1 && e.mode !== 2 && e.arch !== 'crate') {
         for (const o of cell) {
           if (o === e) continue;
           const ox = e.s.x - o.s.x, oy = e.s.y - o.s.y;
@@ -901,6 +915,7 @@ export class GameScene extends Phaser.Scene {
     if (e.boss) { this.bossDown(e); return; }
     e.s.setActive(false).setVisible(false).stop();
     this.pool.push(e);
+    if (e.arch === 'crate') { this.crateLoot(e.s.x, e.s.y); return; }
     this.kills++;
     this.sfx('kill', 0.5, 50);
     if (e.elite) {
@@ -920,6 +935,66 @@ export class GameScene extends Phaser.Scene {
       }
     }
     if (e.arch !== 'runner' || !blast) this.dropLoot(e);
+  }
+
+  private crateLoot(x: number, y: number) {
+    burst(this, x, y, 0xac7c00, 12, { colours: [0x503000, 0xf8d878] });
+    this.sfx('hit', 0.6);
+    const r = this.RD.next() / this.st.luck;
+    const heal = this.heat >= 4 ? 0.5 : 1;
+    if (r < 0.4 * heal) this.dropItem('food', x, y);
+    else if (r < 0.52) this.dropItem('vacuum', x, y);
+    else if (r < 0.58) this.dropItem('hotfix', x, y);
+    else for (let k = 0; k < 3; k++) this.dropItem('coin', x + Phaser.Math.Between(-8, 8), y + Phaser.Math.Between(-8, 8));
+  }
+
+  /** Crates to break and tech-debt puddles that spread and slow the hog. */
+  private runHazards(dt: number) {
+    const H_ = HAZARDS, p = this.player;
+    this.hazT.crate -= dt;
+    if (this.hazT.crate <= 0) {
+      this.hazT.crate = H_.crateEvery;
+      if (this.enemies.filter((e) => e.arch === 'crate').length < H_.crateMax) {
+        const a = Math.random() * Math.PI * 2, d = Phaser.Math.Between(110, 180);
+        this.addEnemy('crate', p.x + Math.cos(a) * d, p.y + Math.sin(a) * d);
+      }
+    }
+    this.hazT.puddle -= dt;
+    if (this.hazT.puddle <= 0) {
+      this.hazT.puddle = H_.puddleEvery;
+      if (this.puddles.length < H_.puddleMax) {
+        const a = this.R.next() * Math.PI * 2, d = 120 + this.R.next() * 80;
+        this.puddles.push({ x: Phaser.Math.Clamp(p.x + Math.cos(a) * d, 40, WORLD_W - 40), y: Phaser.Math.Clamp(p.y + Math.sin(a) * d, 40, WORLD_H - 40), r: 6, age: 0 });
+      }
+    }
+    for (let i = this.puddles.length - 1; i >= 0; i--) {
+      const q = this.puddles[i];
+      q.age += dt;
+      const max = H_.puddleR + this.heat * 3;
+      q.r = q.age < H_.puddleGrow ? 6 + (max - 6) * (q.age / H_.puddleGrow) : q.age > H_.puddleLife - 3 ? max * Math.max(0, (H_.puddleLife - q.age) / 3) : max;
+      if (q.age >= H_.puddleLife) this.puddles.splice(i, 1);
+    }
+  }
+
+  /** Player speed factor from puddles (1 = dry). */
+  private puddleSlow() {
+    const p = this.player;
+    for (const q of this.puddles) if ((p.x - q.x) ** 2 + ((p.y - q.y) * 1.5) ** 2 < q.r * q.r) return HAZARDS.puddleSlow;
+    return 1;
+  }
+
+  private drawHazards() {
+    const g = this.hazG;
+    g.clear();
+    for (const q of this.puddles) {
+      g.fillStyle(0x305010, 0.75).fillEllipse(q.x, q.y, q.r * 2, q.r * 1.33);
+      g.fillStyle(0x587818, 0.8).fillEllipse(q.x - q.r * 0.2, q.y - q.r * 0.1, q.r * 1.2, q.r * 0.7);
+      // A few bubbles that pop in and out.
+      for (let k = 0; k < 3; k++) {
+        const t = (this.time.now / 700 + k * 0.37 + q.x * 0.01) % 1;
+        if (t < 0.6) g.fillStyle(0x98b838, 1).fillRect(Math.round(q.x + Math.cos(k * 2.1 + q.y) * q.r * 0.5), Math.round(q.y + Math.sin(k * 2.1 + q.x) * q.r * 0.3), 2, 2);
+      }
+    }
   }
 
   private dropLoot(e: Enemy) {
@@ -1578,6 +1653,7 @@ export class GameScene extends Phaser.Scene {
   private draw() {
     this.fx.clear();
     drawWeapons(this, this.fx, this.auraG);
+    this.drawHazards();
     this.drawEnemyFx();
     if (this.invuln > 0) this.player.setAlpha(Math.floor(this.time.now / 60) % 2 ? 0.4 : 1);
     else this.player.setAlpha(1);
@@ -1670,10 +1746,12 @@ export class GameScene extends Phaser.Scene {
         (Object.keys(PASSIVES) as PassiveId[]).slice(0, 6).forEach((id) => this.passives.set(id, Math.min(PASSIVES[id].max, lvl)));
         this.recalc(); this.refreshIcons();
       },
-      chest: (big = false) => this.dropItem('chest', this.player.x + 20, this.player.y, !!big),
-      pickup: (kind: ItemKind = 'vacuum') => this.dropItem(kind, this.player.x + 20, this.player.y),
+      chest: (big = false) => { this.dropItem('chest', this.player.x + 20, this.player.y, !!big); },
+      pickup: (kind: ItemKind = 'vacuum') => { this.dropItem(kind, this.player.x + 20, this.player.y); },
       hotfix: () => this.hotfix(),
-      elite: (arch: ArchId = 'tank') => this.spawnElite(arch),
+      crate: () => { this.addEnemy('crate', this.player.x + 40, this.player.y); },
+      puddle: () => { this.puddles.push({ x: this.player.x + 60, y: this.player.y, r: 6, age: 0 }); },
+      elite: (arch: ArchId = 'tank') => { this.spawnElite(arch); },
       event: (id: EventId = 'stampede') => this.startEvent(id),
       spawn: (arch: ArchId = 'charger', n = 5) => { for (let i = 0; i < n; i++) { const [x, y] = this.offscreenPoint(); this.addEnemy(arch, x, y); } },
       heat: (n: number) => { this.heat = Math.max(0, Math.min(5, n | 0)); },
