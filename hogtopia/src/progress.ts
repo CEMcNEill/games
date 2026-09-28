@@ -65,7 +65,10 @@ export function endSummary(d: EndData): string[] {
     .filter(([, v]) => v).map(([k, v]) => `${k} ${v}`);
   const lines = [parts.join('  ')];
   const top = meta.heatUnlocked();
-  lines.push(d.won ? (top > 0 ? `Next: a new map, or try HEAT ${top} on the title` : 'Next: a new map and a new rival') : `Tip: mass 3 units before you attack a city`);
+  let beaten = 0;
+  try { const kd = meta.kitData({ beaten: [] as string[] }); beaten = Array.isArray(kd.beaten) ? kd.beaten.length : 0; } catch { beaten = 0; }
+  const next = top > 0 ? `next: a new map, or HEAT ${top}` : 'next: a new map and rival';
+  lines.push(d.won ? `Rivals beaten ${beaten}/${PERSONALITY_IDS.length}   ${next}` : 'Tip: gather 3 units before you attack a city');
   return lines;
 }
 

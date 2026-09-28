@@ -765,9 +765,12 @@ export class MapScene extends Phaser.Scene {
     else if (w.turn === 2) this.say('advisor', PERSONA_TIPS[w.f[1].persona.id] ?? tips[0]);
     else if (w.turn === MAX_TURNS) this.say('advisor', 'Last turn! Grab every point you can.');
     else if (w.turn % 3 === 0 && tips.length) this.say('advisor', tips[(w.turn / 3) % tips.length | 0]);
-    const sum = this.summary.length ? `Rival: ${[...new Set(this.summary)].slice(0, 3).join(', ')}.` : '';
+    const rname = String(K.theme.game.rival.name);
+    const sum = this.summary.length ? `${rname.length > 16 ? 'Rival' : rname} ${[...new Set(this.summary)].slice(0, 3).join(', ')}.` : '';
     this.msg.setText(`Turn ${w.turn}: +${w.income(0)} stars. ${sum || (w.turn === 1 ? 'Press T to research PostHog tech.' : '')}`);
-    if (sum && !this.fast() && this.summary.some((s) => s.startsWith('took') || s.startsWith('defeated'))) this.banner(sum);
+    if (sum && !this.fast() && this.summary.some((s) => /^(took|defeated|is attacking|is massing)/.test(s))) this.banner(sum);
+    const mass = this.summary.find((s) => s.startsWith('is massing') || s.startsWith('is attacking'));
+    if (mass && !first) this.say('advisor', `Heads up: rival units are gathering near ${mass.replace(/.* near /, '')}. Guard it from cities and forests.`);
     this.summary = [];
     this.redraw();
     // P2: at turn 8 the rival offers a truce (not in the first game, and not on your very first turns).
@@ -778,6 +781,16 @@ export class MapScene extends Phaser.Scene {
     }
     this.openPendingReward();
     if (this.autopilot) void this.playerAuto();
+  }
+
+  /** Tell the player what the rival is up to: an army gathering near one of their cities. */
+  private readRival() {
+    const w = this.w;
+    const r = w.f[1];
+    const tgt = w.cities[r.ai.target];
+    if (!tgt || tgt.owner !== 0) return;
+    const near = w.units.filter((u) => u.owner > 0 && cheb(u.x, u.y, tgt.x, tgt.y) <= 4).length;
+    if (near >= 2) this.summary.unshift(`${r.ai.assault ? 'is attacking' : 'is massing'} ${near} units near ${tgt.name}`);
   }
 
   /** Rival turn summary, big enough to notice. */
@@ -850,6 +863,7 @@ export class MapScene extends Phaser.Scene {
       w.endTurn(o);
     }
     if (this.checkOver()) return;
+    this.readRival();
     await this.wait(this.animMs);
     this.startPlayerTurn();
   }
@@ -942,6 +956,22 @@ export class MapScene extends Phaser.Scene {
       turn: (n: number) => { w().turn = Math.max(1, Math.min(MAX_TURNS, Math.floor(n))); this.redraw(); },
       rivalTurn: () => this.endTurn(),
       techTree: () => { this.openTech(); },
+      // Load test: fill the map with units on both sides (every tile they can stand on, up to n each).
+      flood: (n = 45) => {
+        const W0 = w();
+        W0.tiles.forEach((t) => (t.seen = true));
+        const cnt = [0, 0];
+        W0.tiles.forEach((t, i) => {
+          const x = i % W0.W, y = (i / W0.W) | 0;
+          if (!(t.t === 'plain' || t.t === 'forest') || W0.unitAt(x, y)) return;
+          const o = x < W0.W / 2 ? 0 : 1;
+          if (cnt[o] >= n || (x + y) % 2) return;
+          cnt[o]++;
+          W0.addUnit(o, UNIT_ORDER[(x * 3 + y) % UNIT_ORDER.length], x, y);
+        });
+        this.redraw();
+        return cnt;
+      },
     };
   }
 

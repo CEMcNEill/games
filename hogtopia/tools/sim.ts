@@ -26,9 +26,11 @@ function runSide(w: World, o: Owner) {
   if (!w.over) w.endTurn(o);
 }
 
+const PRODUCTS = (process.env.PRODUCTS ?? 'product_analytics,experiments,feature_flags,error_tracking,data_warehouse,session_replay').split(',');
+
 export function play(seed: number, diff: string, personality: string, heat: number, map: string, passive: boolean) {
   const names = { capital: 'HQ', cities: ['A', 'B', 'C', 'D', 'E'], rivalCapital: 'Old', rivalShort: 'Mono' };
-  const w = new World({ seed, biome: 'meadow', difficulty: diff, products: ['product_analytics', 'experiments', 'feature_flags', 'error_tracking', 'data_warehouse', 'session_replay'], names, personality, heat, map });
+  const w = new World({ seed, biome: 'meadow', difficulty: diff, products: PRODUCTS, names, personality, heat, map });
   w.autoPlayer = true;
   if (process.env.SYM) { w.f[0].persona = w.f[1].persona; w.f[0].stars = w.f[1].stars; (w as any).canResearch = () => false; }
   for (let guard = 0; guard < 80 && !w.over; guard++) {
