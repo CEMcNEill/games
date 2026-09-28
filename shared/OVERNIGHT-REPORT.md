@@ -1,6 +1,6 @@
 # Shared foundations: overnight report (phase 0)
 
-Branch `overnight/20260927-2143/shared`. Only `shared/` and the README Layout section changed (the brief asked
+Branch `overnight/20260927-2143/shared`, commit c61ac13. Only `shared/` and the README Layout section changed (the brief asked
 for that README change). No kit, `tests/` or `build-kits.mjs` changes. No theme fields added.
 
 ## API summary (details at the top of each file)
@@ -62,3 +62,5 @@ for that README change). No kit, `tests/` or `build-kits.mjs` changes. No theme 
 - Screenshots: `shared/overnight-shots/sheet-bug-survivors.png` (first title, juice, first End, title with meta
   + menu, End with BEST), `sheet2.png` (other kits), `seq.png` (burst + float text frames).
 - Gate 2 does not apply to shared on its own (kit agents re-check the prospect games on their branches).
+
+OVERNIGHT-STATUS: PASS
