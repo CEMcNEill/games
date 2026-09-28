@@ -34,7 +34,8 @@ existing theme (default, 3 examples, the real `ledgerly-hogtopia` prospect) load
 - **1a1431c** new sounds (warn, fanfare, veteran), End names the next map, rival style in the info
   panel, no second rival on the small map, perks line capped to one line, report.
 - **Archipelago map** (the brief's "if boats are feasible"): islands, everyone starts with Sailing, the
-  capitals on different islands; boats drawn under units. It favours the player a little (normal ~77%).
+  capitals on different islands (home island >= 12 tiles); boats drawn under units. Rivals get +4 income
+  there because the AI is clumsier at sea; it still favours the player a little (normal ~73%).
   Hard growth nudged 0.55 -> 0.62 to keep the rotation average in range.
 
 ## Review fixes (5f7d508)
@@ -47,7 +48,7 @@ map attempts instead of the original 60 (a first-game difference on rare seeds).
 
 ## Balance (headless AI vs AI, `tools/run-sim.sh`, details in DESIGN-NOTES.md)
 Later runs (map rotation, heat 0, 80 seeds per cell, autopilot win rate):
-easy 98-100%, normal 58-71% (avg 65%), hard 33-49% (avg 42%). ~40% of normal wins are dominations;
+easy 96-99%, normal 54-69% (avg 63%), hard 30-50% (avg 40%). ~40% of normal wins are dominations;
 normal Aggressors take the autopilot's capital in 20% of games.
 First game (classic map, Expander, `FIRST_GAME` overrides): autopilot 100/99/96%, a "casual first-timer"
 stand-in 80/54/9% (the original kit gave that stand-in 44/20/14%). A passive player loses the capital on

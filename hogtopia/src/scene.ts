@@ -435,7 +435,7 @@ export class MapScene extends Phaser.Scene {
       cities: w.myCities(0).length, rivalCities: w.cities.filter((c) => c.owner > 0).length,
       neutral: w.cities.filter((c) => c.owner === -1).length, units: w.myUnits(0).length,
       rivalUnits: w.units.filter((u) => u.owner > 0).length, score: w.score(0), rivalScore: w.rivalScore(),
-      map: w.mapType, mapSize: `${w.W}x${w.H}`, firstGame: this.setup.runIndex === 0 && !this.setup.daily, personality: w.f[1].persona.id, heat: w.heat, rivals: w.rivals().length, daily: this.setup.daily,
+      map: w.mapType, mapSize: `${w.W}x${w.H}`, firstGame: this.setup.runIndex === 0 && !this.setup.daily && this.setup.heat === 0, personality: w.f[1].persona.id, heat: w.heat, rivals: w.rivals().length, daily: this.setup.daily,
       runIndex: this.setup.runIndex, vets: w.units.filter((u) => u.vet && u.owner === 0).length, rivalVets: w.units.filter((u) => u.vet && u.owner > 0).length,
       monuments: w.monuments.filter((m) => m.o === 0).map((m) => m.id), rivalMonuments: w.monuments.filter((m) => m.o > 0).map((m) => m.id),
       perks: w.myCities(0).flatMap((c) => c.perks), pending: w.pending.length, truce: w.truce, battlesWon: w.f[0].wins,
@@ -537,6 +537,7 @@ export class MapScene extends Phaser.Scene {
     this.busy = true;
     try { await fn(); } finally { if (this.alive && !this.w.over) this.busy = false; }
     this.openPendingReward();
+    if (this.autopilot && this.alive && !this.w.over) void this.playerAuto(); // switched on mid-animation
   }
 
   private async doMove(u: Unit, x: number, y: number) {
@@ -715,7 +716,14 @@ export class MapScene extends Phaser.Scene {
     if (m.kind === 'reward' || m.kind === 'truce') {
       if (left || right) { m.sel ^= 1; K.play('move', 0.3); this.drawMenu(); return; }
       if (code === 'Digit1' || code === 'Digit2') { m.sel = code === 'Digit1' ? 0 : 1; this.drawMenu(); }
-      else if (!ok) return;
+      else if (code === 'KeyE' && !repeat) {
+        // E takes the highlighted choice and ends the turn (other pending rewards are auto-picked).
+        if (m.kind === 'reward') { const p = w.pending.shift(); if (p) w.applyReward(p.city, LEVEL_REWARDS[p.level][m.sel].id); }
+        else this.answerTruce(m.sel === 0);
+        m.objs.forEach((o) => o.destroy()); this.menu = null; hooks.state = 'playing';
+        void this.endTurn();
+        return;
+      } else if (!ok) return;
       if (m.kind === 'reward') {
         const p = w.pending.shift();
         if (p) {
@@ -1066,7 +1074,7 @@ export class MapScene extends Phaser.Scene {
       }
       return null;
     };
-    const mine: UnitType[] = ['catcher', 'warrior', 'archer'], theirs: UnitType[] = ['warrior', 'defender', 'scout'];
+    const mine: UnitType[] = ['catcher', 'warrior', 'archer', 'giant'], theirs: UnitType[] = ['warrior', 'defender', 'scout'];
     let sel: Unit | null = null;
     const mx = Math.floor(w.W / 2) - 2, my = Math.floor(w.H / 2) - 2;
     mine.forEach((t, i) => { const p = free(mx, my + i * 2); if (p) { const u = w.addUnit(0, t, p[0], p[1]); u.moved = u.attacked = u.done = false; if (i === 0) { sel = u; u.kills = 2; } if (i === 1) { u.vet = true; u.kills = 3; u.maxHp += 5; u.hp = u.maxHp; } } });

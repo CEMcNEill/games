@@ -136,7 +136,7 @@ export class World {
     let s = this.myCities(o).reduce((a, c) => a + this.cityIncome(c), 0);
     if (this.has(o, 'data_warehouse')) s += 2;
     s += this.f[o].techs.filter((t) => TECHS[t].tier === 1).length; // every PostHog product pays for itself: +1 star a turn
-    if (o !== 0) s += this.diff.rivalIncome + HEAT[this.heat].income + Math.floor(this.turn * this.diff.growth); // rivals scale with time
+    if (o !== 0) s += this.diff.rivalIncome + HEAT[this.heat].income + Math.floor(this.turn * this.diff.growth) + (MAP_TYPES[this.mapType]?.rivalIncome ?? 0); // rivals scale with time
     return s;
   }
   techCost(o: Owner, tech?: string) { return TECH_COST[tech ? TECHS[tech]?.tier ?? 1 : 1] + 3 * this.f[o].techs.length; }

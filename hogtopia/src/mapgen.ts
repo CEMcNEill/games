@@ -10,7 +10,7 @@ export interface City {
 }
 export interface MapData { W: number; H: number; tiles: Tile[]; cities: City[]; type: string }
 
-export interface MapType { id: string; name: string; W: number; H: number; villages: number; water: number; mountain: number; forest: number; smooth: number; minDist: number; res: number; sea?: boolean }
+export interface MapType { id: string; name: string; W: number; H: number; villages: number; water: number; mountain: number; forest: number; smooth: number; minDist: number; res: number; sea?: boolean; rivalIncome?: number }
 /** Map presets for runs after the first. Shares are fractions of the half map. */
 export const MAP_TYPES: Record<string, MapType> = {
   classic: { id: 'classic', name: 'Classic', W: 18, H: 12, villages: 3, water: -1, mountain: -1, forest: -1, smooth: 2, minDist: 10, res: 0.5 },
@@ -19,7 +19,7 @@ export const MAP_TYPES: Record<string, MapType> = {
   continents: { id: 'continents', name: 'Continents', W: 18, H: 12, villages: 3, water: 0.34, mountain: 0.08, forest: 0.2, smooth: 3, minDist: 10, res: 0.55 },
   small: { id: 'small', name: 'Skirmish', W: 14, H: 10, villages: 2, water: 0.12, mountain: 0.1, forest: 0.24, smooth: 2, minDist: 8, res: 0.6 },
   // Islands: everyone starts with Sailing; cities only need to be reachable by land or sea.
-  archipelago: { id: 'archipelago', name: 'Archipelago', W: 18, H: 12, villages: 3, water: 0.5, mountain: 0.04, forest: 0.22, smooth: 2, minDist: 10, res: 0.6, sea: true },
+  archipelago: { id: 'archipelago', name: 'Archipelago', W: 18, H: 12, villages: 3, water: 0.5, mountain: 0.04, forest: 0.22, smooth: 2, minDist: 10, res: 0.6, sea: true, rivalIncome: 4 }, // the AI is clumsier at sea
   wide: { id: 'wide', name: 'Frontier', W: 18, H: 12, villages: 4, water: 0.12, mountain: 0.1, forest: 0.25, smooth: 2, minDist: 10, res: 0.45 },
 };
 export const MAP_ROTATION = ['highlands', 'lakes', 'wide', 'archipelago', 'continents', 'small', 'classic'];
@@ -128,11 +128,11 @@ function tryGenerate(r: () => number, mt: MapType, [pf, pm, pw]: number[], nRuin
     t.city = i;
   });
   const caps = [cities[0], cities[per]];
-  // Capitals get dry land around them.
+  // Capitals get dry land around them (on island maps, water too: no one-tile home islands).
   for (const c of caps) {
     for (const [dx, dy] of DIRS) {
       const x = c.x + dx, y = c.y + dy;
-      if (inMap(x, y) && tile(x, y).t === 'mountain') tile(x, y).t = 'plain';
+      if (inMap(x, y) && (tile(x, y).t === 'mountain' || (mt.sea && tile(x, y).t === 'water'))) tile(x, y).t = 'plain';
     }
   }
   // Territory: radius 1, capitals first.
@@ -175,7 +175,11 @@ function tryGenerate(r: () => number, mt: MapType, [pf, pm, pw]: number[], nRuin
   const d = landDist(m, cities[0].x, cities[0].y, mt.sea ? (t) => t.t !== 'mountain' : land);
   if (cities.some((c) => d[c.y * W + c.x] < 0)) return null;
   // Islands must really be islands: the two capitals may not share a landmass.
-  if (mt.sea && landDist(m, cities[0].x, cities[0].y)[caps[1].y * W + caps[1].x] >= 0) return null;
+  if (mt.sea) {
+    const home = landDist(m, cities[0].x, cities[0].y);
+    if (home[caps[1].y * W + caps[1].x] >= 0) return null;
+    if (home.filter((v) => v >= 0).length < 12) return null; // a home island big enough to grow on
+  }
   return cheb(caps[0].x, caps[0].y, caps[1].x, caps[1].y) >= mt.minDist ? m : null;
 }
 
