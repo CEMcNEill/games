@@ -1,5 +1,5 @@
 // Kit contract and boot: every kit calls startKit(kitDef). The engine loads theme/theme.json and
-// theme/manifest.json (written per prospect by make-game), sanitises the theme against the kit's
+// theme/manifest.json (written per prospect by build-game), sanitises the theme against the kit's
 // schema, and runs Boot -> Title -> HowTo -> kit scenes -> End. Nothing per prospect touches code.
 import Phaser from 'phaser';
 import { sanitize } from './schema';
@@ -18,7 +18,7 @@ export interface Slot {
   h: number;
   frames: number;
   fps?: number;
-  /** Flux prompt template with {theme.path} placeholders; absent = fixed kit art, never generated. */
+  /** Art brief (sprite prompt) template with {theme.path} placeholders; absent = fixed kit art, never generated. */
   prompt?: string;
   kind?: string; // 'sprite' (default) or 'tile'
 }

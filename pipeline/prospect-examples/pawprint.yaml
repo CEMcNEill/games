@@ -1,0 +1,11 @@
+name: Pawprint
+domain: pawprint.app
+industry: pet-care marketplace (dog walkers and sitters), web and mobile
+brand_colors: ["#7b3fe4", "#ffffff", "#ff8a3d"]
+pain_points:
+  - the Android app crashes during booking and they don't know why
+  - half of started bookings are abandoned
+  - the data team drowns in ad-hoc SQL requests
+posthog_products: [error_tracking, session_replay, experiments, product_analytics]
+buyer: cto
+notes: Playful brand, lots of dog puns on their site. CTO used to be a game developer.

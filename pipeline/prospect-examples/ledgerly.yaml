@@ -1,0 +1,11 @@
+name: Ledgerly
+domain: ledgerly.io
+industry: fintech (invoicing and payments for freelancers)
+brand_colors: ["#0a7d5a", "#0b1f33", "#ffd166"]
+pain_points:
+  - users drop off in the bank-connection step of onboarding
+  - compliance reviews make every rollout slow and all-or-nothing
+  - they can't see why customers churn after their first invoice
+posthog_products: [product_analytics, session_replay, feature_flags, surveys]
+buyer: product
+notes: Head of Product is the champion; tone should be friendly and calm, nothing too violent.

@@ -1,5 +1,5 @@
 // The fixed 36-colour NES-style master palette. Brand colours are snapped to it, so every game
-// stays 8-bit and readable whatever the prospect's brand. tools/theme_writer.py mirrors this list.
+// stays 8-bit and readable whatever the prospect's brand. shared/sprites.py uses the same list (palette.json).
 import masterList from '../palette.json';
 
 export const MASTER: string[] = masterList as string[];

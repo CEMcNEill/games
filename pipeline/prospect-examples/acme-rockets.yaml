@@ -1,0 +1,11 @@
+name: Acme Rockets
+domain: acmerockets.com
+industry: aerospace SaaS (launch scheduling and telemetry for small-satellite operators)
+brand_colors: ["#e0402a", "#1c2a4a", "#f7c948"]
+pain_points:
+  - releases are slow because nobody trusts the test suite
+  - launches break in production and they find out from customers
+  - no product analytics, so roadmap fights are opinion vs opinion
+posthog_products: [session_replay, feature_flags, experiments, error_tracking]
+buyer: engineering
+notes: Champion is a rocket nerd and loves retro games. Small team (40 people), very technical.

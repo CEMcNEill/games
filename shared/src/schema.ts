@@ -1,7 +1,7 @@
 // Runtime theme sanitiser driven by the kit's JSON Schema (a small subset: type, properties,
 // items, enum, min/maxLength, pattern, min/maxItems, minimum/maximum, uniqueItems). Anything
 // missing or invalid falls back to the default theme's value at the same path, so bad content
-// can never crash a game. make-game validates strictly before this; this is the safety net.
+// can never crash a game. build-game / check_theme.py validate strictly before this; this is the safety net.
 import { cleanText } from './font';
 
 type Schema = Record<string, any>;

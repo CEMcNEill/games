@@ -22,7 +22,7 @@ evolutions, heat 1-5, the shop, heroes, endless and the daily run.
 | `game.arena.name` | Start banner | Setting |
 | `text.win/lose/credits` | End screen | Last impression |
 | `game.difficulty` | Enemy HP/damage/spawn, regen | easy for execs, hard for gamers |
-| `*.sprite_prompt` | Flux sprites for enemies, boss, floor tile | Look |
+| `*.sprite_prompt` | Per-prospect sprites (the prompt is the art brief) for enemies, boss, floor tile | Look |
 
 Fixed in the kit (never per prospect): the hedgehog and hats, product and passive icons, projectiles, gem,
 coin, chest, food, hotfix bomb, vacuum magnet, crate, level curve, weapon behaviour, evolutions, timeline, and all

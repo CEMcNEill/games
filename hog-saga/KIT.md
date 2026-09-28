@@ -110,7 +110,7 @@ secrets and a superboss.
 | `products`, `game.product_lines` | Starred skills, skill descriptions, relic | Which PostHog products they see |
 | `palette` | UI, roofs, cave and lair walls, gates | Brand feel |
 | `text.*`, `music.mood` | End screen, music | Tone |
-| `*.sprite_prompt` | Flux sprites for companions, townsfolk, 5 enemies, boss | Look |
+| `*.sprite_prompt` | Per-prospect sprites (the prompt is the art brief) for companions, townsfolk, 5 enemies, boss | Look |
 
 No theme fields were added overnight. Fixed in the kit: the map, encounter order and groups, stats,
 skills, combos, weaknesses, statuses, items, gear, the shop, the Old Dev, the Merchant, the Tech Debt

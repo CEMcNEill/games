@@ -72,7 +72,7 @@ heat 0-5, a boss rush, 14 achievements, and NPCs who remember your last run.
 - Missing `ending_pacifist` / `ending_bugfix` are not an issue: they fall back to `ending`.
 
 ## Sprite slots
-Generated per prospect (Flux, from `sprite_prompt`): `npc_1..6` (16x16, 2 frames), `enemy_1..3`
+Drawn per prospect (the `sprite_prompt` is the art brief): `npc_1..6` (16x16, 2 frames), `enemy_1..3`
 (32x32, 2 frames), `boss` (48x48, 2 frames). Fixed kit art, recoloured with the brand palette:
 `player` (8 frames: down, up, left, right x 2), `tiles` (17-frame sheet, `kind: "sheet"`, never
 sent to Flux), `soul`, `bullet`, product icons, `props` (7-frame sheet: vending machine, save

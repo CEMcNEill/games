@@ -17,13 +17,13 @@ level on the title (Enter still starts at once with the defaults).
 |---|---|---|
 | `products` | The tech tree (research menu, T): each product plus its tier-2 feature | Which PostHog products they "adopt" |
 | `game.faction`, `game.cities` | City names, info panel, capture messages | It's their company on the map |
-| `game.rival` | Rival name, portrait (Flux), taunts, final line | The villain, and the fun |
+| `game.rival` | Rival name, portrait (per-prospect sprite), taunts, final line | The villain, and the fun |
 | `game.tips` | Hedgehog advisor panel, every few turns | Strategy tied to their world |
 | `game.tech_lines` | Research menu, under the fixed effect (products only) | Tailored pitch |
 | `game.units` | Unit names in menus and info panel (the 5 basic units) | Flavour |
 | `game.biome` | Terrain look (meadow, desert, tundra, circuit) | Feel |
 | `game.difficulty` | Rival income, unlock timing and aggression | Challenge |
-| `game.hq_prompt` | Title screen HQ (Flux) | Personal touch |
+| `game.hq_prompt` | Title screen HQ (per-prospect sprite) | Personal touch |
 
 No theme fields were added overnight. Fixed in code: maps, rules, combat, techs, rewards, personalities
 (and their extra taunt lines), monuments, achievements and all unit/terrain art (new art lives in the

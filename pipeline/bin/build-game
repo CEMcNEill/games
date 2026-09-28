@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Build a prospect game from a theme you (or Claude) wrote: no local models, no hosting.
+
+    build-game <kit> <theme.json> [--brief brief.yaml] [--art DIR] [--music FILE.ogg] [--out DIR] [--no-check]
+
+1. builds the kit if <kit>/dist is missing (npm install + node build-kits.mjs <kit>)
+2. checks a copy of the theme: kit schema always; with --brief also the content filter, and the
+   brief's name/domain/colours are applied to the copy (your file is never rewritten)
+3. copies <kit>/dist to the output folder and writes theme/theme.json
+4. renders every sprite slot from the kit's default art in the theme's colours
+5. installs your own sprites from --art DIR (<slot>.sprite files, see shared/prompts/sprite-style.md)
+6. runs the headless game check (pipeline/tools/game_check.py; needs uv + playwright + chromium)
+
+Output: a static site in --out (default: ./out/<prospect>-<kit>). Serve it with
+    python3 -m http.server -d <out> 8000
+and host it anywhere static (GitHub Pages, Cloudflare Pages, S3...).
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+TOOLS = os.path.join(REPO, "pipeline", "tools")
+UV = shutil.which("uv")
+
+
+def py(args, deps, **kw):
+    """Run a python tool with its deps via uv when available, else the current interpreter."""
+    if UV:
+        cmd = [UV, "run", "-q"] + [x for d in deps for x in ("--with", d)] + ["python"] + args
+    else:
+        cmd = [sys.executable] + args
+    return subprocess.run(cmd, **kw)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("kit")
+    ap.add_argument("theme")
+    ap.add_argument("--brief", help="prospect brief.yaml: enables the content filter and fixes name/domain/colours")
+    ap.add_argument("--art", help="folder of <slot>.sprite files drawn for this prospect")
+    ap.add_argument("--music", help="an .ogg to use instead of the kit's default track")
+    ap.add_argument("--out")
+    ap.add_argument("--no-check", action="store_true")
+    a = ap.parse_args()
+
+    kdir = os.path.join(REPO, a.kit)
+    if not os.path.exists(os.path.join(kdir, "kit.json")):
+        kits = sorted(d for d in os.listdir(REPO) if os.path.exists(os.path.join(REPO, d, "kit.json")))
+        raise SystemExit(f"no kit {a.kit!r}; kits: {', '.join(kits)}")
+    if not os.path.exists(os.path.join(kdir, "dist", "index.html")):
+        print(f"building kit {a.kit}...")
+        if not os.path.isdir(os.path.join(REPO, "node_modules")):
+            subprocess.run(["npm", "install"], cwd=REPO, check=True)
+        subprocess.run(["node", "build-kits.mjs", a.kit], cwd=REPO, check=True)
+
+    # check (and, with --brief, fix) a copy: the author's file is never rewritten
+    import tempfile
+    theme_path = os.path.join(tempfile.mkdtemp(prefix="build-game-"), "theme.json")
+    shutil.copy(os.path.abspath(a.theme), theme_path)
+    check = [os.path.join(TOOLS, "check_theme.py"), kdir]
+    if a.brief:
+        rc = py(check + [os.path.abspath(a.brief), theme_path, "--fix"], ["jsonschema", "pyyaml"]).returncode
+    else:
+        rc = py(["-c", "import json,sys,jsonschema; s=json.load(open(sys.argv[1])); t=json.load(open(sys.argv[2])); "
+                 "e=[f\"{'/'.join(map(str,x.absolute_path)) or '(root)'}: {x.message}\" for x in "
+                 "jsonschema.Draft202012Validator(s).iter_errors(t)]; [print('PROBLEM', p) for p in e]; "
+                 "print('OK' if not e else f'{len(e)} problems'); sys.exit(1 if e else 0)",
+                 os.path.join(kdir, "theme.schema.json"), theme_path], ["jsonschema"]).returncode
+    if rc:
+        raise SystemExit("theme has problems (above); fix them and run again")
+    theme = json.load(open(theme_path))
+
+    name = re.sub(r"[^a-z0-9]+", "-", theme.get("prospect", {}).get("name", "prospect").lower()).strip("-")
+    slug = f"{name}-{a.kit}"
+    out = os.path.abspath(a.out or os.path.join("out", slug))
+    shutil.rmtree(out, ignore_errors=True)
+    shutil.copytree(os.path.join(kdir, "dist"), out)
+    tdir = os.path.join(out, "theme")
+    os.makedirs(os.path.join(tdir, "sprites"), exist_ok=True)
+    shutil.copy(theme_path, os.path.join(tdir, "theme.json"))
+
+    slots = [s["id"] for s in json.load(open(os.path.join(kdir, "slots.json")))]
+    code = ("import json,sys; sys.path.insert(0, sys.argv[1]); import sprites; "
+            "sprites.build(sys.argv[2], sys.argv[3], json.load(open(sys.argv[4])))")
+    py(["-c", code, os.path.join(REPO, "shared"), kdir, os.path.join(tdir, "sprites"), os.path.join(tdir, "theme.json")],
+       ["pillow"], check=True)
+    music = None
+    if a.music:
+        shutil.copy(a.music, os.path.join(tdir, "music.ogg"))
+        music = "theme/music.ogg"
+    manifest = {"slug": slug, "kit": a.kit, "music": music, "posthog": None, "draft": False,
+                "sprites": {s: f"theme/sprites/{s}.png" for s in slots if os.path.exists(os.path.join(tdir, "sprites", f"{s}.png"))}}
+    json.dump(manifest, open(os.path.join(tdir, "manifest.json"), "w"), indent=1)
+    if a.art:
+        py([os.path.join(TOOLS, "install_sprites.py"), kdir, os.path.abspath(a.art), out], ["pillow"], check=True)
+    print(f"built {out}")
+
+    if not a.no_check:
+        report = os.path.join(os.path.dirname(out), f"{slug}-check")
+        rc = py([os.path.join(TOOLS, "game_check.py"), out, report], ["playwright", "pillow"]).returncode
+        rep = json.load(open(os.path.join(report, "report.json"))) if os.path.exists(os.path.join(report, "report.json")) else {}
+        print(f"check: passed={rep.get('passed')} bot={rep.get('bot_outcome')}  (screens: {report}/contact.png)")
+        if rc or not rep.get("passed"):
+            raise SystemExit("game check failed; see the report above")
+    print(f"play it:  python3 -m http.server -d {out} 8000   ->  http://localhost:8000/")
+
+
+if __name__ == "__main__":
+    main()

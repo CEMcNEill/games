@@ -2,7 +2,9 @@
 
 Tested, data-driven 8-bit browser games. Each kit is built once; a prospect game is the prebuilt kit
 plus a `theme/` folder (theme.json, sprites, music). Nothing per prospect compiles or edits code.
-Spec: "Prospect Games: Plan & Spec" (Claude Doc).
+Spec: "Prospect Games: Plan & Spec" (Claude Doc). The brief-to-game pipeline (make-game, theme and
+sprite tools, publishing) is in `pipeline/` (see pipeline/README.md); default art follows
+`shared/prompts/sprite-style.md` on CC0 packs (`pipeline/assets/`).
 
 | Kit | Inspired by | Buyer |
 |---|---|---|
@@ -13,22 +15,26 @@ Spec: "Prospect Games: Plan & Spec" (Claude Doc).
 | `hogtopia` | The Battle of Polytopia (4X) | ceo, coo, vp, executive, leadership, strategy |
 | `hogshop` | Overcooked (packing rush) | ecommerce, retail, operations, fulfilment, marketplace, shop |
 
-make-game picks by whole-word match on the brief's `buyer:`; the earliest matching word wins
-("vp product" -> hogtopia, "head of product" -> data-inspector). `--kit` or `kit:` in the brief overrides.
+The Buyer column says which kit suits which audience; pick the kit yourself when you make a game.
 
-## Make a game for a prospect
+## Make a game for a prospect (with Claude)
 ```
-cp prospects/examples/acme-rockets.yaml prospects/<slug>.yaml   # edit: name, colours, pains, products, buyer
-make-game prospects/<slug>.yaml [--kit bug-survivors]          # detached; ~10-15 min
-journalctl --user -fu game-<slug>-<kit>                        # follow it
-approve-game <slug>-<kit>                                      # after a person plays the draft
+cp pipeline/prospect-examples/acme-rockets.yaml prospects/<name>.yaml     # name, colours, pains, products, buyer
+# 1. theme: Claude reads <kit>/prompts/theme.md + shared/prompts/rules.md + <kit>/themes/examples/ and writes
+#    prospects/<name>-themes/<kit>.json; check it until OK:
+pipeline/tools/check_theme.py <kit> prospects/<name>.yaml prospects/<name>-themes/<kit>.json --fix
+# 2. art (optional): Claude draws the kit's per-prospect slots (slots.json entries with a prompt) as .sprite
+#    files following shared/prompts/sprite-style.md, on CC0 packs (pipeline/assets/fetch-assets.sh)
+# 3. build + headless check -> static site in out/<name>-<kit>/
+pipeline/bin/build-game <kit> prospects/<name>-themes/<kit>.json --brief prospects/<name>.yaml --art prospects/<name>-art/<kit>
+python3 -m http.server -d out/<name>-<kit> 8000
 ```
-Output: `~/games/builds/<slug>-<kit>/` holds run.json (steps, fallbacks, check result), theme.json and
-its LLM log, sprites-preview.png, check/ (report, contact sheet, gameplay.gif) and game/ (the site).
-Drafts appear on the games page  marked DRAFT.
+The output is a plain static folder; host it anywhere (GitHub Pages, Cloudflare Pages, S3).
+Needs: node 20+, uv (or python 3.11+ with pillow, jsonschema, pyyaml, playwright), and
+`uv run --with playwright playwright install chromium` once for the check.
 
-Optional PostHog capture in the games: put `{"posthog": {"key": "phc_...", "host": "https://us.i.posthog.com"}}`
-in `~/games/config.json`. Events: game_opened, game_started, game_finished, product_picked (kit-specific
+Optional PostHog capture in the games: set `"posthog": {"key": "phc_...", "host": "https://us.i.posthog.com"}`
+in the built game's `theme/manifest.json`. Events: game_opened, game_started, game_finished, product_picked (kit-specific
 events too); nothing loads until the player presses a key.
 
 ## Layout

@@ -1,4 +1,4 @@
-// Optional PostHog capture. Enabled only when make-game writes a posthog key into
+// Optional PostHog capture. Enabled only when the build writes a posthog key into
 // theme/manifest.json; otherwise events only go to window.__game.events (for playtests).
 // No cookies or network until the player first presses a key.
 import { hooks } from './hooks';
