@@ -4,11 +4,13 @@
 import Phaser from 'phaser';
 import { sanitize } from './schema';
 import { deriveUi, snap, Ui } from './palette';
-import { hooks } from './hooks';
+import { hooks, sharedDebug } from './hooks';
 import { initAnalytics, capture } from './analytics';
 import { Sfx, ZzfxParams } from './zzfx';
 import { W, H } from './ui';
-import { BootScene, TitleScene, HowToScene, EndScene } from './scenes';
+import { BootScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
+import { meta, initMeta, achieve, dailySeed, randomSeed, AchievementDef, RunResult } from './meta';
+import { OverlayScene, toast, burst, floatText, shake, hitstop } from './juice';
 
 export interface Slot {
   id: string;
@@ -43,7 +45,58 @@ export interface KitDef {
   postSanitize?: (theme: any, issues: string[]) => void;
   scenes: Phaser.Types.Scenes.SceneType[];
   gameScene: string;
+  /** Optional title-screen choices (LEFT/RIGHT to change, UP/DOWN between rows). Return a flat list for one
+   * row (its values become K.run.mode) or rows with a `key` ('mode', 'heat' or anything -> K.run.choices[key]).
+   * Enter always starts at once; untouched rows use their first unlocked choice. heatRow() builds a HEAT row. */
+  titleMenu?: () => TitleChoice[] | TitleRow[];
+  /** Optional extra End-screen lines (run stats, new unlocks). Keep them short: ~3 lines fit. */
+  endSummary?: (data: EndData, result: RunResult) => string[];
+  /** Achievement table; unlock with achieve(id) from '@shared/meta'. */
+  achievements?: AchievementDef[];
 }
+
+export interface TitleChoice { label: string; value: string | number; locked?: boolean }
+export interface TitleRow { key: string; label?: string; choices: TitleChoice[] }
+
+/** The current run's settings, chosen on the title (or defaults). Always set, even before the title. */
+export interface Run {
+  mode: string;          // value of the 'mode' row, else 'standard'
+  heat: number;          // value of the 'heat' row, else 0
+  seed: number;          // dailySeed() when mode is 'daily', else random per run
+  daily: boolean;
+  number: number;        // 1-based run count for this game on this browser
+  choices: Record<string, string | number>; // every row's chosen value by key
+  recorded?: boolean;    // meta.recordRun already called for this run
+  startedAt: number;     // Date.now() at beginRun
+}
+
+/** Standard HEAT 0..max row; levels above meta.heatUnlocked() are locked. */
+export function heatRow(max = 5, label = 'HEAT'): TitleRow {
+  const top = meta.heatUnlocked();
+  return { key: 'heat', label, choices: Array.from({ length: max + 1 }, (_, i) => ({ label: String(i), value: i, locked: i > top })) };
+}
+
+/** Start a new run with the given choices (or the previous run's): fresh seed, run number, analytics props. */
+export function beginRun(choices: Record<string, string | number> = K.run.choices): Run {
+  const mode = String(choices.mode ?? 'standard');
+  const heat = Math.max(0, Math.min(5, Math.floor(Number(choices.heat) || 0)));
+  const daily = mode === 'daily';
+  K.run = { mode, heat, seed: daily ? dailySeed() : randomSeed(), daily, number: meta.data.runs + 1, choices: { ...choices },
+    startedAt: Date.now() };
+  hooks.run = K.run;
+  return K.run;
+}
+
+/** Record the current run in meta once (EndScene calls this for you; call it earlier if the kit needs the
+ * RunResult first, e.g. to bank coins or show unlocks). Later calls for the same run return the same result. */
+export function finishRun(r: { won: boolean; score: number; stats?: Record<string, unknown> }): RunResult {
+  if (K.run.recorded && K.lastResult) return K.lastResult;
+  K.run.recorded = true;
+  K.lastResult = meta.recordRun({ won: r.won, score: r.score, durationS: hooks.elapsed, heat: K.run.heat, mode: K.run.mode, stats: r.stats });
+  return K.lastResult;
+}
+
+export const runProps = () => ({ run_number: K.run.number, heat: K.run.heat, mode: K.run.mode });
 
 /** Everything the scenes need, set once at boot. */
 export const K = {
@@ -54,9 +107,13 @@ export const K = {
   sfx: null as unknown as Sfx,
   /** slot id -> texture key actually in use (themed or default) */
   sprites: {} as Record<string, string>,
+  lastResult: null as RunResult | null,
+  run: { mode: 'standard', heat: 0, seed: 0, daily: false, number: 1, choices: {}, startedAt: 0 } as Run,
   /** play one ZzFX preset */
   play: (name: string, vol = 1, gap = 40) => K.sfx?.play(name, vol, gap),
 };
+
+export { meta, achieve };
 
 export const spr = (id: string) => K.sprites[id] ?? `d:${id}`;
 export const anim = (id: string) => `${id}-anim`;
@@ -93,6 +150,8 @@ export async function startKit(kit: KitDef) {
   document.title = theme.title;
   document.body.style.background = K.ui.bg;
   initAnalytics(K.manifest.posthog ?? undefined, K.manifest.slug ?? 'default', kit.id);
+  initMeta(kit.id, K.manifest.slug ?? 'default', kit.achievements, (a) => toast(null, `ACHIEVEMENT: ${a.name}`));
+  beginRun({});
 
   const zoom = () => Math.max(1, Math.floor(Math.min(window.innerWidth / W, window.innerHeight / H)));
   const game = new Phaser.Game({
@@ -109,7 +168,7 @@ export async function startKit(kit: KitDef) {
     input: { keyboard: true, gamepad: false },
     audio: { disableWebAudio: false },
     fps: { target: 60 },
-    scene: [BootScene, TitleScene, HowToScene, ...kit.scenes, EndScene],
+    scene: [BootScene, TitleScene, HowToScene, ...kit.scenes, EndScene, OverlayScene],
   });
   window.addEventListener('resize', () => game.scale.setZoom(zoom()));
   game.events.on('step', () => { hooks.fps = Math.round(game.loop.actualFps); });
@@ -122,6 +181,23 @@ export async function startKit(kit: KitDef) {
   });
   K.sfx = new Sfx(null, kit.sfx, hashPitch(theme.prospect.name));
   (window as any).__phaser = game;
+  Object.assign(sharedDebug, {
+    // The live KitDef, e.g. to try a titleMenu: __game.debug.kitDef().titleMenu = () => [...]; then debug.goto('Title').
+    kitDef: () => K.kit,
+    goto: (key: string) => { game.scene.getScenes(true).filter((s) => s.scene.key !== 'Overlay').forEach((s) => s.scene.stop());
+      game.scene.start(key); },
+    // Fire every juice effect in the top gameplay scene (screenshots, feel checks).
+    juiceTest: () => {
+      const sc = game.scene.getScenes(true).filter((s) => s.scene.key !== 'Overlay').pop();
+      if (!sc) return;
+      const cam = sc.cameras.main, x = cam.scrollX + W / 2, y = cam.scrollY + H / 2;
+      burst(sc, x, y, K.ui.accentInt, 24, { colours: [K.ui.textInt] });
+      floatText(sc, x, y - 16, '+123', K.ui.accentInt);
+      shake(sc, 3, 150);
+      hitstop(sc, 80);
+      toast(sc, 'JUICE TEST');
+    },
+  });
   capture('game_opened', { referrer: document.referrer || null });
   return game;
 }

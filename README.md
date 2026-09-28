@@ -40,7 +40,15 @@ shared/            engine every kit uses (never edited per prospect)
   src/zzfx.ts      in-browser sound effects (ZzFX parameters)
   src/ui.ts        PixelText (wrap/cut + warnings), box, bar, fitScale
   src/scenes.ts    Boot (sprite slots with fallback), Title, HowTo, End
-  src/hooks.ts     window.__game: state, score, stats, fallbacks, themeIssues, textWarnings, debug
+  src/hooks.ts     window.__game: state, score, stats, fallbacks, themeIssues, textWarnings, debug, meta, run
+  src/meta.ts      between-runs save per slug+kit (localStorage, never throws): meta.recordRun/bank/spend/unlock/
+                   has/heatUnlocked/kitData, achieve(id) + toast, dailySeed(), rng(seed) (mulberry32)
+  src/juice.ts     feel: shake, hitstop (+hitstopped/setJuiceSpeed), flash, punch, burst, floatText, toast
+  KitDef extras    optional titleMenu (mode/HEAT rows -> K.run {mode, heat, seed, daily, number, choices}; Enter
+                   still starts with the defaults; heatRow() helper), endSummary(data, result) lines, achievements
+                   table. EndScene records the run (finishRun), shows NEW BEST / BEST, R or Enter = one more run.
+                   Shared debug hooks: resetMeta, unlockAll, meta(patch), reducedMotion, kitDef, goto, juiceTest
+  tools/meta_shots.py  screenshots of title/menu/juice/end with fake meta and blocked storage
   sprites.py       renders default art from text grids; digits 1-5 = brand colours
   theme.base.schema.json, products.json, prompts/rules.md
 <kit>/             kit.json, game.schema.json (+ generated theme.schema.json), themes/default.json,
