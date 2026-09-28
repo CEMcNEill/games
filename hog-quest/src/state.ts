@@ -54,6 +54,15 @@ export const R = {
   ending: '' as '' | Ending,
   heat: 0,
   rushTime: 0,     // boss rush: seconds so far
+  rush: -1,        // boss rush: -1 = story mode
+  gold: 0,
+  items: [] as string[],
+  secretIds: new Set<string>(), // secrets found this run (layout ids)
+  doorOpen: false,  // the hidden door in the first room
+  mini: '' as '' | 'spared' | 'debugged', // the miniboss behind it
+  checkpoint: null as null | { room: number; snap: Snap },
+  continues: 0,
+  itemsUsed: 0,
   secretsFound: 0, // secrets found this run
 };
 
@@ -71,7 +80,40 @@ export function resetRun() {
   R.battleHits = [];
   R.ending = '';
   R.rushTime = 0;
+  R.gold = 0;
+  R.items = [];
+  R.secretIds = new Set();
+  R.doorOpen = false;
+  R.mini = '';
   R.secretsFound = 0;
+}
+
+export const MAX_CONTINUES = 2;
+
+/** What a save star remembers: enough to put the run back as it was. */
+export interface Snap {
+  hp: number; cleared: number[]; spared: number; debugged: number; met: number[]; outcomes: Record<number, 'spared' | 'debugged'>;
+  gold: number; items: string[]; secretIds: string[]; doorOpen: boolean; mini: '' | 'spared' | 'debugged';
+}
+
+export function snapshot(): Snap {
+  return { hp: R.hp, cleared: [...R.cleared], spared: R.spared, debugged: R.debugged, met: [...R.met], outcomes: { ...R.outcomes },
+    gold: R.gold, items: [...R.items], secretIds: [...R.secretIds], doorOpen: R.doorOpen, mini: R.mini };
+}
+
+export function restore(s: Snap) {
+  R.hp = Math.max(1, s.hp);
+  R.cleared = new Set(s.cleared);
+  R.spared = s.spared;
+  R.debugged = s.debugged;
+  R.met = new Set(s.met);
+  R.outcomes = { ...s.outcomes };
+  R.gold = s.gold;
+  R.items = [...s.items];
+  R.secretIds = new Set(s.secretIds);
+  R.secretsFound = R.secretIds.size;
+  R.doorOpen = s.doorOpen;
+  R.mini = s.mini;
 }
 
 /** How the three regular enemies were handled so far. */
@@ -83,16 +125,35 @@ export function route(): 'pacifist' | 'bugfix' | 'neutral' {
 }
 
 export const BOSS = 3;
+export const MINI = 4; // the hidden miniboss behind the cracked wall
+
+/** Tech Debt: fixed kit text, so it works for every prospect. Its fix is one of the theme's products. */
+function miniDef(): EncDef {
+  const prods = (K.theme.products as string[]) ?? [];
+  const solved = ['error_tracking', 'product_analytics', 'session_replay'].find((p) => prods.includes(p)) ?? prods[0] ?? 'product_analytics';
+  return {
+    name: 'Tech Debt',
+    pain: 'Nobody remembers why it is here. Everyone is scared to touch it.',
+    intro: 'Tech Debt oozes out from behind the wall! It has been growing in there for years.',
+    talk: ['It lists every shortcut ever taken. It takes a while.', 'You promise to write it down this time. It perks up.',
+      'You add it to the roadmap. For real. It relaxes.'],
+    solved_by: solved,
+    solve_line: 'You finally see which parts are still used. Tech Debt shrinks to one small TODO.',
+    patterns: ['thread', 'laser', 'burst'],
+  };
+}
 
 export function encDef(i: number): EncDef {
   const g = K.theme.game;
+  if (i === MINI) return miniDef();
   return i === BOSS ? g.boss : g.enemies[i] ?? g.enemies[0];
 }
 
 export const productName = (id: string) => (products as Record<string, { name: string }>)[id]?.name ?? id;
 
 export function score(won: boolean) {
-  return R.spared * 1000 + R.debugged * 400 + R.met.size * 150 + Math.max(0, Math.round(R.hp)) * 20 + (won ? 2000 : 0);
+  return R.spared * 1000 + R.debugged * 400 + R.met.size * 150 + Math.max(0, Math.round(R.hp)) * 20 + (won ? 2000 : 0)
+    + R.secretIds.size * 250 + (R.mini ? 600 : 0) + Math.min(500, R.grazes * 5) + R.heat * (won ? 1000 : 0) - R.continues * 500;
 }
 
 /** Which ending the finished boss fight leads to. */

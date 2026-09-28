@@ -9,17 +9,20 @@ import { capture } from '@shared/analytics';
 import { achieve } from '@shared/meta';
 import { shake, hitstop, hitstopped, flash, burst, floatText, punch } from '@shared/juice';
 import { text, bar, PixelText, W } from '@shared/ui';
-import { R, BOSS, encDef, endData, productName, EncDef, route, heat } from './state';
+import { R, BOSS, MINI, MAX_CONTINUES, encDef, endData, productName, EncDef, route, heat } from './state';
+import { item, itemLine } from './items';
 import { Box } from './patterns';
 import { Typewriter } from './typewriter';
 import { makePuzzle, hint, Puzzle, VERBS, verbLabel } from './acts';
 import { enemySteps, enemyStep, bossStep, Step } from './choreo';
 import { Dodge } from './dodge';
 import { battleMusic, stopBattleMusic } from './music';
+import { patchHq } from './save';
 
 const TEXT_BOX: Box = { x: 24, y: 110, w: 432, h: 86 };
 const DODGE_BOX: Box = { x: 165, y: 110, w: 150, h: 86 };
-const BUTTONS = ['FIGHT', 'ACT', 'POSTHOG', 'SPARE'];
+const BUTTONS = ['FIGHT', 'ACT', 'POSTHOG', 'ITEM', 'SPARE'];
+const BTN_X = (i: number) => 24 + i * 87;
 const TP_COST = 40;
 const CRIT_ZONE = 5;
 
@@ -53,7 +56,7 @@ const EFFECTS: Record<string, string> = {
   data_warehouse: 'You query the warehouse and find a snack. +10 HP.',
 };
 
-type Mode = 'menu' | 'acts' | 'items' | 'fight' | 'result' | 'turn' | 'end';
+type Mode = 'menu' | 'acts' | 'items' | 'bag' | 'fight' | 'result' | 'turn' | 'end';
 type Mood = 'calm' | 'annoyed' | 'ready' | 'furious';
 
 interface Choice { id: string; t: PixelText; icon?: Phaser.GameObjects.Image; x: number; y: number }
@@ -62,7 +65,8 @@ export class BattleScene extends Phaser.Scene {
   private enc = 0;
   private def!: EncDef;
   private isBoss = false;
-  private hell = false;      // bugfix-route boss: can't be talked down, pure bullet hell
+  private hell = false;
+  private isMini = false;      // bugfix-route boss: can't be talked down, pure bullet hell
   private hp = 36;
   private maxHp = 36;
   private mercy = 0;
@@ -108,6 +112,7 @@ export class BattleScene extends Phaser.Scene {
   private finished = false;
   private hitsThis = 0;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
+  private clockT: PixelText | null = null;
 
   constructor() { super('Battle'); }
 
@@ -116,13 +121,14 @@ export class BattleScene extends Phaser.Scene {
     this.def = encDef(this.enc);
     this.isBoss = this.enc === BOSS;
     this.hell = this.isBoss && route() === 'bugfix';
-    this.maxHp = this.hp = this.isBoss ? (this.hell ? 90 : 70) : 36;
+    this.isMini = this.enc === MINI;
+    this.maxHp = this.hp = this.isBoss ? (this.hell ? 80 : 70) : this.isMini ? 50 : 36;
     Object.assign(this, { mercy: 0, solved: false, annoyed: false, progress: 0, checked: false, turn: 0, mode: 'menu', sel: 0,
       subSel: 0, tp: 0, next: null, botT: 0, finished: false, btns: [], choices: [], hitsThis: 0, live: false, turnPats: [] });
     this.used = new Set();
     this.fx = { slow: false, shield: false, crit: false, short: false };
     this.boxNow = { ...TEXT_BOX };
-    this.puzzle = makePuzzle(this.def.name, this.isBoss ? 3 : 2 + heat().extraStep);
+    this.puzzle = makePuzzle(this.def.name, this.isBoss || this.isMini ? 3 : 2 + heat().extraStep);
     this.steps = enemySteps(this.enc, this.def.patterns);
     hooks.scene = 'Battle';
     hooks.state = 'battle';
@@ -134,7 +140,7 @@ export class BattleScene extends Phaser.Scene {
     const grid = this.add.graphics().lineStyle(1, ui.panelInt, 0.35);
     for (let x = 24; x <= 456; x += 24) grid.lineBetween(x, 8, x, 100);
     for (let y = 8; y <= 100; y += 23) grid.lineBetween(24, y, 456, y);
-    this.enemyKey = this.isBoss ? 'boss' : `enemy_${this.enc + 1}`;
+    this.enemyKey = this.isBoss ? 'boss' : this.isMini ? 'miniboss' : `enemy_${this.enc + 1}`;
     this.enemy = this.add.sprite(W / 2, this.isBoss ? 56 : 60, spr(this.enemyKey)).setScale(2).play(anim(this.enemyKey));
     this.tweens.add({ targets: this.enemy, y: this.enemy.y - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.dust = this.sampleColours();
@@ -148,6 +154,7 @@ export class BattleScene extends Phaser.Scene {
     this.fightG = this.add.graphics().setDepth(6);
     this.tw = new Typewriter(this, TEXT_BOX.x + 14, TEXT_BOX.y + 10, 66, 6, { depth: 7 });
     this.caption = text(this, W / 2, 100, '', { align: 'center', color: ui.accentInt, depth: 30 });
+    this.clockT = K.run.mode === 'rush' ? text(this, 454, 10, '', { align: 'right', color: ui.accentInt, depth: 30 }) : null;
     const short = String(K.theme.prospect.short).toUpperCase();
     text(this, 26, 202, `${short.slice(0, 12)}  LV 1`, { color: ui.textInt });
     text(this, 172, 202, 'HP', { color: ui.textInt });
@@ -157,9 +164,9 @@ export class BattleScene extends Phaser.Scene {
     this.tpBar = bar(this, 350, 203, 60, 6, 0xf87858, 0x503000, 0x000000);
     this.tpT = text(this, 416, 202, '', { color: ui.textInt });
     BUTTONS.forEach((b, i) => {
-      const x = 25 + i * 110;
+      const x = BTN_X(i);
       const g = this.add.graphics();
-      const t = text(this, x + 55, 225, b, { align: 'center', color: 0xf83800 });
+      const t = text(this, x + 42, 225, b, { align: 'center', color: 0xf83800 });
       this.btns.push({ g, t });
     });
     this.soul = this.add.image(0, 0, spr('soul')).setDepth(20);
@@ -221,10 +228,10 @@ export class BattleScene extends Phaser.Scene {
     this.frame.clear().fillStyle(0x000000, 1).fillRect(b.x, b.y, b.w, b.h)
       .lineStyle(2, this.live && this.dodge.heavy ? 0x3cbcfc : 0xfcfcfc, 1).strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
     this.btns.forEach(({ g, t }, i) => {
-      const x = 25 + i * 110;
+      const x = BTN_X(i);
       const on = i === this.sel && this.mode === 'menu';
       const col = on ? ui.accentInt : 0xf83800;
-      g.clear().lineStyle(2, col, 1).strokeRect(x + 1, 219, 98, 20);
+      g.clear().lineStyle(2, col, 1).strokeRect(x + 1, 219, 83, 20);
       t.setColor(col);
     });
     const mood = this.mood();
@@ -239,8 +246,8 @@ export class BattleScene extends Phaser.Scene {
     this.tpBar.draw(this.tp / 100, this.tp >= TP_COST ? 0xf8b800 : 0xf87858);
     this.tpT.setText(`${Math.floor(this.tp)}%`);
     // Soul: menu cursor, submenu cursor, or the dodging heart.
-    if (this.mode === 'menu') this.soul.setPosition(25 + this.sel * 110 + 12, 229).setVisible(true).setAlpha(1);
-    else if ((this.mode === 'items' || this.mode === 'acts') && this.choices[this.subSel]) {
+    if (this.mode === 'menu') this.soul.setPosition(BTN_X(this.sel) + 10, 229).setVisible(true).setAlpha(1);
+    else if ((this.mode === 'items' || this.mode === 'acts' || this.mode === 'bag') && this.choices[this.subSel]) {
       const c = this.choices[this.subSel];
       this.soul.setPosition(c.x - 14, c.y + 3).setVisible(true).setAlpha(1);
     } else if (this.mode !== 'turn') this.soul.setVisible(false);
@@ -275,6 +282,7 @@ export class BattleScene extends Phaser.Scene {
         else if (ok) { K.play('select'); this.choose(this.sel); }
         break;
       case 'acts':
+      case 'bag':
       case 'items': {
         const n = this.choices.length;
         if (left || right) this.subSel = (this.subSel + (this.subSel % 2 === 0 ? 1 : -1) + n) % n;
@@ -284,7 +292,7 @@ export class BattleScene extends Phaser.Scene {
         if (ok) {
           K.play('select');
           const id = this.choices[this.subSel].id;
-          if (this.mode === 'acts') this.act(id); else this.useProduct(id);
+          if (this.mode === 'acts') this.act(id); else if (this.mode === 'bag') this.useItem(Number(id)); else this.useProduct(id);
         }
         if (back) { this.clearChoices(); this.mode = 'menu'; this.say(this.flavour(), null); }
         break;
@@ -314,9 +322,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (i === 1) { this.openActs(); return; }
     if (i === 2) { this.openProducts(); return; }
+    if (i === 3) { this.openBag(); return; }
     if (this.sparable()) {
-      R.spared++;
-      R.outcomes[this.enc] = 'spared';
+      if (this.isMini) R.mini = 'spared';
+      else { R.spared++; R.outcomes[this.enc] = 'spared'; }
       K.play('spare');
       this.mode = 'end';
       this.enemy.setTint(0x7c7c7c);
@@ -359,6 +368,41 @@ export class BattleScene extends Phaser.Scene {
       this.choices.push({ id, t, icon, x, y });
     });
     this.subSel = Math.min(this.subSel, this.choices.length - 1);
+  }
+
+  private openBag() {
+    if (!R.items.length) {
+      this.say('Your bag is empty. Vending machines sell snacks for gold.', null);
+      return;
+    }
+    this.mode = 'bag';
+    this.tw.t.setVisible(false);
+    this.clearChoices();
+    R.items.forEach((id, i) => {
+      const x = TEXT_BOX.x + 40 + (i % 2) * 210, y = TEXT_BOX.y + 16 + Math.floor(i / 2) * 26;
+      const t = text(this, x, y, `* ${item(id)?.name ?? id}`, { depth: 8, color: K.ui.textInt });
+      this.choices.push({ id: String(i), t, x, y });
+    });
+    this.subSel = Math.min(this.subSel, this.choices.length - 1);
+  }
+
+  private useItem(i: number) {
+    const id = R.items[i];
+    const it = item(id);
+    this.clearChoices();
+    if (!it) { this.mode = 'menu'; return; }
+    R.items.splice(i, 1);
+    R.itemsUsed = (R.itemsUsed ?? 0) + 1;
+    K.play('product', 0.7);
+    let healed = 0;
+    if (it.kind === 'heal') {
+      healed = Math.min(R.maxHp - R.hp, it.n ?? 10);
+      R.hp += healed;
+      floatText(this, 216, 190, `+${healed}`, 0x58d854);
+    }
+    if (it.kind === 'shield') this.fx.shield = true;
+    if (it.kind === 'slow') this.fx.slow = true;
+    this.result(itemLine(it, healed));
   }
 
   private clearChoices() {
@@ -479,8 +523,8 @@ export class BattleScene extends Phaser.Scene {
     const t = text(this, W / 2, 30, String(n), { scale: 2, align: 'center', color: big ? K.ui.accentInt : 0xf83800, depth: 30 });
     this.tweens.add({ targets: t, y: 14, alpha: 0, duration: 900, onComplete: () => t.destroy() });
     if (this.hp <= 0) {
-      R.debugged++;
-      R.outcomes[this.enc] = 'debugged';
+      if (this.isMini) R.mini = 'debugged';
+      else { R.debugged++; R.outcomes[this.enc] = 'debugged'; }
       this.mode = 'end';
       this.dissolve();
       K.play('kill');
@@ -580,6 +624,7 @@ export class BattleScene extends Phaser.Scene {
   update(_t: number, dtMs: number) {
     const dt = Math.min(dtMs, 50) / 1000;
     if (!hitstopped(this)) for (let i = 0; i < R.speed && !this.finished; i++) this.step(dt);
+    this.clockT?.setText(`RUSH ${hooks.elapsed.toFixed(1)}s`);
     hooks.stats = {
       battle: this.enc, enemyHp: this.hp, mercy: this.mercy, mood: this.mood(), sparable: this.sparable(), hp: Math.ceil(R.hp),
       mode: this.mode, bullets: this.dodge.bullets.length, lasers: this.dodge.lasers.length, pattern: this.turnPats.join('+'),
@@ -669,7 +714,20 @@ export class BattleScene extends Phaser.Scene {
     stopBattleMusic(this, false);
     this.tweens.add({ targets: this.soul, scale: 2.5, alpha: 0, duration: 900 });
     burst(this, this.soul.x, this.soul.y, 0xf83800, 20, { colours: [0xa80020], speed: 80, life: 1 });
-    this.time.delayedCall(1300, () => {
+    const retry = !!R.checkpoint && R.continues < MAX_CONTINUES && K.run.mode !== 'rush';
+    if (retry) {
+      R.over = false;
+      const t = text(this, W / 2, 150, 'STAY DETERMINED', { scale: 2, align: 'center', color: K.ui.accentInt, depth: 40 });
+      t.setAlpha(0);
+      this.tweens.add({ targets: t, alpha: 1, delay: 500, duration: 400 });
+    }
+    this.time.delayedCall(retry ? 2000 : 1300, () => {
+      if (retry) {
+        this.cameras.main.fadeOut(200, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => { this.scene.stop(); this.scene.wake('Explore', { continue: true }); });
+        return;
+      }
+      patchHq({ lastLost: true });
       this.scene.stop('Explore');
       this.scene.start('End', endData(false));
     });
@@ -687,7 +745,7 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.fadeOut(200, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop();
-      this.scene.wake('Explore', { enc: this.enc, how, hits: this.hitsThis, products: this.used.size });
+      this.scene.wake('Explore', { enc: this.enc, how, hits: this.hitsThis, products: this.used.size, grazes: this.dodge.grazes });
     });
   }
 
@@ -705,7 +763,8 @@ export class BattleScene extends Phaser.Scene {
       const prods = K.theme.products as string[];
       const kill = this.hell || (R.forceRoute === 'bugfix' && !this.isBoss);
       const solve = this.isBoss && this.progress >= 1 && prods.includes(this.def.solved_by) && !this.used.has(this.def.solved_by) && !this.solved;
-      const want = kill ? 0 : this.sparable() ? 3 : solve ? 2 : 1;
+      const healIdx = R.items.findIndex((id) => item(id)?.kind === 'heal');
+      const want = R.hp < R.maxHp * 0.4 && healIdx >= 0 && !this.sparable() ? 3 : kill ? 0 : this.sparable() ? 4 : solve ? 2 : 1;
       if (this.sel !== want) { this.sel = want; this.drawAll(); return; }
       this.input_(true, false, false, false, false, false);
     } else if (this.mode === 'acts') {
@@ -713,6 +772,10 @@ export class BattleScene extends Phaser.Scene {
       const want = this.puzzle.seq[this.progress] ?? 'check';
       const i = this.choices.findIndex((c) => c.id === want);
       this.subSel = Math.max(0, i);
+      this.input_(true, false, false, false, false, false);
+    } else if (this.mode === 'bag') {
+      this.botT = 0;
+      this.subSel = Math.max(0, R.items.findIndex((id) => item(id)?.kind === 'heal'));
       this.input_(true, false, false, false, false, false);
     } else if (this.mode === 'items') {
       this.botT = 0;

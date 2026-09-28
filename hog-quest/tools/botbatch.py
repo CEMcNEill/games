@@ -48,6 +48,8 @@ def main():
     ap.add_argument("--theme")
     ap.add_argument("--js", default="")
     ap.add_argument("--timeout", type=int, default=240)
+    ap.add_argument("--meta", default="", help="JSON patch for debug.meta() before the title (e.g. to unlock modes)")
+    ap.add_argument("--title_keys", default="", help="comma-separated keys pressed on the title before Enter")
     a = ap.parse_args()
     base = json.load(open(a.theme or os.path.join(KIT, "themes/default.json")))
     tmp = tempfile.mkdtemp(prefix="hqbot-")
@@ -70,7 +72,14 @@ def main():
                 pg.wait_for_function("window.__game && window.__game.ready", timeout=20000)
                 if a.heat:
                     pg.evaluate("__game.debug.meta({maxHeatCleared: 4})")
+                if a.meta:
+                    pg.evaluate(f"__game.debug.meta({a.meta})")  # persisted: reload to redraw the title
+                    pg.reload()
+                    pg.wait_for_function("window.__game && window.__game.ready", timeout=20000)
                 pg.wait_for_timeout(700)
+                for k in [k for k in a.title_keys.split(",") if k]:
+                    pg.keyboard.press(k)
+                    pg.wait_for_timeout(150)
                 pg.keyboard.press("Enter")
                 pg.wait_for_timeout(500)
                 pg.keyboard.press("Enter")

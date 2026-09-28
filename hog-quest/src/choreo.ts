@@ -17,7 +17,7 @@ const known = (ps: unknown): string[] => (Array.isArray(ps) ? ps : []).filter((p
 
 export function enemySteps(enc: number, themePats: unknown): Step[] {
   const p = known(themePats);
-  const lesson = LESSONS[enc % LESSONS.length];
+  const lesson = enc < LESSONS.length ? LESSONS[enc] : 'thread';
   const a = p[0] ?? 'rain', b = p[1] ?? a, c = p[2] ?? b;
   return [
     { pats: [a], busy: 0.85 },
