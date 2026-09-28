@@ -1,0 +1,27 @@
+size 16x16
+concept Wheel: a blue exercise wheel with a gold hub on a grey stand
+legend
+  k #141b1b
+  B #3c7dd9
+  b #1b4f9c
+  c #79b8ce
+  S #9a93b5
+  s #6a6478
+  h #e0a820
+frame
+................
+.....kkkkkk.....
+...kkcccccBkk...
+..kccBkkkkBBbk..
+..kcBk....kBbk..
+.kcBk......kBbk.
+.kcBk..hh..kBbk.
+.kcBkSShhSSkBbk.
+.kcBk..hh..kBbk.
+.kBBk......kBbk.
+..kBBk....kBbk..
+..kbBBkkkkBbbk..
+...kkbbbbbbkk...
+.....kkkkkk.....
+....kSk..kSk....
+...kSSSkkSssk...

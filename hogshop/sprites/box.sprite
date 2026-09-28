@@ -1,0 +1,65 @@
+size 16x16
+concept cardboard box: open, open with items, sealed with tape and label
+base ninja-adventure Items/Object/CrateEmpty.png (proportions), redrawn as cardboard
+legend
+  k #141b1b
+  a #8a5a2b
+  b #c68a4a
+  c #e8b878
+  i #4a2f1a
+  t #f0dca0
+  T #c8b070
+  r #d0404a
+  g #4c9a4a
+  l #f7f3fb
+frame
+................
+................
+................
+.kk..........kk.
+.kckkkkkkkkkkck.
+..kkiiiiiiiikk..
+..kciiiiiiiibk..
+..kkkkkkkkkkkk..
+..kcbbbbbbbbak..
+..kcbbbbbbbbak..
+..kcbbbbbbbbak..
+..kbbbbbbbbbak..
+..kbbbbbbbbaak..
+..kaaaaaaaaaak..
+..kkkkkkkkkkkk..
+................
+frame
+................
+................
+................
+.kk...rr.ll..kk.
+.kckkkrrkllkkck.
+..kkggrrillikk..
+..kcggiiillibk..
+..kkkkkkkkkkkk..
+..kcbbbbbbbbak..
+..kcbbbbbbbbak..
+..kcbbbbbbbbak..
+..kbbbbbbbbbak..
+..kbbbbbbbbaak..
+..kaaaaaaaaaak..
+..kkkkkkkkkkkk..
+................
+frame
+................
+................
+................
+................
+..kkkkkkkkkkkk..
+..kcccctTcccak..
+..kbbbbtTbbbak..
+..kkkkktTkkkkk..
+..kcbbbtTbbbak..
+..kcbllllllbak..
+..kcblkkkklbak..
+..kbbllllllbak..
+..kbbbbtTbbaak..
+..kaaaatTaaaak..
+..kkkkkkkkkkkk..
+................

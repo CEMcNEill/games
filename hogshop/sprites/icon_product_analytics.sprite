@@ -1,0 +1,25 @@
+size 16x16
+concept PostHog product_analytics icon (shared with the other kits)
+base data-inspector/public/assets/default/icon_product_analytics.png
+legend
+  a #000000
+  b #0058f8
+  c #3cbcfc
+  d #a4e4fc
+frame
+................
+.aa.............
+.aa.........aa..
+.aa........adda.
+.aa........adda.
+.aa....aa..adda.
+.aa...abba.adda.
+.aa...abba.adda.
+.aa.aaabba.adda.
+.aa.acabba.adda.
+.aa.acabba.adda.
+.aa.acabba.adda.
+.aaaaaaaaaaaaaa.
+.aaaaaaaaaaaaaa.
+................
+................

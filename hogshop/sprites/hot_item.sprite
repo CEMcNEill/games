@@ -1,0 +1,29 @@
+size 16x16
+concept Hog Mansion: a tiny luxury house with a red roof and gold trim
+legend
+  k #141b1b
+  r #8f2a35
+  R #d0404a
+  e #f07a70
+  c #f0e0b0
+  C #c8b080
+  G #e0a820
+  d #6b3e26
+  w #79b8ce
+frame
+.......kk.......
+......kRRk......
+.....kReRRk.....
+....kReRRRrk....
+...kReRRRRRrk...
+..kReRRRRRRRrk..
+.kGGGGGGGGGGGGk.
+..kccccccccCCk..
+..kcwwcccwwcCk..
+..kcwwcccwwcCk..
+..kccccddcccCk..
+..kccccddccCCk..
+..kGGGGddGGGGk..
+..kkkkkkkkkkkk..
+................
+................

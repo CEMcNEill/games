@@ -1,0 +1,24 @@
+size 16x16
+concept PostHog session_replay icon (shared with the other kits)
+base data-inspector/public/assets/default/icon_session_replay.png
+legend
+  a #000000
+  b #f8b800
+  c #fcfcfc
+frame
+................
+..aaaaaaaaaaaa..
+.abbbbbbbbbbbba.
+.abaaaaaaaaaaba.
+.abaccaccaccaba.
+.abaaaaaaaaaaba.
+.abaaacaaaaaaba.
+.abaaaccaaaaaba.
+.abaaacccaaaaba.
+.abaaaccaaaaaba.
+.abaaacaaaaaaba.
+.abaaaaaaaaaaba.
+.abbbbbbbbbbbba.
+..aaaaaaaaaaaa..
+....aaaaaaaa....
+................

@@ -1,0 +1,24 @@
+size 16x16
+concept PostHog surveys icon (shared with the other kits)
+base data-inspector/public/assets/default/icon_surveys.png
+legend
+  a #000000
+  b #f85898
+  c #fcfcfc
+frame
+................
+..aaaaaaaaaaaa..
+.abbbbbbbbbbbba.
+.abccccccccccba.
+.abcaaaaaaaacba.
+.abccccccccccba.
+.abcaaaaaccccba.
+.abccccccccccba.
+.abbbbbbbbbbbba.
+..aaaaabbaaaaa..
+......abba......
+......aba.......
+......aa........
+................
+................
+................

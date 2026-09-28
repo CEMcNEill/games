@@ -1,0 +1,40 @@
+{
+  "prospect": { "name": "Ledgerly", "short": "Ledgerly", "domain": "ledgerly.io" },
+  "title": "Ledgerly Mailroom",
+  "tagline": "Made for Ledgerly by PostHog",
+  "palette": { "primary": "#0a7d5a", "secondary": "#0b1f33", "accent": "#ffd166" },
+  "products": ["product_analytics", "session_replay", "feature_flags", "surveys"],
+  "music": { "mood": "calm, tidy, gently jazzy mailroom shuffle", "bpm": 108 },
+  "text": {
+    "win": "Every welcome kit reached its freelancer. Nobody churned after their first invoice this week.",
+    "lose": "A few kits went to the wrong desk. Deep breath, sort the mail, and try again.",
+    "credits": "With thanks to the Ledgerly team, from PostHog"
+  },
+  "game": {
+    "difficulty": "easy",
+    "store": { "name": "Ledgerly", "sprite_prompt": "light green office carpet tiles seen from above" },
+    "manager": { "name": "Robin", "title": "Head of Product", "sprite_prompt": "a friendly product lead with short dark hair and a green cardigan" },
+    "items": [
+      { "name": "Invoice", "sprite_prompt": "a white paper invoice with a green header" },
+      { "name": "Card", "sprite_prompt": "a green payment card with a gold chip" },
+      { "name": "Welcome Kit", "sprite_prompt": "a small green gift box with a white ribbon" },
+      { "name": "Receipt", "sprite_prompt": "a curled paper receipt roll" },
+      { "name": "Card Reader", "sprite_prompt": "a small black card reader with a screen", "fragile": true },
+      { "name": "Notebook", "sprite_prompt": "a navy notebook with an elastic band" },
+      { "name": "Mug", "sprite_prompt": "a white mug with a green leaf print", "fragile": true },
+      { "name": "Stickers", "sprite_prompt": "a sheet of round green stickers" }
+    ],
+    "hot_item": { "name": "Gold Card", "sprite_prompt": "a shiny gold payment card" },
+    "customers": ["Jo", "Marco", "Ines", "Dev", "Priya", "Sam"],
+    "docks": { "standard": "POST", "express": "COURIER", "international": "OVERSEAS" },
+    "days": [
+      { "intro": "New freelancers sign up every minute. Each one gets a welcome kit. Let's make their first week easy." },
+      { "intro": "Courier orders are for people mid-onboarding. If their kit is late, they drop off. Keep them moving." },
+      { "intro": "Card readers and mugs break in the post. Wrap them first, so nobody's first impression is broken." },
+      { "intro": "The bank link keeps timing out and stopping the belt. Pull the lever. And we have two Gold Cards!" },
+      { "intro": "Tax season. Every freelancer needs their kit at once. Calm, tidy, and quick." }
+    ],
+    "jam": { "name": "BANK TIMEOUT" },
+    "rush": { "name": "TAX SEASON" }
+  }
+}

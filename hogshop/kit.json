@@ -1,0 +1,39 @@
+{
+  "id": "hogshop",
+  "name": "HogShop",
+  "genre": "conveyor-belt packing sim (Overcooked-style order rush)",
+  "buyer": [
+    "ecommerce",
+    "e-commerce",
+    "retail",
+    "operations",
+    "ops",
+    "fulfilment",
+    "fulfillment",
+    "marketplace",
+    "shop"
+  ],
+  "summary": "The PostHog hedgehog runs the back room of the prospect's shop for 5 days: grab products off conveyor belts, pack each order at a table and ship the box through the right dock before the customer loses patience, with PostHog products as cooldown tools.",
+  "products": [
+    "product_analytics",
+    "session_replay",
+    "feature_flags",
+    "experiments",
+    "surveys",
+    "error_tracking"
+  ],
+  "tests": {
+    "bot_patch": {
+      "game.difficulty": "normal"
+    },
+    "bot_expect": "win",
+    "bot_speed": 6,
+    "bot_timeout_s": 170,
+    "play_keys": [
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowLeft",
+      "ArrowDown"
+    ]
+  }
+}

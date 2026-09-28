@@ -1,0 +1,28 @@
+size 16x16
+concept Plushie: a round brown hedgehog plush with a pink-cheeked face
+legend
+  k #141b1b
+  q #6b3e26
+  Q #8a5a3c
+  R #b07a4a
+  f #f0c89a
+  F #d49a70
+  n #3b2020
+  p #f07a90
+frame
+................
+...k.k.kk.k.k...
+..kRkQkQQkQkRk..
+.kRQQQQQQQQQQRk.
+.kQQQQffffQQQQk.
+kQQQQffffffQQQqk
+kQQQfkffffkfQQqk
+kQQQfffnnfffQQqk
+kQQpfffffffpQqqk
+kqQQFffffffFQqqk
+.kqQQFFFFFFQQqk.
+.kqqQQQQQQQQqqk.
+..kqqqqqqqqqqk..
+...kffkkkkffk...
+....kk....kk....
+................

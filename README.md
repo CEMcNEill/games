@@ -11,6 +11,7 @@ Spec: "Prospect Games: Plan & Spec" (Claude Doc).
 | `hog-quest` | Undertale | champion, top accounts |
 | `hog-saga` | Dragon Quest (JRPG) | founder, growth, marketing, sales |
 | `hogtopia` | The Battle of Polytopia (4X) | ceo, coo, vp, executive, leadership, strategy |
+| `hogshop` | Overcooked (packing rush) | ecommerce, retail, operations, fulfilment, marketplace, shop |
 
 make-game picks by whole-word match on the brief's `buyer:`; the earliest matching word wins
 ("vp product" -> hogtopia, "head of product" -> data-inspector). `--kit` or `kit:` in the brief overrides.

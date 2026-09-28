@@ -1,0 +1,35 @@
+size 24x24
+concept blue returns bin with a return arrow
+legend
+  k #141b1b
+  2 #3c7dd9
+  L #79b8ce
+  D #1b4f9c
+  r #6a6478
+  R #9a93b5
+  w #f7f3fb
+frame
+........................
+........................
+..kkkkkkkkkkkkkkkkkkkk..
+.kRRRRRRRRRRRRRRRRRRRRk.
+.krrrrrrrrrrrrrrrrrrrrk.
+.krrrrrrrrrrrrrrrrrrrrk.
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL22wwwwwwww22DDDk..
+..kLLL22wwwww22w22DDDk..
+..kLLL22ww22222w22DDDk..
+..kLLL22w222222w22DDDk..
+..kLLL22w222222w22DDDk..
+..kLLL22wwwwwwww22DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+..kLLL222222222222DDDk..
+...kDDDDDDDDDDDDDDDDk...
+....kkkkkkkkkkkkkkkk....

@@ -1,0 +1,28 @@
+size 16x16
+concept a sealed box with a red return tag
+legend
+  k #141b1b
+  a #8a5a2b
+  b #c68a4a
+  c #e8b878
+  t #f0dca0
+  T #c8b070
+  r #d0404a
+  l #f7f3fb
+frame
+................
+................
+................
+................
+..kkkkkkkkkkkk..
+..kcccctTcccak..
+..kbbbbtTbbbak..
+..kkkkktTkkkkk..
+..kcbrrrrrrbak..
+..kcbrlrrrrbak..
+..kcbllllllbak..
+..kbbrlrrrrbak..
+..kbbrrrrrraak..
+..kaaaatTaaaak..
+..kkkkkkkkkkkk..
+................

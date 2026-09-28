@@ -1,0 +1,29 @@
+size 16x16
+concept Mealworms: a glass jar of freeze-dried mealworms, brown lid
+legend
+  k #141b1b
+  l #6b3e26
+  L #a0643c
+  M #d49a5c
+  g #6a8aa8
+  G #b8d8e8
+  H #f0fbff
+  w #d8a860
+  W #a07038
+frame
+................
+....kkkkkkkk....
+...kLMMMMMMLk...
+...klLLLLLLlk...
+...kkkkkkkkkk...
+...kHGGGGGGgk...
+..kHGwWGGwWGgk..
+..kHGGwwGGGwgk..
+..kGwWGGwWGGgk..
+..kGGGwwGGwWgk..
+..kGwWGGGwwGgk..
+..kGGGwWGGGGgk..
+..kgGGGGGGGggk..
+..kggggggggggk..
+...kkkkkkkkkk...
+................

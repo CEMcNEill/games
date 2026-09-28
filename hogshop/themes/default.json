@@ -1,0 +1,40 @@
+{
+  "prospect": { "name": "HogShop", "short": "HogShop", "domain": "shop.hogflix.dev" },
+  "title": "HogShop: Pack It Up",
+  "tagline": "Behind the scenes at HogShop, by PostHog",
+  "palette": { "primary": "#e45c10", "secondary": "#1d1a2e", "accent": "#f8b800" },
+  "products": ["product_analytics", "session_replay", "feature_flags", "experiments", "surveys", "error_tracking"],
+  "music": { "mood": "bouncy, busy, cheerful warehouse shuffle", "bpm": 124 },
+  "text": {
+    "win": "Every hedgehog got their mealworms. The reviews are glowing and the belts are still humming.",
+    "lose": "Too many orders went astray this week. Coffee, a deep breath, and back to the belts.",
+    "credits": "HogShop is PostHog's demo store: shop.hogflix.dev"
+  },
+  "game": {
+    "difficulty": "easy",
+    "store": { "name": "HogShop", "sprite_prompt": "cool dark grey warehouse concrete slabs seen from above" },
+    "manager": { "name": "Max", "title": "Store Manager", "sprite_prompt": "a cheerful hedgehog in a small orange shop apron" },
+    "items": [
+      { "name": "Mealworms", "sprite_prompt": "a small jar of freeze-dried mealworms with a brown lid" },
+      { "name": "Hog Food", "sprite_prompt": "a green bag of premium hedgehog food" },
+      { "name": "Wheel", "sprite_prompt": "a blue hedgehog exercise wheel on a little stand" },
+      { "name": "Plushie", "sprite_prompt": "a brown hedgehog plush toy" },
+      { "name": "Mug", "sprite_prompt": "a white coffee mug with a small hedgehog print", "fragile": true },
+      { "name": "T-Shirt", "sprite_prompt": "a folded orange t-shirt" },
+      { "name": "Sleep Bag", "sprite_prompt": "a rolled up purple hedgehog sleeping bag" },
+      { "name": "Bowl Set", "sprite_prompt": "a pale blue ceramic food bowl", "fragile": true }
+    ],
+    "hot_item": { "name": "Hog Mansion", "sprite_prompt": "a tiny luxury hedgehog house with a red roof and gold trim" },
+    "customers": ["Sonic", "Spike", "Bramble", "Hazel", "Pip", "Quill", "Ruby", "Tiggy"],
+    "docks": { "standard": "STANDARD", "express": "EXPRESS", "international": "WORLDWIDE" },
+    "days": [
+      { "intro": "Welcome to the back room! Customers are clicking Add to Cart as we speak. Let's get their orders out." },
+      { "intro": "Express shipping is live. It converts great, but those customers do not like to wait." },
+      { "intro": "Last week a mug arrived in more pieces than it left in. Fragile items get bubble wrap now." },
+      { "intro": "We ship worldwide from today. And the Hog Mansion is back in stock: only two left!" },
+      { "intro": "Flash sale! Twenty percent off everything and the checkout button is on fire. All paws on deck." }
+    ],
+    "jam": { "name": "BELT JAM" },
+    "rush": { "name": "FLASH SALE" }
+  }
+}

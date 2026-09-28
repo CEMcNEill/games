@@ -1,0 +1,40 @@
+{
+  "prospect": { "name": "Pawprint", "short": "Pawprint", "domain": "pawprint.app" },
+  "title": "Pawprint Supply Shop",
+  "tagline": "A pawsitively tiny game from PostHog",
+  "palette": { "primary": "#7b3fe4", "secondary": "#ffffff", "accent": "#ff8a3d" },
+  "products": ["error_tracking", "session_replay", "experiments", "product_analytics"],
+  "music": { "mood": "playful, bouncy, cartoon pet shop, a bit silly", "bpm": 128 },
+  "text": {
+    "win": "Every walker got their leash, every sitter got their treats. Good dev. Very good dev.",
+    "lose": "Too many boxes went walkies to the wrong door. Have a treat and try again.",
+    "credits": "Made with love (and dog puns) for Pawprint by PostHog"
+  },
+  "game": {
+    "difficulty": "normal",
+    "store": { "name": "Pawprint", "sprite_prompt": "purple and white checkered pet shop floor seen from above" },
+    "manager": { "name": "Biscuit", "title": "Top Dog", "sprite_prompt": "a golden retriever wearing a purple bandana" },
+    "items": [
+      { "name": "Leash", "sprite_prompt": "a coiled purple dog leash" },
+      { "name": "Treats", "sprite_prompt": "a small bag of bone-shaped dog treats" },
+      { "name": "Chew Toy", "sprite_prompt": "an orange rubber chew bone" },
+      { "name": "Ball", "sprite_prompt": "a yellow tennis ball" },
+      { "name": "Dog Bowl", "sprite_prompt": "a white ceramic dog bowl with a paw print", "fragile": true },
+      { "name": "Collar", "sprite_prompt": "a red dog collar with a gold tag" },
+      { "name": "Shampoo", "sprite_prompt": "a pink bottle of dog shampoo", "fragile": true },
+      { "name": "Pet Bed", "sprite_prompt": "a round purple pet bed" }
+    ],
+    "hot_item": { "name": "Deluxe Kennel", "sprite_prompt": "a small wooden dog kennel with a purple roof" },
+    "customers": ["Rex", "Luna", "Bella", "Max", "Daisy", "Milo", "Coco"],
+    "docks": { "standard": "WALKIES", "express": "ZOOMIES", "international": "ABROAD" },
+    "days": [
+      { "intro": "Walkers and sitters are booking like mad. Every booking gets a care kit. Let's fetch!" },
+      { "intro": "Zoomies orders are for walks starting in an hour. Half of bookings get abandoned when we are slow." },
+      { "intro": "Bowls and shampoo bottles hate the post. Bubble wrap first, or it is a soggy doormat." },
+      { "intro": "The app crashed during booking again and the belt stopped with it. Pull the lever. Kennels in stock!" },
+      { "intro": "Holiday rush. Every dog in town needs a sitter and every sitter needs a kit. Good luck!" }
+    ],
+    "jam": { "name": "APP CRASH" },
+    "rush": { "name": "HOLIDAY RUSH" }
+  }
+}
