@@ -53,8 +53,10 @@ startKit({
   ],
   endSummary: () => {
     const save = kitSave();
+    const out0: string[] = [];
     if (lastEnd.endless) return [`ENDLESS BEST ${save.endlessBest} RECORDS`];
-    const out: string[] = [];
+    if (lastEnd.daily) out0.push(`DAILY SHIFT ${new Date().toISOString().slice(0, 10)}`);
+    const out: string[] = out0;
     const e = lastEnd.ending;
     if (e) out.push(...wrap(fill(e.text, lastEnd.names), 68, 2));
     const found = save.endings.filter((id) => ENDINGS.some((x) => x.id === id)).length;

@@ -60,7 +60,7 @@ export function kitSave(): KitSave {
 }
 
 /** What the End screen's kit lines need (set by finish()). */
-export const lastEnd = { ending: null as Ending | null, grade: '', endless: false, records: 0, newBestGrade: false, names: {} as Record<string, string> };
+export const lastEnd = { ending: null as Ending | null, grade: '', endless: false, daily: false, records: 0, newBestGrade: false, names: {} as Record<string, string> };
 
 export class GameScene extends Phaser.Scene {
   private world!: World;
@@ -283,7 +283,10 @@ export class GameScene extends Phaser.Scene {
     this.request = REQUESTS.find((q) => q.day === this.day) ?? null;
     this.panel(`DAY ${this.day + 1}`);
     const ui = K.ui;
-    this.add_(text(this, W / 2, 42, K.theme.game.desk.name, { align: 'center', color: ui.dimInt, depth: 102, maxWidth: W - 60, maxLines: 1 }));
+    const tag = [this.runMode === 'daily' ? `DAILY ${new Date().toISOString().slice(0, 10)}` : '', this.heatN ? `HEAT ${this.heatN}` : '']
+      .filter(Boolean).join(' - ');
+    this.add_(text(this, W / 2, 42, tag ? `${K.theme.game.desk.name} - ${tag}` : K.theme.game.desk.name,
+      { align: 'center', color: tag ? GOLD : ui.dimInt, depth: 102, maxWidth: W - 60, maxLines: 1 }));
     const y = Math.max(this.managerSays(K.theme.game.days[this.day]?.intro ?? 'Back to work!', 58) + 8, 118);
     const rules = this.world.days[this.day];
     this.add_(text(this, 118, y, rules.length > 1 ? 'NEW RULES' : 'NEW RULE', { color: ui.accentInt, depth: 102 }));
@@ -531,6 +534,7 @@ export class GameScene extends Phaser.Scene {
 
   private startEndless() {
     this.day = 0;
+    this.desk.setClockLabel('NEXT');
     this.world.newDay(0);
     this.charges = new Map(this.tools.map((id) => [id, this.diff.charges]));
     this.refreshDocs(false);
@@ -928,7 +932,7 @@ export class GameScene extends Phaser.Scene {
     const judged = this.total.processed - this.total.skipped;
     const acc = judged > 0 ? Math.round((100 * this.total.correct) / judged) : 0;
     const save = kitSave();
-    Object.assign(lastEnd, { ending: null, grade: '', endless: false, records: 0, newBestGrade: false, names: this.names() });
+    Object.assign(lastEnd, { ending: null, grade: '', endless: false, daily: this.runMode === 'daily', records: 0, newBestGrade: false, names: this.names() });
     if (this.runMode === 'endless') {
       const n = this.total.correct; // endless score = records called right
       lastEnd.endless = true;
@@ -957,7 +961,7 @@ export class GameScene extends Phaser.Scene {
       lastEnd.newBestGrade = true;
     }
     meta.save();
-    if (won) {
+    if (won && this.grades.length >= DAYS) { // a real week (not a debug jump)
       achieve('first_week');
       if (this.patternNoted >= 3) achieve('pattern');
       if (this.toolsUsed === 0) achieve('no_tools');
@@ -975,7 +979,7 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(won ? 300 : 700, () => this.scene.start('End', {
       won, score: this.score, headline,
       stats: [['Records checked', this.total.processed], ['Accuracy', `${acc}%`],
-        ['Week grade', won ? `${weekGrade}  (days ${this.grades.map((g) => g.g).join('')})` : '-']],
+        ['Week grade', won ? `${weekGrade}${this.grades.length ? `  (days ${this.grades.map((g) => g.g).join('')})` : ''}` : '-']],
       props: { day: this.day + 1, accuracy: acc, quality: Math.round(this.quality), tools: this.tools, ending: ending?.id ?? null,
         grade: weekGrade, heat: this.heatN, mode: this.runMode },
     }));

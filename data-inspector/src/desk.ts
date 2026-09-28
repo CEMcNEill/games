@@ -37,6 +37,7 @@ export class Desk {
   private streakT!: PixelText;
   private flames!: Phaser.GameObjects.Graphics;
   private streak = 0;
+  private clockLabel!: PixelText;
   private sayT!: PixelText;
   hog!: Phaser.GameObjects.Sprite;
   private boss!: Phaser.GameObjects.Sprite;
@@ -64,7 +65,7 @@ export class Desk {
     const g = scene.add.graphics().setDepth(1);
     g.fillStyle(ui.bgInt, 1).fillRect(0, 0, W, 17).fillStyle(ui.panelInt, 1).fillRect(0, 17, W, 1);
     this.day = text(scene, 4, 4, 'DAY 1/5', { color: ui.accentInt, depth: 2 });
-    text(scene, 58, 4, 'TIME', { color: ui.dimInt, depth: 2 });
+    this.clockLabel = text(scene, 58, 4, 'TIME', { color: ui.dimInt, depth: 2 });
     this.clock = bar(scene, 86, 6, 90, 5, ui.accentInt, 0x000000, ui.textInt);
     this.clock.g.setDepth(2);
     text(scene, 186, 4, 'QUALITY', { color: ui.dimInt, depth: 2 });
@@ -111,6 +112,7 @@ export class Desk {
     }
   }
   clockBar(frac: number, col: number) { this.clock.draw(frac, col); }
+  setClockLabel(s: string) { this.clockLabel.setText(s); }
 
   /** Streak flames: 1/2/3 flickering pixel flames at 3+/6+/10+. */
   tickFlames(t: number) {
@@ -290,6 +292,14 @@ export class Desk {
     this.fresh.delete(next.id);
     K.play('rustle', 0.7);
     this.renderDocs();
+    // A quick page flip: the new page slides up into place.
+    for (const o of this.body) {
+      const t = o as unknown as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.Components.Alpha & Phaser.GameObjects.GameObject;
+      const y = t.y;
+      t.y = y + 6;
+      t.setAlpha(0.4);
+      this.s.tweens.add({ targets: t, y, alpha: 1, duration: 90, ease: 'Quad.easeOut' });
+    }
   }
 
   scrollDoc(d: number) {
