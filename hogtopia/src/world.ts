@@ -109,7 +109,7 @@ export class World {
     const tech = UNITS[type].tech;
     if (!tech) return true;
     if (o === 0) return this.has(0, tech);
-    const at = ({ archer: 5, defender: 8, catcher: 12 } as Record<string, number>)[type] ?? 99;
+    const at = ({ archer: 5, defender: 8, catcher: 12, catapult: 15 } as Record<string, number>)[type] ?? 99;
     return this.turn >= at + this.unlockShift();
   }
   /** Effective unit numbers after techs. */

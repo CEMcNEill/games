@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { K, spr } from '@shared/kit';
 import { text, box } from '@shared/ui';
 import products from '../../shared/products.json';
-import { TECHS, TIER2, BASE_TECHS, UNITS, UNIT_ORDER, UnitType, LEVEL_REWARDS } from './data';
+import { TECHS, TIER2, BASE_TECHS, UNITS, UNIT_ORDER, TRAINABLE, UnitType, LEVEL_REWARDS } from './data';
 import { World, City } from './world';
 
 export const productName = (id: string) => (products as Record<string, { name: string }>)[id]?.name ?? id;
@@ -65,11 +65,11 @@ export function drawTech(scene: Phaser.Scene, w: World, row: number, col: number
 
 export function drawTrain(scene: Phaser.Scene, w: World, c: City, sel: number, name: (t: UnitType) => string): Objs {
   const ui = K.ui, o: Objs = [];
-  const bx = 30, by = 40, bw = 250, bh = 136;
+  const bx = 30, by = 36, bw = 250, bh = 150;
   o.push(box(scene, bx, by, bw, bh, ui.bgInt, ui.textInt, ui.panelInt).setDepth(30));
   o.push(text(scene, bx + bw / 2, by + 6, `TRAIN AT ${c.name.toUpperCase()}`, { align: 'center', color: ui.accentInt, depth: 31, maxWidth: bw - 12, maxLines: 1 }));
-  [...UNIT_ORDER, 'invest'].forEach((id, i) => {
-    const y = 60 + i * 16;
+  [...TRAINABLE, 'invest'].forEach((id, i) => {
+    const y = 54 + i * 16;
     if (i === sel) o.push(scene.add.rectangle(36, y - 2, 238, 14, ui.panelInt, 0.6).setOrigin(0).setDepth(31));
     if (id === 'invest') {
       o.push(scene.add.image(44, y - 1, spr('star')).setOrigin(0).setDepth(32));
@@ -79,13 +79,14 @@ export function drawTrain(scene: Phaser.Scene, w: World, c: City, sel: number, n
     }
     const t = id as UnitType, s = w.stats({ owner: 0, type: t });
     const locked = !w.unlocked(0, t);
-    o.push(scene.add.image(40, y - 3, spr('units'), UNIT_ORDER.indexOf(t)).setOrigin(0).setDepth(32).setAlpha(locked ? 0.4 : 1));
-    const label = locked ? `${name(t)} - needs ${productName(UNITS[t].tech!)}`
-      : `${name(t)}  ${s.cost}*  A${s.atk} D${s.def} M${s.move}${s.range > 1 ? ' R2' : ''}`;
+    const art = UNIT_ORDER.includes(t) ? scene.add.image(40, y - 3, spr('units'), UNIT_ORDER.indexOf(t)) : scene.add.image(40, y - 3, spr('extra'), 8);
+    o.push(art.setOrigin(0).setDepth(32).setAlpha(locked ? 0.4 : 1));
+    const label = locked ? `${name(t)} - needs ${techName(UNITS[t].tech!)}`
+      : `${name(t)}  ${s.cost}*  A${s.atk} D${s.def} M${s.move}${s.range > 1 ? ` R${s.range}` : ''}`;
     o.push(text(scene, 60, y, label, { depth: 32, color: w.canTrain(0, c, t) ? ui.textInt : ui.dimInt, maxWidth: 212, maxLines: 1 }));
   });
   const cap = w.myUnits(0).length >= w.unitCap(0);
-  o.push(text(scene, 155, 160, cap ? 'Unit limit reached: grow your cities' : `You have ${w.f[0].stars} stars`, { align: 'center', depth: 32, color: ui.dimInt }));
+  o.push(text(scene, 155, by + bh - 14, cap ? 'Unit limit reached: grow your cities' : `You have ${w.f[0].stars} stars`, { align: 'center', depth: 32, color: ui.dimInt }));
   return o;
 }
 

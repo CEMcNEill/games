@@ -13,7 +13,7 @@ export type Action =
   | { kind: 'capture'; u: Unit }
   | { kind: 'invest'; city: City };
 
-const VALUE: Record<UnitType, number> = { scout: 2, warrior: 3, archer: 4, defender: 4, catcher: 6, giant: 10 };
+const VALUE: Record<UnitType, number> = { scout: 2, warrior: 3, archer: 4, defender: 4, catcher: 6, catapult: 6, giant: 10 };
 
 /** The side's personality after difficulty and heat. */
 export function profile(w: World, o: Owner): Personality {

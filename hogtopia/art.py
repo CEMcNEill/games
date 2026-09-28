@@ -433,7 +433,7 @@ GIANT = [
 
 def _extra(pal):
     """Fixed kit art: 0 giant (yours), 1 giant (rival), 2 boat hull, 3 monument, 4 city wall, 5 park,
-    6 veteran chevron, 7 rival-turn marker (skull-ish bug)."""
+    6 veteran chevron, 7 rival-turn marker (skull-ish bug), 8 catapult (yours), 9 catapult (rival)."""
     from sprites import render
     riv = rival_colour(pal)
     rpal = dict(pal, **{"1": riv, "4": shade(riv, 0.55)})
@@ -460,10 +460,17 @@ def _extra(pal):
         "kkkkkk..........", "kyyyyk..........", "kykkyk..........", "kk..kk..........", "kkkkkk..........",
         "kyyyyk..........", "kykkyk..........", "kk..kk..........", "................", "................",
         "................", "................", "................", "................", "................", "................"], pal))
+    cat = [
+        "................", "................", "............kk..", "...........kyyk.", "..........kkyyk.", ".........kok....",
+        "........kok.....", ".......kok......", "......kok.......", ".kkkkkkokkkkkkk.", ".k1111111111111k", ".k4444444444444k",
+        ".kkkkkkkkkkkkkk.", "..kgk......kgk..", "..kkk......kkk..", "................"]
+    frames.append(render(cat, pal))
+    frames.append(render(cat, rpal))
     frames.append(render([
         "................", "................", "...kk......kk...", "..kRRk....kRRk..", "...kRRkkkkRRk...", "....kRRRRRRk....",
         "...kRRkRRkRRk...", "...kRRRRRRRRk...", "....kRkRRkRk....", "...kRk.kk.kRk...", "................",
         "................", "................", "................", "................", "................"], pal))
+    frames[7:10] = [frames[9], frames[7], frames[8]]  # keep 7 = marker; catapults at 8 and 9
     return frames
 
 

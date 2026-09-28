@@ -53,6 +53,14 @@ with sync_playwright() as p:
         pg.evaluate("__game.debug.reveal()"); pg.wait_for_timeout(300); shot(pg, "map-" + m[4:])
         print(m, pg.evaluate("JSON.stringify(__game.debug.setup())"))
         pg.close()
+    if "train" in want:
+        pg = start(b)
+        pg.evaluate("__game.debug.stars(40)")
+        pg.keyboard.press("t"); pg.wait_for_timeout(200); pg.keyboard.press("Enter"); pg.wait_for_timeout(200)
+        pg.evaluate("__game.debug.research('funnels')")
+        pg.evaluate("__game.debug.trainMenu()"); pg.wait_for_timeout(300)
+        shot(pg, "train"); pg.keyboard.press("Escape"); pg.keyboard.press("t"); pg.wait_for_timeout(300); shot(pg, "tech-owned")
+        pg.close()
     if "heat" in want:
         pg = start(b)
         pg.evaluate("__game.debug.heat(5)"); pg.wait_for_timeout(800); pg.evaluate("__game.debug.reveal()"); pg.wait_for_timeout(300); shot(pg, "heat5")

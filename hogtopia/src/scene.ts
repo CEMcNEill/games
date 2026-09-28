@@ -10,7 +10,7 @@ import { text, box, PixelText, W, H } from '@shared/ui';
 import { dist, toInt } from '@shared/palette';
 import { World, MAX_TURNS, UNITS, TECHS, Unit, City, Owner, UnitType, cheb, foes } from './world';
 import { aiTurn, Action, dangerMap } from './ai';
-import { UNIT_ORDER, LEVEL_REWARDS, MONUMENTS, PERSONALITIES, PERSONALITY_IDS, VET_KILLS } from './data';
+import { UNIT_ORDER, TRAINABLE, LEVEL_REWARDS, MONUMENTS, PERSONALITIES, PERSONALITY_IDS, VET_KILLS } from './data';
 import { MAP_TYPES } from './mapgen';
 import { productName, techName, techGrid, drawTech, drawTrain, drawReward, drawTruce } from './menus';
 import { chooseSetup, RunSetup } from './setup';
@@ -26,8 +26,8 @@ const SX = MX + VW + 6; // sidebar x
 const SW = W - SX - 4;
 const BIOMES = ['meadow', 'desert', 'tundra', 'circuit'];
 
-export const PLAYER_UNIT_NAMES: Record<UnitType, string> = { scout: 'Intern', warrior: 'Engineer', archer: 'Analyst', defender: 'Flag Guard', catcher: 'Bug Catcher', giant: 'Giant' };
-const RIVAL_UNIT_NAMES: Record<UnitType, string> = { scout: 'Stray Cron', warrior: 'Tech Debt', archer: 'Spam Alert', defender: 'Firewall', catcher: 'Monolith Bot', giant: 'Behemoth' };
+export const PLAYER_UNIT_NAMES: Record<UnitType, string> = { scout: 'Intern', warrior: 'Engineer', archer: 'Analyst', defender: 'Flag Guard', catcher: 'Bug Catcher', catapult: 'Catapult', giant: 'Giant' };
+const RIVAL_UNIT_NAMES: Record<UnitType, string> = { scout: 'Stray Cron', warrior: 'Tech Debt', archer: 'Spam Alert', defender: 'Firewall', catcher: 'Monolith Bot', catapult: 'Spam Cannon', giant: 'Behemoth' };
 const PERSONA_TIPS: Record<string, string> = {
   aggressor: 'Scouts say this rival is an AGGRESSOR. Expect an early attack: guard your capital!',
   expander: 'This rival is an EXPANDER: it races for villages. Grab the ones near you fast!',
@@ -245,6 +245,7 @@ export class MapScene extends Phaser.Scene {
 
   private unitFrame(u: Unit): [string, number] {
     if (u.type === 'giant') return [spr('extra'), u.owner === 0 ? 0 : 1];
+    if (u.type === 'catapult') return [spr('extra'), u.owner === 0 ? 8 : 9];
     return [spr('units'), (u.owner === 0 ? 0 : 5) + UNIT_ORDER.indexOf(u.type)];
   }
 
@@ -651,12 +652,14 @@ export class MapScene extends Phaser.Scene {
   }
 
   private openTrain(c: City) {
+    if (this.menu) { this.menu.objs.forEach((o) => o.destroy()); this.menu = null; }
     this.menu = { kind: 'train', sel: 0, city: c, objs: [] };
     hooks.state = 'menu';
     this.drawMenu();
   }
 
   private openTech() {
+    if (this.menu) { this.menu.objs.forEach((o) => o.destroy()); this.menu = null; }
     this.sel = null;
     // Start on the first product you can research (or the first row).
     const grid = techGrid(this.w);
@@ -706,9 +709,10 @@ export class MapScene extends Phaser.Scene {
     }
     if (code === 'Escape' || (code === 'KeyT' && m.kind === 'tech')) { this.closeMenu(); return; }
     if (m.kind === 'train') {
-      if (up || down) { m.sel = (m.sel + (up ? 5 : 1)) % 6; K.play('move', 0.3); this.drawMenu(); return; }
+      const n = TRAINABLE.length + 1;
+      if (up || down) { m.sel = (m.sel + (up ? n - 1 : 1)) % n; K.play('move', 0.3); this.drawMenu(); return; }
       if (!ok) return;
-      if (m.sel === 5) {
+      if (m.sel === TRAINABLE.length) {
         const r = w.invest(0, m.city);
         if (!r) { K.play('error'); return; }
         K.play(r.grew ? 'levelup' : 'harvest');
@@ -716,7 +720,7 @@ export class MapScene extends Phaser.Scene {
         this.drawMenu();
         return;
       }
-      const u = w.train(0, m.city, UNIT_ORDER[m.sel]);
+      const u = w.train(0, m.city, TRAINABLE[m.sel]);
       if (!u) { K.play('error'); return; }
       K.play('train');
       this.closeMenu();
@@ -816,11 +820,25 @@ export class MapScene extends Phaser.Scene {
     const gen = aiTurn(this.w, o);
     let guard = 0;
     for (let a = gen.next(); !a.done && this.alive && guard < 400; a = gen.next(), guard++) {
+      const shown = o === 0 || this.visible(a.value);
       await this.apply(a.value, o);
       if (this.w.over) break;
-      if (!this.fast() || guard % 8 === 0) await this.wait(this.animMs);
+      // Rival moves hidden in the fog don't make you wait.
+      if ((!this.fast() && shown) || guard % 8 === 0) await this.wait(shown ? this.animMs : 0);
     }
     this.redraw();
+  }
+
+  private visible(a: Action) {
+    const seen = (x: number, y: number) => this.w.tile(x, y)?.seen;
+    switch (a.kind) {
+      case 'move': return seen(a.u.x, a.u.y) || seen(a.x, a.y);
+      case 'attack': return seen(a.u.x, a.u.y) || seen(a.target.x, a.target.y);
+      case 'capture': return seen(a.u.x, a.u.y);
+      case 'harvest': return seen(a.x, a.y);
+      case 'train': case 'invest': return seen(a.city.x, a.city.y);
+      default: return false;
+    }
   }
 
   private async apply(a: Action, o: Owner) {
@@ -956,6 +974,8 @@ export class MapScene extends Phaser.Scene {
       turn: (n: number) => { w().turn = Math.max(1, Math.min(MAX_TURNS, Math.floor(n))); this.redraw(); },
       rivalTurn: () => this.endTurn(),
       techTree: () => { this.openTech(); },
+      research: (id: string) => { const f = w().f[0]; for (const t of [TECHS[id]?.requires, id]) if (t && !f.techs.includes(t)) f.techs.push(t); w().updateFog(); this.redraw(); return [...f.techs]; },
+      trainMenu: () => { const c = w().capital(0); if (c && c.owner === 0) this.openTrain(c); },
       // Load test: fill the map with units on both sides (every tile they can stand on, up to n each).
       flood: (n = 45) => {
         const W0 = w();

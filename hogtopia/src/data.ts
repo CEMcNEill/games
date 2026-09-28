@@ -4,7 +4,7 @@ export const MAX_TURNS = 24;
 
 export type Terrain = 'plain' | 'forest' | 'mountain' | 'water';
 export type Res = 'data' | 'fruit' | 'fish' | null;
-export type UnitType = 'scout' | 'warrior' | 'archer' | 'defender' | 'catcher' | 'giant';
+export type UnitType = 'scout' | 'warrior' | 'archer' | 'defender' | 'catcher' | 'catapult' | 'giant';
 
 export interface UnitDef { cost: number; hp: number; atk: number; def: number; move: number; range: number; vision: number; tech: string | null; splash?: number }
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -13,11 +13,15 @@ export const UNITS: Record<UnitType, UnitDef> = {
   archer: { cost: 3, hp: 10, atk: 2, def: 1, move: 1, range: 2, vision: 2, tech: 'product_analytics' },
   defender: { cost: 3, hp: 15, atk: 1, def: 3, move: 1, range: 1, vision: 1, tech: 'feature_flags' },
   catcher: { cost: 5, hp: 12, atk: 3, def: 2, move: 2, range: 1, vision: 1, tech: 'error_tracking', splash: 2 },
+  // Siege: long range, paper thin. Unlocked by Funnels (tier 2 of Product Analytics).
+  catapult: { cost: 6, hp: 8, atk: 4, def: 1, move: 1, range: 3, vision: 1, tech: 'funnels' },
   // Only from a level-5 city reward; never trained.
   giant: { cost: 99, hp: 30, atk: 4, def: 3, move: 1, range: 1, vision: 2, tech: 'never' },
 };
 /** Trainable units in menu order (frame index in the units sheet = this order; giant has its own art). */
 export const UNIT_ORDER: UnitType[] = ['scout', 'warrior', 'archer', 'defender', 'catcher'];
+/** Everything the train menu offers (catapult and giant art live in the fixed `extra` sheet). */
+export const TRAINABLE: UnitType[] = [...UNIT_ORDER, 'catapult'];
 export const VET_KILLS = 3;
 export const VET_HP = 5;
 
@@ -36,7 +40,7 @@ export const TECHS: Record<string, TechDef> = {
   error_tracking: { tier: 1, effect: 'Unlocks catchers: attacks also hit nearby enemies.' },
   surveys: { tier: 1, effect: 'Capture neutral villages the turn you arrive.' },
   data_warehouse: { tier: 1, effect: '+2 stars every turn.' },
-  funnels: { tier: 2, name: 'Funnels', requires: 'product_analytics', effect: 'Ranged units get +1 attack.' },
+  funnels: { tier: 2, name: 'Funnels', requires: 'product_analytics', effect: 'Ranged units +1 attack. Unlocks catapults.' },
   heatmaps: { tier: 2, name: 'Heatmaps', requires: 'session_replay', effect: 'Units see 1 further. Red marks show rival reach.' },
   rollouts: { tier: 2, name: 'Rollouts', requires: 'feature_flags', effect: 'Shield units get +5 HP and move 2.' },
   multivariate: { tier: 2, name: 'Multivariate', requires: 'experiments', effect: 'Investing is 3 stars cheaper and gives 2 pop.' },
@@ -79,7 +83,7 @@ export interface Personality {
 }
 export const PERSONALITIES: Record<string, Personality> = {
   aggressor: { id: 'aggressor', name: 'Aggressor', aggroTurn: 5, mass: 3, expand: 0.8, garrison: 0, risk: -2, retreat: 0.25, invest: 0.5, terrain: 0.5,
-    army: ['catcher', 'warrior', 'archer', 'warrior'], rewards: ['explorer', 'stockpile', 'growth', 'giant'],
+    army: ['catcher', 'warrior', 'archer', 'warrior', 'catapult'], rewards: ['explorer', 'stockpile', 'growth', 'giant'],
     lines: ['Charge! Every city will be mine.', 'Your borders look soft today.', 'I brought friends. Lots of friends.'] },
   expander: { id: 'expander', name: 'Expander', aggroTurn: 11, mass: 4, expand: 2, garrison: 0, risk: 0, retreat: 0.35, invest: 1.3, terrain: 0.7,
     army: ['archer', 'warrior', 'catcher', 'defender'], rewards: ['workshop', 'stockpile', 'borders', 'park'],
@@ -88,20 +92,20 @@ export const PERSONALITIES: Record<string, Personality> = {
     army: ['defender', 'archer', 'warrior', 'catcher'], rewards: ['workshop', 'wall', 'borders', 'giant'],
     lines: ['My walls have walls.', 'Come and try it. I will wait.', 'Slow and steady wins.'] },
   opportunist: { id: 'opportunist', name: 'Opportunist', aggroTurn: 8, mass: 3, expand: 1.2, garrison: 0, risk: -1, retreat: 0.4, invest: 0.9, terrain: 1,
-    army: ['archer', 'catcher', 'warrior', 'scout'], rewards: ['workshop', 'stockpile', 'growth', 'giant'],
+    army: ['archer', 'catcher', 'catapult', 'warrior', 'scout'], rewards: ['workshop', 'stockpile', 'growth', 'giant'],
     lines: ['A hurt unit? How lucky for me.', 'I only pick fights I can win.', 'You left a gap. I noticed.'] },
 };
 export const PERSONALITY_IDS = Object.keys(PERSONALITIES);
 /** Your autopilot: balanced, a bit bolder than the rival. */
 export const AUTOPILOT: Personality = { id: 'auto', name: 'Autopilot', aggroTurn: 7, mass: 3, expand: 1.5, garrison: 0, risk: -1, retreat: 0.35, invest: 1,
-  terrain: 1, army: ['catcher', 'archer', 'warrior', 'defender'], rewards: ['workshop', 'stockpile', 'borders', 'giant'], lines: [] };
+  terrain: 1, army: ['catcher', 'archer', 'catapult', 'warrior', 'defender'], rewards: ['workshop', 'stockpile', 'borders', 'giant'], lines: [] };
 
 // ---------------------------------------------------------------- difficulty + heat
 export interface Diff { rivalStars: number; rivalIncome: number; growth: number; rivalUnlock: number; aggro: number; mass: number; risk: number; extraUnit: boolean }
 export const DIFF: Record<string, Diff> = {
   easy: { rivalStars: 3, rivalIncome: 0, growth: 0, rivalUnlock: 3, aggro: 5, mass: 1, risk: 2, extraUnit: false },
-  normal: { rivalStars: 6, rivalIncome: 7, growth: 0.35, rivalUnlock: 0, aggro: 0, mass: 0, risk: 0, extraUnit: false },
-  hard: { rivalStars: 10, rivalIncome: 6, growth: 0.55, rivalUnlock: -2, aggro: -2, mass: 0, risk: -1, extraUnit: true },
+  normal: { rivalStars: 6, rivalIncome: 5, growth: 0.35, rivalUnlock: 0, aggro: 0, mass: 0, risk: 0, extraUnit: false },
+  hard: { rivalStars: 10, rivalIncome: 5, growth: 0.55, rivalUnlock: -2, aggro: -2, mass: 0, risk: -1, extraUnit: true },
 };
 /** HEAT n: rival bonus stars, earlier units, sharper AI, a second rival at 4+, fewer ruins. */
 export const HEAT = [
