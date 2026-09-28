@@ -3,7 +3,7 @@
 // mapgen.ts and the AI in ai.ts.
 import {
   MAX_TURNS, UNITS, UnitType, TECHS, TIER2, BASE_TECHS, TECH_COST, RIVAL_TECHS, DIFF, Diff, HEAT, LEVEL_REWARDS,
-  Personality, PERSONALITIES, AUTOPILOT, VET_KILLS, VET_HP, MONUMENTS, MONUMENT_SCORE, PARK_SCORE, Res,
+  Personality, PERSONALITIES, AUTOPILOT, FIRST_GAME, VET_KILLS, VET_HP, MONUMENTS, MONUMENT_SCORE, PARK_SCORE, Res,
 } from './data';
 import { MapData, Tile, City, generateMap, landDist, cheb, land, rng, hash } from './mapgen';
 
@@ -23,6 +23,8 @@ export interface Names { capital: string; cities: string[]; rivalCapital: string
 export interface Setup {
   seed: number; biome: string; difficulty: string; products: string[]; names: Names;
   map?: string; heat?: number; personality?: string;
+  /** First game for this prospect: the rival gets only the original (gentler) difficulty bonuses. */
+  firstGame?: boolean;
 }
 export type Over = { won: boolean; reason: 'capital' | 'score' | 'lost' | 'outscored' | 'debug'; bonus: number };
 
@@ -55,6 +57,7 @@ export class World {
     this.biome = s.biome;
     this.difficulty = DIFF[s.difficulty] ? s.difficulty : 'normal';
     this.diff = DIFF[this.difficulty];
+    if (s.firstGame) this.diff = { ...this.diff, ...FIRST_GAME[this.difficulty] };
     this.heat = Math.max(0, Math.min(5, Math.floor(s.heat ?? 0)));
     const H0 = HEAT[this.heat];
     this.products = s.products.filter((p) => TECHS[p]?.tier === 1);

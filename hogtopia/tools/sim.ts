@@ -18,11 +18,30 @@ function apply(w: World, a: Action, o: Owner) {
   }
 }
 
+// Behaviour counters for the rival side (BEHAV=1).
+export const B = { attacks: 0, focus: 0, kills: 0, moves: 0, defTile: 0, landTiles: 0, defLand: 0, assaultTurns: 0, turns: 0, retreats: 0 };
 function runSide(w: World, o: Owner) {
   w.startTurn(o);
   const g = aiTurn(w, o);
   let n = 0;
-  for (let a = g.next(); !a.done && n < 400; a = g.next(), n++) { apply(w, a.value, o); if (w.over) break; }
+  if (o === 1) { B.turns++; if (w.f[1].ai.assault) B.assaultTurns++; }
+  for (let a = g.next(); !a.done && n < 400; a = g.next(), n++) {
+    const v = a.value;
+    if (o === 1 && v.kind === 'attack') { B.attacks++; if (v.target.hp < v.target.maxHp) B.focus++; if (w.forecast(v.u, v.target).kills) B.kills++; }
+    if (o === 1 && v.kind === 'move') {
+      B.moves++;
+      const t = w.tile(v.x, v.y); const c = w.cityAt(v.x, v.y);
+      if (t.t === 'forest' || t.t === 'mountain' || (c && c.owner === 1)) B.defTile++;
+      if (v.u.hp < v.u.maxHp * 0.5 && c && c.owner === 1) B.retreats++;
+    }
+    // CASUAL2=1: same filter as the old-kit comparison (research every 3rd turn, fight only near your cities, never take rival cities).
+    if (process.env.CASUAL2 && o === 0) {
+      if (v.kind === 'research' && w.turn % 3 !== 0) continue;
+      if (v.kind === 'attack' && !w.myCities(0).some((c) => Math.max(Math.abs(c.x - v.target.x), Math.abs(c.y - v.target.y)) <= 2)) continue;
+      if (v.kind === 'capture' && (w.cityAt(v.u.x, v.u.y)?.owner ?? -1) > 0) continue;
+    }
+    apply(w, v, o); if (w.over) break;
+  }
   if (!w.over) w.endTurn(o);
 }
 
@@ -30,8 +49,14 @@ const PRODUCTS = (process.env.PRODUCTS ?? 'product_analytics,experiments,feature
 
 export function play(seed: number, diff: string, personality: string, heat: number, map: string, passive: boolean) {
   const names = { capital: 'HQ', cities: ['A', 'B', 'C', 'D', 'E'], rivalCapital: 'Old', rivalShort: 'Mono' };
-  const w = new World({ seed, biome: 'meadow', difficulty: diff, products: PRODUCTS, names, personality, heat, map });
+  const w = new World({ seed, biome: 'meadow', difficulty: diff, products: PRODUCTS, names, personality, heat, map, firstGame: !!process.env.FIRST });
   w.autoPlayer = true;
+  // CASUAL=1: a stand-in for a first-time human: never assaults cities, researches at most every 3rd turn.
+  if (process.env.CASUAL) {
+    w.f[0].persona = { ...w.f[0].persona, aggroTurn: 99, risk: 3, mass: 6 };
+    const orig = w.canResearch.bind(w);
+    (w as any).canResearch = (o: number, t: string) => w.turn % 3 === 0 && orig(o, t);
+  }
   if (process.env.SYM) { w.f[0].persona = w.f[1].persona; w.f[0].stars = w.f[1].stars; (w as any).canResearch = () => false; }
   for (let guard = 0; guard < 80 && !w.over; guard++) {
     for (const o of w.owners()) {
@@ -67,4 +92,10 @@ for (const diff of diffs) for (const p of pers) {
     continue;
   }
   console.log(`${diff.padEnd(6)} ${p.padEnd(11)} win ${(100 * wins / N).toFixed(0).padStart(3)}%  turns ${avg((r) => Math.min(r.turn, 24))}  score ${avg((r) => r.score)} v ${avg((r) => r.rival)}  final ${avg((r) => r.final)}  cities ${avg((r) => r.cities)} v ${avg((r) => r.rcities)}  k/l ${avg((r) => r.kills)}/${avg((r) => r.lost)} vets ${avg((r) => r.vets)} tech ${avg((r) => r.techs)} mon ${avg((r) => r.monuments)} ${JSON.stringify(reasons)}`);
+}
+if (process.env.BEHAV) {
+  const land = (w: World) => { const l = w.tiles.filter((t) => t.t === 'plain' || t.t === 'forest'); return l.filter((t) => t.t === 'forest').length / l.length; };
+  const w0 = new World({ seed: hash('seed0'), biome: 'meadow', difficulty: 'normal', products: PRODUCTS, names: { capital: 'a', cities: ['b'], rivalCapital: 'c', rivalShort: 'd' } });
+  console.log(`rival behaviour: attacks ${B.attacks}, on already-hurt targets ${(100 * B.focus / B.attacks).toFixed(0)}%, killing blows ${(100 * B.kills / B.attacks).toFixed(0)}%, ` +
+    `moves ending on forest/mountain/own city ${(100 * B.defTile / B.moves).toFixed(0)}% (forest share of land ~${(100 * land(w0)).toFixed(0)}%), retreats to heal ${B.retreats}, turns in assault mode ${(100 * B.assaultTurns / B.turns).toFixed(0)}%`);
 }

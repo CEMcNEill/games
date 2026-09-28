@@ -95,6 +95,7 @@ export class MapScene extends Phaser.Scene {
   private firstBlood = false;
   private summary: string[] = [];
   private truceOffered = false;
+  private warned = -1; // city the last massing warning was about
   private runStats = { lostUnits: 0, battles: 0 };
 
   constructor() { super('Map'); }
@@ -111,6 +112,7 @@ export class MapScene extends Phaser.Scene {
     this.tauntsUsed = new Set();
     this.firstBlood = false;
     this.truceOffered = false;
+    this.warned = -1;
     this.summary = [];
     this.runStats = { lostUnits: 0, battles: 0 };
     this.unitSprites = new Map();
@@ -121,7 +123,7 @@ export class MapScene extends Phaser.Scene {
     this.setup = chooseSetup(data && typeof data === 'object' ? data : {});
     const s = this.setup;
     this.w = new World({
-      seed: s.seed, biome: g.biome, difficulty: g.difficulty, products: K.theme.products, map: s.map, heat: s.heat, personality: s.personality,
+      seed: s.seed, biome: g.biome, difficulty: g.difficulty, products: K.theme.products, map: s.map, heat: s.heat, personality: s.personality, firstGame: s.runIndex === 0 && !s.daily,
       names: { capital: g.faction.capital, cities: g.cities, rivalCapital: g.rival.capital || `${rivalShort} HQ`.slice(0, 14), rivalShort },
     });
     const w = this.w;
@@ -421,7 +423,7 @@ export class MapScene extends Phaser.Scene {
       cities: w.myCities(0).length, rivalCities: w.cities.filter((c) => c.owner > 0).length,
       neutral: w.cities.filter((c) => c.owner === -1).length, units: w.myUnits(0).length,
       rivalUnits: w.units.filter((u) => u.owner > 0).length, score: w.score(0), rivalScore: w.rivalScore(),
-      map: w.mapType, mapSize: `${w.W}x${w.H}`, personality: w.f[1].persona.id, heat: w.heat, rivals: w.rivals().length, daily: this.setup.daily,
+      map: w.mapType, mapSize: `${w.W}x${w.H}`, firstGame: this.setup.runIndex === 0 && !this.setup.daily, personality: w.f[1].persona.id, heat: w.heat, rivals: w.rivals().length, daily: this.setup.daily,
       runIndex: this.setup.runIndex, vets: w.units.filter((u) => u.vet && u.owner === 0).length, rivalVets: w.units.filter((u) => u.vet && u.owner > 0).length,
       monuments: w.monuments.filter((m) => m.o === 0).map((m) => m.id), rivalMonuments: w.monuments.filter((m) => m.o > 0).map((m) => m.id),
       perks: w.myCities(0).flatMap((c) => c.perks), pending: w.pending.length, truce: w.truce, battlesWon: w.f[0].wins,
@@ -607,7 +609,8 @@ export class MapScene extends Phaser.Scene {
       const c: City = d.city;
       if (!this.fast() && w.tile(c.x, c.y).seen) {
         burst(this, this.px(c.x) + 8, this.py(c.y) + 6, K.ui.accentInt, 18, { colours: [0xfcfcfc, this.ownerCol(c.owner)], gravity: 60 });
-        floatText(this, this.px(c.x) + 8, this.py(c.y) - 4, `LEVEL ${c.level}`, K.ui.accentInt, 0.9);
+        // Your own level-ups get the reward panel instead of a floating label.
+        if (c.owner !== 0 || this.autopilot) floatText(this, this.px(c.x) + 8, this.py(c.y) - 4, `LEVEL ${c.level}`, K.ui.accentInt, 0.9);
       }
       if (c.owner > 0 && c.level >= 3) this.summary.push(`grew ${c.name} to ${c.level}`);
     } else if (e === 'reward') {
@@ -766,6 +769,10 @@ export class MapScene extends Phaser.Scene {
     this.sel = null;
     const tips: string[] = K.theme.game.tips;
     if (first) this.say('advisor', `Welcome to ${K.theme.game.faction.capital}! ${tips[0] ?? ''}`);
+    if (first && (this.setup.runIndex > 0 || this.setup.daily || w.heat > 0) && !this.fast()) {
+      const mt = MAP_TYPES[w.mapType]?.name ?? w.mapType;
+      this.time.delayedCall(300, () => this.banner(`${this.setup.daily ? 'DAILY MAP: ' : ''}${mt.toUpperCase()}${w.heat ? `   HEAT ${w.heat}` : ''}${w.rivals().length > 1 ? '   TWO RIVALS' : ''}`));
+    }
     else if (w.turn === 2) this.say('advisor', PERSONA_TIPS[w.f[1].persona.id] ?? tips[0]);
     else if (w.turn === MAX_TURNS) this.say('advisor', 'Last turn! Grab every point you can.');
     else if (w.turn % 3 === 0 && tips.length) this.say('advisor', tips[(w.turn / 3) % tips.length | 0]);
@@ -794,7 +801,10 @@ export class MapScene extends Phaser.Scene {
     const tgt = w.cities[r.ai.target];
     if (!tgt || tgt.owner !== 0) return;
     const near = w.units.filter((u) => u.owner > 0 && cheb(u.x, u.y, tgt.x, tgt.y) <= 4).length;
-    if (near >= 2) this.summary.unshift(`${r.ai.assault ? 'is attacking' : 'is massing'} ${near} units near ${tgt.name}`);
+    if (near >= 2 && (this.warned !== tgt.id || r.ai.assault)) {
+      this.summary.unshift(`${r.ai.assault ? 'is attacking' : 'is massing'} ${near} units near ${tgt.name}`);
+      this.warned = tgt.id;
+    }
   }
 
   /** Rival turn summary, big enough to notice. */

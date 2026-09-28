@@ -103,9 +103,15 @@ export const AUTOPILOT: Personality = { id: 'auto', name: 'Autopilot', aggroTurn
 // ---------------------------------------------------------------- difficulty + heat
 export interface Diff { rivalStars: number; rivalIncome: number; growth: number; rivalUnlock: number; aggro: number; mass: number; risk: number; extraUnit: boolean }
 export const DIFF: Record<string, Diff> = {
-  easy: { rivalStars: 3, rivalIncome: 0, growth: 0, rivalUnlock: 3, aggro: 5, mass: 1, risk: 2, extraUnit: false },
+  easy: { rivalStars: 3, rivalIncome: -2, growth: 0, rivalUnlock: 3, aggro: 5, mass: 1, risk: 2, extraUnit: false },
   normal: { rivalStars: 6, rivalIncome: 5, growth: 0.35, rivalUnlock: 0, aggro: 0, mass: 0, risk: 0, extraUnit: false },
   hard: { rivalStars: 10, rivalIncome: 5, growth: 0.55, rivalUnlock: -2, aggro: -2, mass: 0, risk: -1, extraUnit: true },
+};
+/** The first game keeps the original kit's rival economy (depth comes from later runs, not a harder first game). */
+export const FIRST_GAME: Record<string, Partial<Diff>> = {
+  easy: { rivalIncome: -3, aggro: 8, mass: 2 },
+  normal: { rivalIncome: -3, growth: 0.1, aggro: 6, mass: 2, risk: 2 },
+  hard: { rivalIncome: -3, growth: 0.1, aggro: 5, mass: 1, risk: 1 },
 };
 /** HEAT n: rival bonus stars, earlier units, sharper AI, a second rival at 4+, fewer ruins. */
 export const HEAT = [

@@ -58,3 +58,83 @@ is far stronger than the old one, so the rival needed help to hit the brief's ta
 and monuments. Levers: rival start stars, flat income, and `growth` (income + turn x growth).
 
 See the tables at the end (updated after each milestone).
+
+## M2: balance for real players, first game, siege, readability
+
+**What moved the numbers.** (1) Techs were the player's decisive edge (the autopilot reached ~14): tech
+cost is now 4/5/8 by tier + 3 per tech owned, and only products pay +1 star/turn. (2) Monuments and tech
+score were player-only; rivals now score their turn-based unlocks as techs and can build 3 of the 4
+monuments. (3) AI bugs found with `tools/trace.ts`: the capital garrison blocked training (it now stands
+next to the capital unless an enemy is within 2), units squatted on their own cities (penalised when there
+is money to train there), expansion was a first-come claim (now a greedy unit-village pairing by arrival
+time). (4) Difficulty levers: rival start stars, flat income and `growth` (+turn x growth income).
+
+**First game.** Depth must not make the first game harder. A "casual first-timer" stand-in (the
+autopilot with a filter: researches only every 3rd turn, only fights near its own cities, never takes
+rival cities; `CASUAL2=1`) against the original kit (old world.ts + old AI, same filter) won easy 44%,
+normal 20%, hard 14%; the old autopilot won 90% / 65% / 60%. The new rival is much more dangerous, so the
+first game (run index 0, not daily) uses `FIRST_GAME` overrides: lower rival income and later, bigger
+assaults. First game (classic map, Expander, 80 seeds):
+
+| difficulty | casual stand-in | autopilot |
+|---|---|---|
+| easy | 78% | 100% |
+| normal | 59% | 100% |
+| hard | 11% | 95% |
+
+So a first game is at least as forgiving as before on every difficulty (hard stays for strategy fans).
+
+**Later runs (the brief's targets), heat 0, map rotation, 80 seeds per cell, autopilot vs rival:**
+
+| diff | rival | player win | avg turns | wins: domination/score | player capital lost | final score v rival | vets | monuments (both sides) |
+|---|---|---|---|---|---|---|---|---|
+| easy | aggressor | 99% | 19.6 | 66/13 | 0 | 3640 v 268 | 1.0 | 4.9 |
+| easy | expander | 100% | 19.9 | 56/24 | 0 | 3647 v 468 | 0.8 | 5.0 |
+| easy | turtle | 100% | 19.8 | 64/16 | 0 | 3632 v 310 | 0.8 | 4.7 |
+| easy | opportunist | 98% | 19.6 | 64/14 | 0 | 3614 v 366 | 0.9 | 4.9 |
+| normal | aggressor | 51% | 22.6 | 15/26 | 16 | 2943 v 2484 | 2.2 | 6.8 |
+| normal | expander | 63% | 22.3 | 31/19 | 2 | 3749 v 2180 | 1.8 | 6.5 |
+| normal | turtle | 60% | 23.0 | 18/30 | 2 | 3284 v 2339 | 1.8 | 6.8 |
+| normal | opportunist | 56% | 23.1 | 16/29 | 7 | 3136 v 2447 | 2.3 | 6.8 |
+| hard | aggressor | 33% | 21.6 | 7/19 | 28 | 2458 v 2986 | 2.1 | 6.6 |
+| hard | expander | 33% | 22.9 | 14/12 | 11 | 3135 v 3439 | 1.9 | 6.7 |
+| hard | turtle | 39% | 23.1 | 10/21 | 16 | 2814 v 2981 | 2.1 | 6.7 |
+| hard | opportunist | 30% | 22.4 | 5/19 | 24 | 2491 v 3135 | 2.4 | 6.6 |
+
+Easy sits at ~99% rather than 90%: easy is tuned so the casual stand-in wins ~80% (an exec's first game);
+the autopilot is far stronger than that. Normal averages 58% (target 55-70), hard 34% (target 30-45).
+Normal's Aggressor takes the autopilot's capital in 20% of games. Domination is ~40% of normal wins.
+
+**Passive player** (never acts, `run-sim.sh 20 normal all 0 classic passive`): the rival takes the capital
+in every game, around turn 15 on normal and 18-23 on easy, so a passive player does lose the capital.
+
+**Heat (autopilot win rate, 40 seeds, map rotation):**
+
+| heat | easy (agg/exp/tur/opp) | normal (agg/exp/tur/opp) |
+|---|---|---|
+| 1 | 98/100/100/100 | 50/58/63/55 |
+| 2 | 95/90/93/93 | 35/30/40/35 |
+| 3 | 73/83/90/83 | 28/28/28/18 |
+| 4 (two rivals) | 68/88/90/65 | 13/18/10/10 |
+| 5 | 48/70/78/35 | 0/15/0/5 |
+
+**Rival behaviour** (40 normal games, rival side): 72% of its attacks hit an already-damaged target (focus
+fire), 40% are killing blows, 38% of its moves end on a forest, mountain or its own city (forests are ~23%
+of land), it retreated hurt units into cities 95 times, and it spends 36% of its turns in assault mode
+(it gathered `mass` units first).
+
+**Product mix.** The balance barely depends on which products a theme picks: the real Ledgerly set
+(Product Analytics, Session Replay, Feature Flags, Surveys; no economy products) gives normal 48-83% by
+personality vs 60-77% for the default set.
+
+**Catapult (P2 siege unit).** Funnels (tier 2 of Product Analytics) unlocks it for you; rivals get it on
+turn 15 (+ difficulty/heat shift). Range 3, attack 4, 8 HP, defence 1. It helped Aggressor rivals too much
+(normal 39%), so it is last in the Aggressor's build list.
+
+**Game length.** An autopilot game at normal animation speed takes ~150 s, of which rival turns are ~37 s
+(~1.9 s per turn) before rival moves in the fog stopped waiting; a human's own turns set the 6-10 minutes.
+
+**Readability.** Turn-2 advisor line names the rival's personality. After each rival turn the message bar
+summarises it ("Legacy Monolith took Growth Town, is massing 3 units near HQ") and a red banner shows
+when it took a city, killed a unit or started massing near one of your cities (once per target), with an
+advisor line on how to guard. Runs after the first open with a banner: map type, DAILY, HEAT, TWO RIVALS.
