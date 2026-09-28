@@ -11,6 +11,13 @@ import { ShopScene } from './shop';
 import { ACHIEVEMENTS, HEAT } from './content';
 import { dailyBest, currentHero } from './save';
 
+/** Runs once per how-to screen: the SHOP title choice skips straight to the shop. Module scope so off() matches. */
+function toShop(this: void) {
+  if (K.run.mode !== 'shop') return;
+  const howto = (window as any).__phaser?.scene?.getScene('HowTo') as Phaser.Scene | undefined;
+  howto?.scene.start('Shop');
+}
+
 startKit({
   id: 'bug-survivors',
   name: 'Bug Survivors',
@@ -29,7 +36,7 @@ startKit({
     ];
     if (K.run.heat > 0) lines.push(`HEAT ${K.run.heat}: ${HEAT.slice(1, K.run.heat + 1).map((h) => h.desc).join(', ')}.`);
     else if (K.run.mode === 'endless') lines.push('ENDLESS: the boss returns every 2:00, stronger each time.');
-    else if (K.run.mode === 'daily') lines.push("DAILY: everyone gets today's weapon, bugs and drops.");
+    else if (K.run.mode === 'daily') lines.push("DAILY: everyone gets today's weapon, bug waves and events. Hero: Max.");
     return lines;
   },
   titleArt: (scene: Phaser.Scene) => {
@@ -51,7 +58,6 @@ startKit({
     if (parts.length) text(scene, W / 2, 16, parts.join('   '), { align: 'center', color: 0xf8d878, depth: 10 });
     // SHOP is a title choice: when the run starts in shop mode, jump from the how-to straight to the shop.
     const howto = scene.scene.get('HowTo');
-    const toShop = () => { if (K.run.mode === 'shop') howto.scene.start('Shop'); };
     howto.events.off('create', toShop);
     howto.events.once('create', toShop);
   },

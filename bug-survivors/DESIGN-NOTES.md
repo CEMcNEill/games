@@ -177,3 +177,11 @@ Re-measured, n=8 each, 0 page errors:
 | easy h0 novice | 8/8 | 222-282 |
 | normal h0 novice | 7/8 | 157 (L), 221-307 |
 | normal h0 smart | 8/8 | 216-256 |
+
+### ~02:05: second read-only review pass
+No crash reachable in normal play. Fixed: the shop no longer re-exposes the dead game's debug hooks (`debug.win()` from
+the shop threw); `winNow` runs once and `debug.lose` can't undo a win; no level-up modal on the victory beat; no bugs
+spawn after the win; Meltdown (heat 5) isn't awarded in endless (no overtime there); quitting from pause banks the
+gold picked up (the run isn't recorded); the shop hand-off listener is module-scoped so `off()` works; invalid banish
+gives feedback; daily how-to text no longer promises identical drops (shop luck still differs between players).
+Checks after: easy novice n=8 8/8 (223-291 s), normal h5 n=4 2/4, 0 page errors; Gate 1 PASS.

@@ -21,3 +21,6 @@ Everything below is worked around locally in the kit; none of it blocks the kit.
 7. **Debug hooks that return game objects make Playwright serialize the whole scene graph** (one call hit
    17 GB of RAM in the test runner). A note in hooks.ts ("return plain data or nothing") would save the next kit
    some confusion.
+8. **`starfield()` leaks an `update` listener per visit** (scenes.ts): `scene.events.on('update', ...)` is never
+   removed, and scene events survive shutdown, so every Title/HowTo/End visit adds a listener that keeps moving
+   destroyed rectangles. Fix: `scene.events.once('shutdown', () => scene.events.off('update', fn))`.

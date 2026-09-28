@@ -326,7 +326,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.paused && (e.code === 'Enter' || e.code === 'Space')) this.resume();
-    if (this.paused && e.code === 'KeyQ') this.scene.start('Title');
+    if (this.paused && e.code === 'KeyQ') {
+      // Quitting keeps the gold you picked up (the run isn't recorded).
+      try { meta.bank(this.gold); const sv = save(); sv.gold += this.gold; sv.kills += this.kills; persist(); } catch { /* ignore */ }
+      this.over = true;
+      this.scene.start('Title');
+    }
   }
 
   private pause() {
@@ -490,7 +495,7 @@ export class GameScene extends Phaser.Scene {
       // Level-up fanfare: a beat of slow motion, then the cards.
       this.slowmo -= dt;
       dt *= 0.25;
-      if (this.slowmo <= 0 && this.pendingLevels > 0) { this.openLevelUp(); return; }
+      if (this.slowmo <= 0 && this.pendingLevels > 0 && !this.won) { this.openLevelUp(); return; }
     }
     this.elapsed += dt;
     this.numBudget = Math.min(14, this.numBudget + dt * 40);
@@ -513,7 +518,7 @@ export class GameScene extends Phaser.Scene {
       if (this.overtime <= 0) this.winNow();
     }
     if (this.mode === 'endless' && this.elapsed >= 600) achieve('endless10');
-    if (this.pendingLevels > 0 && !this.modal && this.slowmo <= 0 && !this.over) this.levelFanfare();
+    if (this.pendingLevels > 0 && !this.modal && this.slowmo <= 0 && !this.over && !this.won) this.levelFanfare();
   }
 
   private movePlayer(dt: number) {
@@ -639,6 +644,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   addEnemy(arch: ArchId, x: number, y: number, elite: EliteMod | null = null): Enemy | null {
+    if (this.won) return null;
     if (this.enemies.length >= MAX_ENEMIES && !elite) return null;
     x = Phaser.Math.Clamp(x, 8, WORLD_W - 8);
     y = Phaser.Math.Clamp(y, 8, WORLD_H - 8);
@@ -1278,7 +1284,7 @@ export class GameScene extends Phaser.Scene {
     const m = this.modal;
     if (!m || m.kind !== 'levelup' || !m.armed || this.banishes <= 0) { this.sfx('hurt', 0.3, 100); return; }
     const c = m.cards[m.sel];
-    if (c.kind !== 'weapon' && c.kind !== 'passive') return;
+    if (c.kind !== 'weapon' && c.kind !== 'passive') { this.sfx('hurt', 0.3, 100); return; }
     this.banishes--;
     this.banished.add(c.id);
     this.sfx('explode', 0.3);
@@ -1725,7 +1731,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private winNow() {
+    if (this.won) return;
     this.won = true;
+    this.pendingLevels = 0; // no level-up cards on the victory beat
     // Expire hostile shots (don't splice: this can run inside the projectile loop, when a shot kills the boss).
     for (const pr of this.projs) if (pr.hostile) { pr.life = 0; pr.s.setVisible(false); }
     for (const e of [...this.enemies]) if (!e.boss) this.kill(e);
@@ -1772,7 +1780,7 @@ export class GameScene extends Phaser.Scene {
     if (sv.gold >= 500) achieve('rich');
     if (won) achieve('first_win');
     if (won && this.heat >= 2) achieve('heat2');
-    if (won && this.heat >= 5) achieve('heat5');
+    if (won && this.heat >= 5 && this.mode !== 'endless') achieve('heat5');
     const newHeroes = HEROES.filter((h) => heroUnlocked(h.id) && !heroesBefore.includes(h.id));
     // End-screen lines: damage split, gold, unlocks.
     const total = Object.entries(this.dmgBy).filter(([k]) => k !== 'debug').reduce((a, [, b]) => a + b, 0) || 1;
@@ -1845,7 +1853,7 @@ export class GameScene extends Phaser.Scene {
       numbers: (on = true) => { this.numbers = !!on; },
       xp: (n: number) => this.gainXp(n),
       flood: (n = 300) => { for (let i = 0; i < n; i++) { const [x, y] = this.offscreenPoint(); this.addEnemy((['swarmer', 'splitter', 'tank'] as ArchId[])[i % 3], x, y); } },
-      lose: () => this.finish(false),
+      lose: () => { if (!this.won) this.finish(false); },
       // For the gameplay GIF: a mid-game swarm with evolved weapons going.
       showcase: () => {
         this.elapsed = 150;

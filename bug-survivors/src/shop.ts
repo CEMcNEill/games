@@ -32,8 +32,8 @@ export class ShopScene extends Phaser.Scene {
     onKeys(this, ['ArrowDown', 'KeyS'], () => this.moveRow(1), 150);
     onKeys(this, ['Enter', 'Space', 'NumpadEnter'], () => this.act(), 250);
     onKeys(this, ['Escape', 'KeyQ'], () => { K.play('select'); this.scene.start('Title'); }, 150);
+    // Only shop hooks here (the setter merges the shared ones); stale game hooks must not be callable.
     hooks.debug = {
-      ...hooks.debug,
       shopBuy: (id: string) => this.buy(SHOP.findIndex((s) => s.id === id)),
       hero: (id: string) => this.pickHero(HEROES.findIndex((h) => h.id === id)),
       tab: (i: number) => { this.tab = ((i | 0) + TABS.length) % TABS.length; this.row = 0; this.draw(); },

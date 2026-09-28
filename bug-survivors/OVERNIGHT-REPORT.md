@@ -14,7 +14,16 @@ Gate 2 passes on both real prospects (nimbus-grocer, tidewater-logistics).
 | End summary sized to fit the shared lines, calmer GIF showcase, KIT.md, theme prompt note, SHARED-REQUESTS | 6618537 | |
 | Exploder fuse ring + visible blasts, `debug.win` in overtime, `tools/shots.py` + overnight-shots | fe87973 | |
 | Shop-vs-skill pass: heat gold bonus +25% -> +10%/level, Sprinter unlock at 2000 lifetime kills | 6bb2eb3 | |
-| Report, KIT analytics section | (final commit) | |
+| First report, KIT analytics section | 7166172 | |
+| Stronger Error Tracking start, boss "crumbles" in long fights, hurt-by-source stats | 5a890b1 | 3-4 product prospect themes |
+| Viable Session Replay start, lighter boss, earlier crumble | 8d12d83 | every start weapon tested |
+| Heat pressure ramps in over time, elite pack always the 3:00 event | 607681d | removed the heat-5 opening cliff |
+| EVOLUTION READY banner, off-screen chest marker | 114097a | |
+| Fixes from a read-only code review: win-then-GAME-OVER, stacked chest modals, splitter pooling, on-screen spawns, double heal; the boss can't be kited forever | 55449a3 | |
+| **Crash fix**: a shot killing the boss spliced the projectile array mid-loop (page error, run froze) | aff8685 | caught by sims, not by Gate 1 |
+| Records page shows recipes of found evolutions | 889b367 | |
+| Second review pass: stale game hooks unreachable from the shop, `winNow` runs once, no level-up on the victory beat, quit-from-pause banks gold, no Meltdown in endless | (see git log) | |
+| Report update, refreshed shots | (final commit) | |
 
 P2 status: arena hazards done; secret super evolution done (Rage Click Vortex + Stack Trace Storm + a chest =
 **Full Stack Nova**, hidden achievement); boss pattern library done (ring, telegraphed charge, spiral, summon;
@@ -23,23 +32,26 @@ the pool grows with heat and phase; heat 5 adds a rage phase at 25% HP).
 How it plays now, the hooks and the limits are all in `KIT.md`. The design reasoning and every balance run are in
 `DESIGN-NOTES.md`.
 
-## Balance (autopilot at speed 6 via `tools/sim.py`, 4 runs per row unless noted)
+## Balance (autopilot via `tools/sim.py`, speed 6, final build unless noted)
+"novice" = `autopilot(true, 'novice')`: always the first card, never rerolls, ignores chests and food.
 | config | wins | game s | notes |
 |---|---|---|---|
-| before tonight, easy h0 | win | 227 | level 22, 766 kills |
-| easy h0, novice bot (first card, no rerolls, no pickups) | 4/4 | 228-242 | the first-run target: ~4:00 |
-| easy h0, smart bot | 4/4 | 220-307 | every run evolved one weapon, ~100 gold |
-| normal h0, smart | 4/4 | 221-260 | 4/4 evolved |
-| hard h0, smart (before later tuning) | 1/4 | 87-221 | |
-| normal h1 | 4/4 | 223-404 | |
-| normal h3 | 3/4 | ~229 avg | 107 gold avg |
-| normal h5, no shop | 1/4 | 57-269 | bimodal: early death or 4-evolution snowball |
-| normal h5, might 2 + HP 2 | 1/4 | 74-275 | |
-| normal h5, might 3 + HP 3 + luck 2 + reroll 1 | 4/4 | 263-274 | led to the gold cut; see "decide" below |
-| endless normal, smart | alive at 15:00 | 850-900 | level ~90, 3-5 bosses killed |
-Gate 1 bot (easy, speed 6): win at 219-277 s game time on every run tonight.
-Perf: `flood(300)` x2 with every weapon evolved, the fusion and 6 passives at level 5: 60 fps (about 90 projectiles, 300
-bugs). Gate 1 load test: 60 fps min.
+| before tonight, easy h0 (Gate 1 bot) | win | 227 | level 22, 766 kills |
+| easy h0 novice, n=8 | 8/8 | 222-282 | the first-run target: ~4:00 |
+| normal h0 novice, n=8 | 7/8 | 157 (L), 221-307 | |
+| normal h0 smart, n=8 | 8/8 | 216-256 | 6/8 evolved a weapon |
+| hard h0 smart, n=8 | 2/8 | 78-142 (L), 224-227 | |
+| Nimbus theme (3-4 products), easy novice, n=6 | 6/6 | 219-272 | |
+| 3-product theme, normal novice, n=8 | 6/8 | 224-329 | |
+| each start weapon, normal novice, n=4 | 3/4-4/4 | ~220-330 | after the Error Tracking and Session Replay buffs |
+| normal h3 smart, no shop, n=8 | 5/8 | 74-204 (L), 217-246 | |
+| normal h5 smart, no shop, n=8 | 3/8 | 83-128 (L), 265-283 | bimodal: early death or 3-4 evolutions |
+| normal h5, mid shop (~545 gold) | 4/4 | 263-274 | measured before the gold cut and heat ramp |
+| endless normal smart | alive at 11-12 min | | real-time cap; pressure builds (320 bugs) |
+Gate 1 bot (easy, speed 6): win at 219-301 s game time on every run tonight.
+Crash sweep on the final code: endless, heat 5 + overtime, daily, all 4 heroes: 0 page errors, no stalls.
+Perf: `flood(300)` x2 with every weapon evolved, the fusion and 6 passives at level 5: 60 fps (about 90 projectiles,
+300 bugs). Gate 1 load test: 60 fps min.
 
 ## Screenshots worth a look (`bug-survivors/overnight-shots/`)
 `sheet.png` has all of them. Highlights: `01-levelup-hints` (evolution hints on the cards), `02-evolution-chest`,
@@ -64,8 +76,10 @@ Tidewater bot run even reached the fusion.
 1. **Shop strength vs heat 5.** ~545 gold of upgrades (about 5 runs) takes the smart bot from 1/4 to 4/4 at heat 5.
    I cut the heat gold bonus rather than weaken the upgrades. If heat 5 should stay a skill check, lower might/HP
    per level (content.ts SHOP + `recalc()`).
-2. **Normal h0 is easier than before tonight** (smart bot 4/4 vs "usually dies near the boss"). That keeps the
-   first run safe for execs but may feel soft to gamers on `normal`; `hard` still loses 3/4.
+2. **Normal h0 is easier than before tonight** (smart bot 8/8 vs "usually dies near the boss"). That keeps the
+   first run safe for execs but may feel soft to gamers on `normal`; `hard` still loses 6/8.
+5. **Boss "crumbling"** (from 50 s it takes +5%/s more damage, max x8, and speeds up toward the hog's pace)
+   guarantees weak builds finish near 4-5 minutes. Purists may prefer a pure DPS check; it's one function (`bossVuln`).
 3. **Endless never ends for the smart bot** by 15:00. Humans will die much sooner; a hard cap (a VS-style reaper at
    20:00) is a one-liner if wanted.
 4. Banner text uses plural bug names ("Flaky Tests that charge"). Theme names that start with "The" read oddly
@@ -82,5 +96,6 @@ budget; sfx pitch parameter; a "debug hooks return plain data" note (a hook retu
 - Gate 1 `tests/accept.py bug-survivors`: PASS (4 themes, bot win, fuzz 20/20, load 60 fps).
 - Gate 2 `game_check.py` on nimbus-grocer-bug-survivors and tidewater-logistics-bug-survivors: exit 0; contact sheets
   and GIF frames checked.
+- Lesson: Gate 1's single bot run missed a real crash that the 8-run sims caught; run `tools/sim.py` before trusting a change.
 - Blocked `localStorage` (getter throws): title, shop, run, win, End, replay all fine, no page errors.
 - Daily: two fresh daily starts get the same seed and start weapon.
