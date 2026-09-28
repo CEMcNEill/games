@@ -1,22 +1,41 @@
-// Kit save data (shop levels, hero, lifetime totals, daily best, evolution codex) on top of the shared
-// meta blob. Everything is defensive: a broken or blocked store reads as a first run.
-import { meta } from '@shared/meta';
-import { SHOP, HEROES } from './content';
+// Kit save data (shop levels, hoggies, lifetime totals, collections, daily best, evolution codex) on top of the
+// shared meta blob. Everything is defensive: a broken or blocked store reads as a first run.
+import { meta, achieve } from '@shared/meta';
+import { SHOP, RELIC_IDS, PAGES } from './content';
+import { HOGS, HOG_INDEX, DEFAULT_HOG, STARTERS, SECRET_HOGS, SIGNATURE, EVOLVING_FORMS } from './hoggies';
+import { LEGACY, LEGACY_HEROES, CREST_BY_ID } from './crests';
 
 export interface KitSave {
   shop: Record<string, number>;
-  hero: string;
+  hero: string;           // legacy hero id (pre-hoggies)
+  hog: string;            // selected hoggie
+  hogs: string[];         // unlocked hoggies
+  capsules: number;       // bought from the shop (price rises)
   kills: number;          // lifetime
   gold: number;           // lifetime earned
   chests: number;
+  elites: number;
+  revives: number;
+  aiKills: number;
+  dailies: number;
+  bestWave: number;       // highest wave reached (any mode but daily)
+  cleared1: string[];     // hoggies that have cleared wave 1 (client-libraries crest)
+  relics: string[];       // merch collected
+  pages: number[];        // handbook pages found
   codex: string[];        // evolution names found
   daily: { date: string; best: number };
   numbers: boolean;       // damage numbers on/off
+  migrated: number;
 }
 
-const defaults = (): KitSave => ({ shop: {}, hero: 'max', kills: 0, gold: 0, chests: 0, codex: [], daily: { date: '', best: 0 }, numbers: true });
+const defaults = (): KitSave => ({ shop: {}, hero: 'max', hog: DEFAULT_HOG, hogs: [], capsules: 0, kills: 0, gold: 0, chests: 0, elites: 0,
+  revives: 0, aiKills: 0, dailies: 0, bestWave: 0, cleared1: [], relics: [], pages: [], codex: [], daily: { date: '', best: 0 }, numbers: true,
+  migrated: 0 });
 
 const n = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+const strs = (v: unknown, max: number) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, max) : []);
+
+let migrating = false;
 
 /** The kit's save, repaired field by field. */
 export function save(): KitSave {
@@ -25,16 +44,43 @@ export function save(): KitSave {
   if (!k || typeof k !== 'object') return defaults();
   if (!k.shop || typeof k.shop !== 'object' || Array.isArray(k.shop)) k.shop = {};
   for (const s of SHOP) k.shop[s.id] = Math.max(0, Math.min(s.cost.length, Math.floor(n(k.shop[s.id]))));
-  if (!HEROES.some((h) => h.id === k.hero)) k.hero = 'max';
-  k.kills = Math.max(0, n(k.kills));
-  k.gold = Math.max(0, n(k.gold));
-  k.chests = Math.max(0, n(k.chests));
-  if (!Array.isArray(k.codex)) k.codex = [];
-  k.codex = k.codex.filter((x: unknown) => typeof x === 'string').slice(0, 40);
+  for (const f of ['kills', 'gold', 'chests', 'elites', 'revives', 'aiKills', 'dailies', 'bestWave', 'capsules', 'migrated']) k[f] = Math.max(0, n(k[f]));
+  k.codex = strs(k.codex, 60);
+  k.hogs = strs(k.hogs, 400).filter((h: string) => HOG_INDEX.has(h));
+  k.cleared1 = strs(k.cleared1, 400);
+  k.relics = strs(k.relics, 20).filter((r: string) => (RELIC_IDS as string[]).includes(r));
+  k.pages = Array.isArray(k.pages) ? k.pages.filter((p: unknown) => typeof p === 'number' && p >= 0 && p < PAGES.length) : [];
+  if (typeof k.hero !== 'string') k.hero = 'max';
+  if (typeof k.hog !== 'string' || !HOG_INDEX.has(k.hog)) k.hog = DEFAULT_HOG;
   if (!k.daily || typeof k.daily !== 'object') k.daily = { date: '', best: 0 };
   k.daily = { date: String(k.daily.date ?? ''), best: Math.max(0, n(k.daily.best)) };
   if (typeof k.numbers !== 'boolean') k.numbers = true;
+  if (k.migrated < 1 && !migrating) migrate(k as KitSave);
   return k as KitSave;
+}
+
+/** First load on the hoggie build: starter hoggies, old achievements -> crests, old heroes -> hoggies. */
+function migrate(k: KitSave) {
+  migrating = true;
+  try {
+    k.migrated = 1;
+    for (const h of STARTERS) if (!k.hogs.includes(h)) k.hogs.push(h);
+    // One random cast hoggie so the roster starts with a surprise.
+    const cast = HOGS.map((h) => h.id).filter((id) => !SIGNATURE[id] && !k.hogs.includes(id));
+    if (cast.length) k.hogs.push(cast[Math.floor(Math.random() * cast.length)]);
+    let got: Record<string, number> = {};
+    try { got = meta.data.achievements ?? {}; } catch { /* ignore */ }
+    const heroUnlock: Record<string, string> = { kills_2000: 'sprinter', evolve: 'wizard', heat2: 'hacker' };
+    for (const [old, hero] of Object.entries(heroUnlock)) {
+      const hog = LEGACY_HEROES[hero];
+      if (old in got && hog && !k.hogs.includes(hog)) k.hogs.push(hog);
+    }
+    if (LEGACY_HEROES[k.hero] && k.hogs.includes(LEGACY_HEROES[k.hero])) k.hog = LEGACY_HEROES[k.hero];
+    persist();
+    for (const [old, crest] of Object.entries(LEGACY)) if (old in got) earnCrest(crest);
+  } finally {
+    migrating = false;
+  }
 }
 
 export function persist() {
@@ -51,15 +97,45 @@ export function dailyBest(): number {
   return d.date === today() ? d.best : 0;
 }
 
-export function heroUnlocked(id: string): boolean {
-  const h = HEROES.find((x) => x.id === id);
-  if (!h) return false;
-  if (!h.unlock) return true;
-  try { return h.unlock in meta.data.achievements; } catch { return false; }
+export const hogUnlocked = (id: string) => save().hogs.includes(id);
+
+/** Unlock a hoggie; true if it's new. Caveman brings its later forms' art along (same slot). */
+export function unlockHog(id: string): boolean {
+  const sv = save();
+  if (!HOG_INDEX.has(id) || sv.hogs.includes(id)) return false;
+  sv.hogs.push(id);
+  persist();
+  return true;
 }
 
-/** The hero to play: the saved pick if still unlocked, else Max. */
-export function currentHero() {
-  const id = save().hero;
-  return HEROES.find((h) => h.id === id && heroUnlocked(id)) ?? HEROES[0];
+/** A random locked hoggie for a capsule (never the secret ones), or null when the roster is complete. */
+export function rollCapsule(rnd: () => number = Math.random): string | null {
+  const sv = save();
+  const pool = HOGS.map((h) => h.id).filter((id) => !sv.hogs.includes(id) && !SECRET_HOGS.has(id) && !EVOLVING_FORMS.slice(1).includes(id));
+  if (!pool.length) return null;
+  return pool[Math.floor(rnd() * pool.length)];
+}
+
+/** The hoggie to play: the saved pick if unlocked, else the default. */
+export function currentHog(): string {
+  const sv = save();
+  return sv.hogs.includes(sv.hog) ? sv.hog : DEFAULT_HOG;
+}
+
+/** Earn a crest (achievement) and unlock its hoggie; true the first time. */
+export function earnCrest(id: string): boolean {
+  let got = false;
+  try { got = achieve(id); } catch { /* storage trouble */ }
+  const c = CREST_BY_ID.get(id);
+  if (c && (got || hasCrest(id))) unlockHog(c.hog);
+  return got;
+}
+
+export function hasCrest(id: string): boolean {
+  try { return id in meta.data.achievements; } catch { return false; }
+}
+
+/** Every crest already earned has its hoggie (e.g. after a data reset of the kit block). */
+export function syncCrestHogs() {
+  for (const c of CREST_BY_ID.values()) if (hasCrest(c.id)) unlockHog(c.hog);
 }

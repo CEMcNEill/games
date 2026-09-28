@@ -9,7 +9,7 @@ then turned into a custom game for any company in minutes by Claude. No code cha
 | | |
 |---|---|
 | ![Bug Survivors](docs/screenshots/bug-survivors-play.png) | ![HogShop](docs/screenshots/hogshop-play.png) |
-| **Bug Survivors**: survive swarms of bugs named after the company's pains; every weapon is a PostHog product. Act 2 adds five more tools and Self-Driving Mode. | **HogShop**: run the back room of a shop; pack orders off conveyor belts and ship them to the right door before customers lose patience. |
+| **Bug Survivors**: survive swarms of bugs named after the company's pains; every weapon is a PostHog product. Every boss is a release: cash out, or climb the wave ladder for 15 PostHog tools, 171 hoggies to unlock and 55 crests. | **HogShop**: run the back room of a shop; pack orders off conveyor belts and ship them to the right door before customers lose patience. |
 | ![Data Inspector](docs/screenshots/data-inspector-play.png) | ![Hogtopia](docs/screenshots/hogtopia-play.png) |
 | **Data Inspector**: approve or flag the company's events against a growing rulebook (Papers, Please style). | **Hogtopia**: a small 4X strategy game; grow cities and out-research a rival named after the company's biggest problem. |
 | ![Hog Saga](docs/screenshots/hog-saga-play.png) | ![Hog Quest](docs/screenshots/hog-quest-play.png) |
@@ -29,7 +29,7 @@ the bugs' names and banners, the products on offer and the ending all come from 
 
 | Template | Game | Player does | Good for |
 |---|---|---|---|
-| `bug-survivors` | Vampire Survivors-like, ~4 min (+3 min Act 2) | dodge, level up, pick PostHog products as weapons | engineers, CTOs |
+| `bug-survivors` | Vampire Survivors-like, ~4 min (then as many waves as you survive) | dodge, level up, pick PostHog products as weapons | engineers, CTOs |
 | `data-inspector` | Papers, Please-like, 5 short days | check events against the rules; approve or flag | data, analytics, product |
 | `hog-quest` | Undertale-like office RPG | talk to the team, spare or fight the problems | a champion, a top account |
 | `hog-saga` | Dragon Quest-like JRPG | explore, fight with a party, beat the boss | founders, growth, marketing, sales |

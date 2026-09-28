@@ -2,9 +2,10 @@
 """Balance runs: play N autopilot games of the built kit and print outcome stats.
 
     uv run -q --with playwright python bug-survivors/tools/sim.py [--n 6] [--diff easy] [--heat 0] [--mode 0]
-        [--speed 6] [--par 3] [--timeout 200] [--shop '{"might":2}'] [--hero max] [--god]
+        [--speed 6] [--par 3] [--timeout 200] [--shop '{"might":2}'] [--hog im-the-driver] [--god] [--cash 99]
 
---mode is the title mode index (0 RUN, 1 DAILY, 2 ENDLESS). Heat/modes above what a fresh save allows are
+--mode is the title mode index (0 RUN, 1 DAILY, 2 YOLO). --cash N: the bot cashes out after wave N's boss (default 99:
+play the ladder until death). Prints each run's death wave and per-wave telemetry (clear time, level, DPS, boss fight s). Heat/modes above what a fresh save allows are
 unlocked with debug.unlockAll() first. Prints one line per run and a summary; --json writes all results.
 """
 import argparse
@@ -46,12 +47,14 @@ async def one(browser, url, a, i):
     await page.wait_for_function("window.__game && window.__game.ready", timeout=20000)
     await page.wait_for_timeout(600)
     setup = []
-    if a.heat or a.mode or a.shop or a.hero != "max":
+    if a.heat or a.mode or a.shop or a.hog:
         setup.append("__game.debug.unlockAll()")
     if a.shop:
         setup.append(f"__game.meta.kit.shop = Object.assign(__game.meta.kit.shop || {{}}, {a.shop})")
-    if a.hero != "max":
-        setup.append(f"__game.meta.kit.hero = '{a.hero}'")
+    if a.hog:
+        setup.append(f"__game.meta.kit.hogs = [...new Set([...(__game.meta.kit.hogs || []), '{a.hog}'])]; __game.meta.kit.hog = '{a.hog}'")
+    if a.mode == 2:
+        setup.append("__game.meta.kit.bestWave = Math.max(__game.meta.kit.bestWave || 0, 6)")
     if setup:
         # debug.goto('Title') from the title leaves it stopped, so save and reload instead.
         await page.evaluate("; ".join(setup) + "; __game.debug.meta({})")
@@ -68,11 +71,15 @@ async def one(browser, url, a, i):
         for _ in range(a.heat):
             await page.keyboard.press("ArrowRight")
             await page.wait_for_timeout(150)
-    await page.keyboard.press("Enter")
-    await page.wait_for_timeout(700)
-    await page.keyboard.press("Enter")
-    await page.wait_for_timeout(700)
-    await page.evaluate(f"__game.debug.autopilot(true, '{"novice" if a.novice else ""}'); __game.debug.speed({a.speed}); {'__game.debug.god(true);' if a.god else ''}")
+    for _ in range(12):  # title -> how-to -> game (slow under parallel load)
+        if await page.evaluate("__game.scene") == "Game":
+            break
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(700)
+    if await page.evaluate("__game.scene") != "Game":
+        raise RuntimeError(f"never reached the game: {errors[:2]}")
+    await page.wait_for_timeout(300)
+    await page.evaluate(f"__game.debug.autopilot(true, '{"novice" if a.novice else ""}'); __game.debug.botCash({a.cash}); __game.debug.speed({a.speed}); {'__game.debug.god(true);' if a.god else ''}")
     t0 = time.time()
     last = {}
     while time.time() - t0 < a.timeout:
@@ -91,8 +98,8 @@ async def one(browser, url, a, i):
             "hp": s.get("hp"), "bossKills": s.get("bossKills"), "gold": s.get("gold"), "chests": s.get("chests"), "elites": s.get("elites"),
             "evolutions": s.get("evolutions"), "weapons": s.get("weapons"), "passives": s.get("passives"),
             "dmg": s.get("dmg"), "hurtBy": s.get("hurtBy"), "fps": last.get("fps"), "bank": end["meta"]["coins"], "errors": errors,
-            "run": last.get("run"), "act": s.get("act"), "act2At": s.get("act2At"), "fullClear": s.get("fullClear"),
-            "powerups": s.get("powerups"), "tools": s.get("tools")}
+            "run": last.get("run"), "wave": s.get("wave"), "waves": s.get("waves"), "releases": s.get("releases"),
+            "powerups": s.get("powerups"), "tools": s.get("tools"), "versions": s.get("versions"), "funding": s.get("funding")}
 
 
 async def main():
@@ -105,7 +112,8 @@ async def main():
     ap.add_argument("--speed", type=int, default=6)
     ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--shop", default="")
-    ap.add_argument("--hero", default="max")
+    ap.add_argument("--hog", default="")
+    ap.add_argument("--cash", type=int, default=99)
     ap.add_argument("--god", action="store_true")
     ap.add_argument("--novice", action="store_true")
     ap.add_argument("--theme", default="")
@@ -128,9 +136,13 @@ async def main():
             async with sem:
                 r = await one(browser, url, a, i)
                 ev = ",".join(r["evolutions"] or [])
-                print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
-                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} act {r['act']} act2@{r['act2At']} full {r['fullClear']} "
-                      f"pu {r['powerups']} tools {r['tools']} evo [{ev}] fps {r['fps']} err {len(r['errors'])} hurt {r['hurtBy']}", flush=True)
+                wv = " ".join(f"w{w['wave']}@{w['t']}s/lv{w['level']}/dps{w['dps']}/boss{w['boss']}s" for w in (r["waves"] or []))
+                print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} WAVE {r['wave']} game {r['game_s']:4}s "
+                      f"real {r['real_s']:3}s lv {r['level']} kills {r['kills']} gold {r['gold']} bosses {r['bossKills']} pu {r['powerups']} "
+                      f"evo {len(r['evolutions'] or [])} rel {list((r['releases'] or {}).keys())} fps {r['fps']} err {len(r['errors'])}\n    {wv}\n    "
+                      f"top dmg {sorted((r['dmg'] or {}).items(), key=lambda x: -x[1])[:5]} hurt {r['hurtBy']}", flush=True)
+                if r["errors"]:
+                    print("    ERRORS", r["errors"][:3], flush=True)
                 results.append(r)
         await asyncio.gather(*(guarded(i) for i in range(a.n)))
         await browser.close()
@@ -138,10 +150,13 @@ async def main():
     shutil.rmtree(tmp, ignore_errors=True)
     wins = sum(r["outcome"] == "win" for r in results)
     avg = lambda k: round(sum((r[k] or 0) for r in results) / max(1, len(results)), 1)
-    print(f"SUMMARY diff={a.diff} heat={a.heat} mode={a.mode} n={len(results)} wins={wins} "
-          f"avg game_s={avg('game_s')} level={avg('level')} kills={avg('kills')} gold={avg('gold')} chests={avg('chests')} "
-          f"evolved={sum(bool(r['evolutions']) for r in results)} reached_act2={sum((r['act'] or 1) >= 2 for r in results)} "
-          f"full_clears={sum(bool(r['fullClear']) for r in results)}")
+    waves = sorted((r["wave"] or 1) for r in results)
+    med = waves[len(waves) // 2] if waves else 0
+    boss = [w["boss"] for r in results for w in (r["waves"] or []) if w["wave"] >= 2]
+    print(f"SUMMARY diff={a.diff} heat={a.heat} mode={a.mode} n={len(results)} wins={wins} death waves={waves} median={med} "
+          f"avg game_s={avg('game_s')} level={avg('level')} kills={avg('kills')} gold={avg('gold')} "
+          f"evolved={sum(bool(r['evolutions']) for r in results)} boss fights (w2+) s={sorted(boss)} "
+          f"errors={sum(len(r['errors']) for r in results)}")
     if a.json:
         json.dump(results, open(a.json, "w"), indent=1)
 

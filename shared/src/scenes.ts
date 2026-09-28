@@ -65,6 +65,7 @@ export class BootScene extends Phaser.Scene {
       this.load.spritesheet(`d:${s.id}`, `assets/default/${s.id}.png`, { frameWidth: s.w, frameHeight: s.h });
       if (themed[s.id]) this.load.spritesheet(`t:${s.id}`, themed[s.id], { frameWidth: s.w, frameHeight: s.h });
     }
+    K.kit.preload?.(this);
     const musicUrl = K.manifest.music || 'assets/default/music.ogg';
     this.load.audio('music', musicUrl);
     this.load.on('loaderror', (file: Phaser.Loader.File) => {

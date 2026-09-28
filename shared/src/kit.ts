@@ -39,6 +39,8 @@ export interface KitDef {
   slots: Slot[];
   sfx: Record<string, ZzfxParams>;
   howTo: (theme: any) => string[];
+  /** Queue extra kit-fixed assets in the Boot scene's preload (sheets that aren't theme slots). */
+  preload?: (scene: Phaser.Scene) => void;
   /** Draw kit art on the title screen (sprites, lineup). */
   titleArt?: (scene: Phaser.Scene) => void;
   /** Kit-specific fix-ups after schema sanitising (e.g. cross-field rules). */
