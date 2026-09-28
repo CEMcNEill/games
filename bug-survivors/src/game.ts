@@ -458,14 +458,14 @@ export class GameScene extends Phaser.Scene {
     if (!id) { this.crestBusy = false; return; }
     this.crestBusy = true;
     const c = CREST_BY_ID.get(id)!;
-    const x = W - 150, y = H - 70, D = UI + 95;
+    const x = W - 206, y = H - 74, D = UI + 95;
     const objs: Phaser.GameObjects.GameObject[] = [
-      box(this, x, y, 144, 44, K.ui.bgInt, 0xf8d878, K.ui.panelInt).setScrollFactor(0).setDepth(D),
-      this.add.image(x + 22, y + 22, CREST64, crestFrame(id)).setScale(0.55).setScrollFactor(0).setDepth(D + 1),
-      text(this, x + 44, y + 6, 'CREST EARNED', { color: 0xf8d878, fixed: true, depth: D + 1 }),
-      text(this, x + 44, y + 16, meta.achievements().find((a) => a.id === id)?.name ?? id, { color: K.ui.textInt, fixed: true, depth: D + 1, maxWidth: 96, maxLines: 1 }),
-      text(this, x + 44, y + 27, `+ ${hogName(c.hog)}`, { color: 0x58d854, fixed: true, depth: D + 1, maxWidth: 80, maxLines: 1 }),
-      this.add.image(x + 132, y + 32, HOG32, hogFrame('stamp-approved')).setScrollFactor(0).setDepth(D + 2).setScale(0.8),
+      box(this, x, y, 200, 48, K.ui.bgInt, 0xf8d878, K.ui.panelInt).setScrollFactor(0).setDepth(D),
+      this.add.image(x + 22, y + 24, CREST64, crestFrame(id)).setScale(0.55).setScrollFactor(0).setDepth(D + 1),
+      text(this, x + 44, y + 5, 'CREST EARNED', { color: 0xf8d878, fixed: true, depth: D + 1 }),
+      text(this, x + 44, y + 15, meta.achievements().find((a) => a.id === id)?.name ?? id, { color: K.ui.textInt, fixed: true, depth: D + 1, maxWidth: 126, maxLines: 2 }),
+      text(this, x + 44, y + 36, `+ ${hogName(c.hog)}`, { color: 0x58d854, fixed: true, depth: D + 1, maxWidth: 126, maxLines: 1 }),
+      this.add.image(x + 186, y + 34, HOG32, hogFrame('stamp-approved')).setScrollFactor(0).setDepth(D + 2).setScale(0.8),
     ];
     objs.forEach((o) => { const t = o as unknown as Phaser.GameObjects.Components.Transform; t.x += 160; });
     this.tweens.add({ targets: objs, x: '-=160', duration: 250, ease: 'Back.Out' });
@@ -2887,7 +2887,7 @@ export class GameScene extends Phaser.Scene {
     });
     const sel = this.add.graphics().setScrollFactor(0).setDepth(UI + 103);
     objs.push(sel);
-    const warn = risk > 0 && this.wave >= 2 ? `${risk} gold from this wave: lose half if you die later. Cash out to keep it all.` : 'Keep going? Later waves have the biggest scores.';
+    const warn = risk > 0 && this.wave >= 2 ? `${risk} gold at risk: die later, lose half. Cash out keeps it all.` : 'Keep going? Later waves have the biggest scores.';
     objs.push(text(this, W / 2, 214, warn, { align: 'center', color: risk > 0 ? 0xf87858 : ui.textInt, fixed: true, depth: D, maxWidth: W - 20, maxLines: 1 }));
     objs.push(text(this, W / 2, 238, 'LEFT/RIGHT choose   ENTER confirm', { align: 'center', color: ui.dimInt, fixed: true, depth: D }));
     const m: Modal = { kind: 'act', cards: [], sel: 0, objs, armed: false };
