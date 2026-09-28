@@ -20,5 +20,7 @@
   { "id": "icon_product_analytics", "w": 16, "h": 16, "frames": 1 },
   { "id": "icon_surveys", "w": 16, "h": 16, "frames": 1 },
   { "id": "icon_web_analytics", "w": 16, "h": 16, "frames": 1 },
-  { "id": "icon_data_warehouse", "w": 16, "h": 16, "frames": 1 }
+  { "id": "icon_data_warehouse", "w": 16, "h": 16, "frames": 1 },
+  { "id": "props", "w": 16, "h": 16, "frames": 7, "fps": 1, "kind": "sheet" },
+  { "id": "miniboss", "w": 32, "h": 32, "frames": 2, "fps": 3 }
 ]

@@ -7,8 +7,12 @@ import { text, box, blink, PixelText, W } from '@shared/ui';
 import {
   buildRoom, cellFrames, cellX, cellY, colOf, rowOf, RoomMap, Spot, COLS, ROWS, OX, OY, DOOR_ROW, TILE,
 } from './rooms';
-import { R, BOSS, encDef, resetRun, endData } from './state';
+import { R, BOSS, encDef, resetRun, endData, endingFor, endingPages, heat } from './state';
+import { addEnding, hq } from './save';
+import { achieve } from '@shared/meta';
 import { Typewriter, paginate } from './typewriter';
+import { preloadMusic } from './music';
+import { setJuiceSpeed } from '@shared/juice';
 
 interface Page { speaker?: string; text: string }
 interface NpcPlace { i: number; room: number; spot: Spot }
@@ -35,6 +39,8 @@ export class ExploreScene extends Phaser.Scene {
   private bot = { path: [] as Spot[], goal: '' as string, push: null as null | { x: number; y: number }, stuckT: 0, lastX: 0, lastY: 0, talkTo: -1 };
 
   constructor() { super('Explore'); }
+
+  preload() { preloadMusic(this); }
 
   create() {
     resetRun();
@@ -357,8 +363,18 @@ export class ExploreScene extends Phaser.Scene {
     const go = () => {
       hooks.state = 'battle';
       K.play('encounter');
-      this.cameras.main.flash(250, 255, 255, 255);
-      this.time.delayedCall(260, () => {
+      // Undertale-style: the soul pops out of the hedgehog and blinks, then stripes wipe the room away.
+      const heart = this.add.image(this.player.x, this.player.y - 2, spr('soul')).setDepth(3001);
+      this.tweens.add({ targets: heart, alpha: 0, duration: 70, yoyo: true, repeat: 2 });
+      const g = this.add.graphics().setDepth(3000);
+      this.tweens.addCounter({ from: 0, to: 1, delay: 220, duration: 300, ease: 'Quad.In', onUpdate: (tw) => {
+        const v = tw.getValue() ?? 1;
+        g.clear().fillStyle(0x000000, 1);
+        for (let i = 0; i < 10; i++) g.fillRect(i % 2 ? W - W * v : 0, i * 27, W * v, 27);
+      } });
+      this.time.delayedCall(560, () => {
+        heart.destroy();
+        g.destroy();
         this.scene.launch('Battle', { enc });
         this.scene.sleep();
       });
@@ -384,12 +400,22 @@ export class ExploreScene extends Phaser.Scene {
     const def = encDef(data.enc);
     const pages: Page[] = [];
     if (data.enc === BOSS) {
-      pages.push(...(K.theme.game.ending as string[]).map((t) => ({ text: t })));
+      R.ending = endingFor(data.how);
+      addEnding(R.ending);
+      achieve(R.ending);
+      if (hq().endings.length >= 3) achieve('all_endings');
+      if (R.heat >= 3) achieve('heat3');
+      pages.push(...endingPages(R.ending).map((t) => ({ text: t })));
       this.say(pages, () => this.finish(true));
       return;
     }
     pages.push({ text: data.how === 'spared' ? `${def.name} wanders off, finally fixed.` : `${def.name} was debugged the hard way.` });
-    if (R.hp < R.maxHp) { R.hp = R.maxHp; pages.push({ text: 'You sip a PostHog coffee. HP fully restored.' }); }
+    const heal = heat().heal;
+    if (R.hp < R.maxHp && heal >= 1) { R.hp = R.maxHp; pages.push({ text: 'You sip a PostHog coffee. HP fully restored.' }); }
+    else if (R.hp < R.maxHp && heal > 0) {
+      R.hp = Math.min(R.maxHp, R.hp + Math.ceil(R.maxHp * heal));
+      pages.push({ text: 'You sip half a PostHog coffee. Crunch time: no time for the rest.' });
+    }
     const bossNow = [0, 1, 2].every((i) => R.cleared.has(i)) && this.actors.some((x) => x.id === BOSS && x.kind === 'enc');
     if (bossNow) pages.push({ text: 'The floor rumbles. Something big just booted up...' });
     this.say(pages, () => { if (bossNow) this.refreshBoss(true); });
@@ -485,11 +511,47 @@ export class ExploreScene extends Phaser.Scene {
     const game = this.game;
     hooks.debug = {
       autopilot: (on = true) => { R.autopilot = !!on; },
-      speed: (n: number) => { R.speed = Math.max(1, Math.min(8, Math.round(n))); },
+      speed: (n: number) => { R.speed = Math.max(1, Math.min(8, Math.round(n))); setJuiceSpeed(R.speed); },
       god: (on = true) => { R.god = !!on; },
+      // Set this run's heat (0-5) now: HP, density and heals follow it.
+      heat: (n: number) => {
+        R.heat = Math.max(0, Math.min(5, Math.floor(Number(n) || 0)));
+        K.run.heat = R.heat;
+        R.hp = R.maxHp = R.diff.hp - heat().hpLoss;
+        return R.heat;
+      },
       lose: () => { if (R.over) return; R.over = true; game.scene.stop('Battle'); game.scene.stop('Explore'); game.scene.start('End', endData(false)); },
       win: () => { if (R.over) return; R.over = true; [0, 1, 2, 3].forEach((i) => R.cleared.add(i)); R.spared = 4; game.scene.stop('Battle'); game.scene.stop('Explore'); game.scene.start('End', endData(true)); },
       room: (i: number) => { if (this.rooms[i]) this.enterRoom(i, this.rooms[i].spots.s); },
+      // Fight encounter i (0-2 enemies, 3 boss) right now.
+      battle: (i: number) => {
+        if (R.over || this.busy || !this.scene.isActive()) return;
+        this.closeDialogue();
+        this.encounter(Math.max(0, Math.min(BOSS, Math.floor(Number(i) || 0))));
+      },
+      // Showcase turn with one named pattern (see patterns.ts), in the current or a new battle.
+      pattern: (name: string) => {
+        R.showPattern = String(name ?? '');
+        (hooks.debug.showcase as () => void)();
+      },
+      // Load test: the busiest turn the game can produce (bullet-hell boss combo, long, dense).
+      flood: () => {
+        R.flood = true;
+        (hooks.debug.showcase as () => void)();
+      },
+      // Make the autopilot take a route: 'bugfix' fights everyone, 'pacifist' (default) spares them.
+      route: (r: string) => { R.forceRoute = r === 'bugfix' ? 'bugfix' : r === 'pacifist' ? 'pacifist' : ''; return R.forceRoute; },
+      // Mark enemies as already spared/debugged (e.g. route outcomes for the boss): debug.outcomes('ddd').
+      outcomes: (code: string) => {
+        String(code ?? '').slice(0, 3).split('').forEach((ch, i) => {
+          if (ch !== 's' && ch !== 'd') return;
+          R.outcomes[i] = ch === 's' ? 'spared' : 'debugged';
+          R.cleared.add(i);
+          if (ch === 's') R.spared++; else R.debugged++;
+        });
+        this.enterRoom(this.roomIdx, { col: colOf(this.pos.x), row: rowOf(this.pos.y) });
+        return { ...R.outcomes };
+      },
       // Jump to a representative, busy moment for the gameplay GIF: a battle with bullets flying.
       showcase: () => {
         if (R.over) return;

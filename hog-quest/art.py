@@ -382,7 +382,61 @@ for k in ("icon_data_warehouse",):
     ICONS[k] = [r if len(r) == 16 else (r + "." * 16)[:16] for r in ICONS[k]]
     ICONS[k] = [r[:15] + "." if r[15] == "k" and r[0] == "." and r.count("k") and r[14] == "c" else r for r in ICONS[k]]
 
+# ---------------------------------------------------------------- props (fixed kit art, one 16x16 sheet)
+P_VENDING = [
+    "kkkkkkkkkkkkkkkk",
+    "k11111111111111k",
+    "k1kkkkkkkkk1111k",
+    "k1kRkGkykBk1kk1k",
+    "k1kkkkkkkkk1kk1k",
+    "k1kykRkBkGk1111k",
+    "k1kkkkkkkkk1ww1k",
+    "k1kGkykRkyk1111k",
+    "k1kkkkkkkkk1kk1k",
+    "k1kwwwwwwwk1111k",
+    "k1kkkkkkkkk1111k",
+    "k11111111111111k",
+    "k1kkkkkkkkkkkk1k",
+    "k1k3333333333k1k",
+    "k1kkkkkkkkkkkk1k",
+    "kkkkkkkkkkkkkkkk",
+]
+P_STAR_A = [
+    E, E, E,
+    ".......y........",
+    ".......y........",
+    "......yYy.......",
+    "..yyyyYwYyyyy...",
+    "....yYwwwYy.....",
+    ".....yYwYy......",
+    "....yYy.yYy.....",
+    "....y.....y.....",
+    E, E, E, E, E,
+]
+P_STAR_B = [
+    E, E, E, E,
+    ".......Y........",
+    "......YwY.......",
+    "...YYYwwwYYY....",
+    ".....YwwwY......",
+    "....YwY.YwY.....",
+    "....Y.....Y.....",
+    E, E, E, E, E, E,
+]
+P_GLINT_A = [E] * 5 + ["........w.......", ".......wWw......".replace("W", "w"), "........w......."] + [E] * 8
+P_GLINT_B = [E] * 4 + [".......w........", "................", ".....w...w......", "................", ".......w........"] + [E] * 7
+P_CRACK = list(T_WALLFACE)
+P_CRACK[2] = "wwwwwwwkwwwwwwww"
+P_CRACK[3] = "wwwwwwkwwwwwwwww"
+P_CRACK[4] = "wwwwwwwkkwwwwwww"
+P_CRACK[5] = "wwwwwwwwwkwwwwww"
+P_CRACK[6] = "wwwwwwwwkwwwwwww"
+P_CRACK[7] = "wwwwwwwkwwwwwwww"
+P_OPEN = ["kkkkkkkkkkkkkkkk", "kggggggggggggggk"] + ["kgkkkkkkkkkkkkgk"] * 12 + ["kgkkkkkkkkkkkkgk", "kkkkkkkkkkkkkkkk"]
+PROPS = [P_VENDING, P_STAR_A, P_STAR_B, P_GLINT_A, P_GLINT_B, P_CRACK, P_OPEN]
+
 SPRITES = {
+    "props": PROPS,
     "player": PLAYER,
     "tiles": TILES,
     "soul": [SOUL],
@@ -503,7 +557,32 @@ def _boss(pal):
     return frames
 
 
+def _miniboss(pal):
+    """Tech Debt: a wobbly stack of sticky notes with tired eyes (fixed kit monster, 32x32)."""
+    frames = []
+    for f in range(2):
+        im = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        k, note, note2, acc = _c(pal, "k"), rgb("#f8d878"), rgb("#f8b800"), _c(pal, "1")
+        for i, (x0, y0) in enumerate([(6, 20), (8 + f, 13), (5 - f, 6)]):
+            d.rectangle([x0 - 1, y0 - 1, x0 + 21, y0 + 9], fill=k)
+            d.rectangle([x0, y0, x0 + 20, y0 + 8], fill=note if i % 2 == 0 else note2)
+            d.line([(x0 + 3, y0 + 3), (x0 + 12, y0 + 3)], fill=acc)
+            d.line([(x0 + 3, y0 + 5), (x0 + 9, y0 + 5)], fill=acc)
+        # tired eyes on the middle note
+        ex = 12 + f
+        d.rectangle([ex, 16, ex + 2, 17], fill=k)
+        d.rectangle([ex + 8, 16, ex + 10, 17], fill=k)
+        d.line([(ex - 1, 15), (ex + 3, 15)], fill=k)
+        d.line([(ex + 7, 15), (ex + 11, 15)], fill=k)
+        d.line([(10, 29), (8, 31)], fill=k, width=2)
+        d.line([(22, 29), (24, 31 - f)], fill=k, width=2)
+        frames.append(im)
+    return frames
+
+
 PROCEDURAL = {
+    "miniboss": _miniboss,
     "enemy_1": _enemy_1, "enemy_2": _enemy_2, "enemy_3": _enemy_3, "boss": _boss,
     **{f"npc_{i + 1}": _npc(i) for i in range(6)},
 }
