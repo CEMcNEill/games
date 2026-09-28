@@ -50,7 +50,8 @@ export function onBattleEnd(enc: number, breaks: number) {
 }
 
 export function onWin() {
-  saveWin(R.party, R.ng, hooks.elapsed, R.mode === 'speedrun');
+  // A solo hedgehog is buffed for the challenge, so it doesn't become the NG+ party.
+  saveWin(R.party, R.ng, hooks.elapsed, R.mode === 'speedrun', R.mode !== 'solo');
   achieve('first_win');
   if (Math.max(...R.party.map((m) => m.lv)) <= 4) achieve('low_level');
   if (R.mode === 'noitems') achieve('no_items');

@@ -7,7 +7,7 @@ import { K, spr, anim } from '@shared/kit';
 import { hooks } from '@shared/hooks';
 import { capture } from '@shared/analytics';
 import { flash, shake, hitstop, burst } from '@shared/juice';
-import { text, box, bar, PixelText, W, H } from '@shared/ui';
+import { text, box, bar, PixelText, W } from '@shared/ui';
 import {
   publishStats, R, ARCH, BOSS, ENCOUNTERS, SKILLS, ITEMS, Arch, ItemId, Member, SkillId, stat, levelUp, xpNext, endData,
   skillLine, featured, productName, knows, gearCrit, gearMagic, gearHeal, gearDef,
@@ -79,7 +79,6 @@ export class BattleScene extends Phaser.Scene {
     { mode: 'none', sel: 0, member: null, pending: null, list: [] };
   private over = false;
   private xpGain = 0;
-  private showcase = false;
   private region = 0;
   private tipShown = false;
 
@@ -100,7 +99,6 @@ export class BattleScene extends Phaser.Scene {
     this.xpGain = 0;
     this.breaks = 0;
     this.minHp = 1;
-    this.showcase = !!data.showcase;
     this.startRounds = R.rounds;
     this.startHp = Math.round((R.party.reduce((a, m) => a + m.hp, 0) / R.party.reduce((a, m) => a + m.maxHp, 0)) * 100) / 100;
     hooks.scene = 'Battle';

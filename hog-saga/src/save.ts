@@ -67,9 +67,10 @@ function patch(p: Partial<SagaSave>) {
 export const ngReady = () => { const s = saga(); return !!s.ngParty && s.ngParty.length > 0; };
 
 /** After a win: keep this party (levels, stats, skills, gear) for New Game+. */
-export function saveWin(party: Member[], cycle: number, timeS: number, speedrun: boolean) {
+export function saveWin(party: Member[], cycle: number, timeS: number, speedrun: boolean, keepParty = true) {
+  if (!keepParty) return;
   const s = saga();
-  // A solo win only stores the hedgehog; keep the old companions if there were any.
+  // Keep saved members this run didn't have (if any).
   const keep = party.map((m) => ({ cls: m.cls, lv: m.lv, xp: m.xp, maxHp: m.maxHp, maxMp: m.maxMp, atk: m.atk, def: m.def, mag: m.mag,
     spd: m.spd, skills: [...m.skills], gear: { ...m.gear } }));
   const merged = [...keep];

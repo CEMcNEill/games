@@ -36,6 +36,7 @@ export class ShopMenu {
 
   show(keep = false) {
     if (!keep) { this.list = SHOP; this.title = 'SHOP'; this.mult = 1; }
+    if (R.mode === 'noitems') this.list = this.list.filter((id) => !!gearDef(id)); // items are useless in NO ITEMS
     const s = this.scene, ui = K.ui;
     this.open = true;
     this.sel = 0;

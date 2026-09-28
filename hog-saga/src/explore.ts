@@ -121,7 +121,6 @@ export class ExploreScene extends Phaser.Scene {
   private bumpAt = 0;
   private bot = { path: [] as P[], goal: '', idle: 0, shopped: -1 };
   private shop!: ShopMenu;
-  private questNpc: Phaser.GameObjects.Sprite | null = null;
   private questItem: Phaser.GameObjects.Image | null = null;
   private contents: string[][] = [];
   private ev!: RunEvents;
@@ -169,7 +168,7 @@ export class ExploreScene extends Phaser.Scene {
     if (M.wyrm.x >= 0) {
       this.encs[WYRM] = this.add.sprite(M.wyrm.x * TILE + 8, M.wyrm.y * TILE + 16, spr('wyrm')).setOrigin(0.5, 1).setDepth(M.wyrm.y + 3).play(anim('wyrm'));
     }
-    this.questNpc = M.quest.x >= 0 ? this.add.sprite(M.quest.x * TILE + 8, M.quest.y * TILE + 6, spr('quest_npc')).play(anim('quest_npc')).setDepth(M.quest.y + 3) : null;
+    if (M.quest.x >= 0) this.add.sprite(M.quest.x * TILE + 8, M.quest.y * TILE + 6, spr('quest_npc')).play(anim('quest_npc')).setDepth(M.quest.y + 3);
     this.questItem = M.item.x >= 0 ? this.add.image(M.item.x * TILE, M.item.y * TILE, spr('saga_map'), 2).setOrigin(0).setDepth(2) : null;
     this.add.image(4 * TILE, 9 * TILE, spr('saga_map'), 0).setOrigin(0).setDepth(2);
     for (const [k, id] of Object.entries(M.secret)) {
