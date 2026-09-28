@@ -10,7 +10,7 @@
     "cto",
     "devops"
   ],
-  "summary": "The PostHog hedgehog survives 3:30 of swarming bugs named after the prospect's pain points, picks PostHog products as auto-firing weapons on level-up, then beats a boss.",
+  "summary": "The PostHog hedgehog survives 3:30 of swarming bugs named after the prospect's pain points, picks PostHog products as auto-firing weapons on level-up, beats a boss, then can continue into Act 2: new PostHog tools, powerups and a final boss.",
   "products": [
     "session_replay",
     "feature_flags",
@@ -25,6 +25,6 @@
     },
     "bot_expect": "win",
     "bot_speed": 6,
-    "bot_timeout_s": 150
+    "bot_timeout_s": 260
   }
 }

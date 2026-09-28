@@ -30,7 +30,7 @@ export function save(): KitSave {
   k.gold = Math.max(0, n(k.gold));
   k.chests = Math.max(0, n(k.chests));
   if (!Array.isArray(k.codex)) k.codex = [];
-  k.codex = k.codex.filter((x: unknown) => typeof x === 'string').slice(0, 20);
+  k.codex = k.codex.filter((x: unknown) => typeof x === 'string').slice(0, 40);
   if (!k.daily || typeof k.daily !== 'object') k.daily = { date: '', best: 0 };
   k.daily = { date: String(k.daily.date ?? ''), best: Math.max(0, n(k.daily.best)) };
   if (typeof k.numbers !== 'boolean') k.numbers = true;

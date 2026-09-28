@@ -6,7 +6,7 @@ import { hooks } from '@shared/hooks';
 import { meta } from '@shared/meta';
 import { text, box, W, H, PixelText } from '@shared/ui';
 import { onKeys, starfield } from '@shared/scenes';
-import { SHOP, HEROES, ACHIEVEMENTS, WEAPONS, SUPER, PASSIVES, ProductId } from './content';
+import { SHOP, HEROES, ACHIEVEMENTS, WEAPONS, SUPER, PASSIVES, WeaponId } from './content';
 import { productName } from './game';
 import { save, persist, heroUnlocked } from './save';
 
@@ -156,22 +156,24 @@ export class ShopScene extends Phaser.Scene {
     const sv = save();
     const list = meta.achievements();
     T(28, 38, `ACHIEVEMENTS ${meta.achievementCount()}`, { color: ui.accentInt });
+    const perCol = Math.ceil(list.length / 3);
     list.forEach((a, i) => {
-      const col = i < 7 ? 0 : 1;
-      const y = 52 + (i % 7) * 11;
-      T(28 + col * 215, y, `${a.got ? '*' : '-'} ${a.name}`, { color: a.got ? ui.textInt : ui.dimInt, maxWidth: 205, maxLines: 1 });
+      const col = Math.floor(i / perCol);
+      const y = 50 + (i % perCol) * 10;
+      T(28 + col * 145, y, `${a.got ? '*' : '-'} ${a.name}`, { color: a.got ? ui.textInt : ui.dimInt, maxWidth: 140, maxLines: 1 });
     });
     // Evolution codex: found ones show their recipe, the rest stay a mystery.
     const evos: [string, string][] = [
-      ...(Object.entries(WEAPONS) as [ProductId, (typeof WEAPONS)[ProductId]][]).map(([id, w]) =>
-        [w.evo.name, `${productName(id)} + ${PASSIVES[w.evo.passive].name}`] as [string, string]),
-      [SUPER.name, `${WEAPONS[SUPER.a].evo.name} + ${WEAPONS[SUPER.b].evo.name}`],
+      ...(Object.entries(WEAPONS) as [WeaponId, (typeof WEAPONS)[WeaponId]][]).filter(([, w]) => w.evo).map(([id, w]) =>
+        [w.evo!.name, `${productName(id)} + ${PASSIVES[w.evo!.passive].name}`] as [string, string]),
+      [SUPER.name, `${WEAPONS[SUPER.a].evo!.name} + ${WEAPONS[SUPER.b].evo!.name}`],
     ];
-    T(28, 130, `EVOLUTIONS FOUND ${sv.codex.filter((n) => evos.some(([e]) => e === n)).length}/${evos.length}`, { color: ui.accentInt });
-    T(W - 28, 130, 'weapon LV 5 + partner + chest', { align: 'right', color: ui.dimInt });
+    const ey = 56 + perCol * 10;
+    T(28, ey, `EVOLUTIONS FOUND ${sv.codex.filter((n) => evos.some(([e]) => e === n)).length}/${evos.length}`, { color: ui.accentInt });
+    T(W - 28, ey, 'weapon LV 5 + partner + chest', { align: 'right', color: ui.dimInt });
     evos.forEach(([n, how], i) => {
       const found = sv.codex.includes(n);
-      const y = 143 + i * 11;
+      const y = ey + 12 + i * 9;
       T(28, y, found ? n : '???', { color: found ? 0xf8d878 : ui.dimInt });
       if (found) T(160, y, how, { color: ui.dimInt, maxWidth: W - 190, maxLines: 1 });
     });

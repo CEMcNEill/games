@@ -4,6 +4,10 @@
 import type { AchievementDef } from '@shared/meta';
 
 export type ProductId = 'session_replay' | 'feature_flags' | 'experiments' | 'error_tracking' | 'product_analytics' | 'surveys';
+/** Act 2 tools: kit-fixed weapons (never theme products), offered from the Act 1 boss onward. */
+export type ToolId = 'web_analytics' | 'heatmaps' | 'posthog_ai' | 'data_warehouse' | 'workflows';
+export type WeaponId = ProductId | ToolId;
+export const TOOL_IDS: ToolId[] = ['web_analytics', 'heatmaps', 'posthog_ai', 'data_warehouse', 'workflows'];
 export type PassiveId = 'speed' | 'magnet' | 'maxhp' | 'cooldown' | 'armour' | 'area' | 'amount' | 'crit' | 'growth' | 'luck' | 'revive';
 
 export const MAX_LEVEL = 5;
@@ -34,14 +38,16 @@ export const baseStats = (): Stats => ({ might: 1, area: 1, cd: 1, amount: 0, cr
 export interface WeaponDef {
   upgrade: string;  // level-up card line for levels 2-5
   short: string;    // end-screen damage label
-  evo: { passive: PassiveId; name: string; line: string };
+  evo?: { passive: PassiveId; name: string; line: string };
+  name?: string;    // tools only: display name (theme products use shared/products.json)
+  line?: string;    // tools only: card line when new
 }
 
-export const WEAPONS: Record<ProductId, WeaponDef> = {
+export const WEAPONS: Record<WeaponId, WeaponDef> = {
   experiments: { upgrade: 'More shots per variant', short: 'Tests',
     evo: { passive: 'amount', name: 'Multivariate Barrage', line: 'Every variant, every direction' } },
   error_tracking: { upgrade: 'Faster, pierces more bugs', short: 'Errors',
-    evo: { passive: 'crit', name: 'Stack Trace Storm', line: 'Homing swarm that chains on kills' } },
+    evo: { passive: 'crit', name: 'Stack Trace Storm', line: 'Homing swarm that chains on each squash' } },
   session_replay: { upgrade: '+1 replay orb, wider orbit', short: 'Replay',
     evo: { passive: 'magnet', name: 'Rage Click Vortex', line: 'Pulsing orbs that pull in gems' } },
   feature_flags: { upgrade: 'More flags, faster zaps', short: 'Flags',
@@ -50,6 +56,14 @@ export const WEAPONS: Record<ProductId, WeaponDef> = {
     evo: { passive: 'area', name: 'Funnel Quake', line: 'Double shockwave, huge knockback' } },
   surveys: { upgrade: 'Wider area, stronger slow', short: 'Surveys',
     evo: { passive: 'armour', name: 'NPS Blizzard', line: 'Freezing aura that shreds bugs' } },
+  // Act 2 tools
+  web_analytics: { name: 'Web Analytics', line: 'Traffic Beam: a sweeping beam of pageviews', upgrade: 'Longer, faster beam', short: 'Web' },
+  heatmaps: { name: 'Heatmaps', line: 'Heat Trail: everywhere you walk gets hot', upgrade: 'Hotter, longer trail', short: 'Heatmaps',
+    evo: { passive: 'speed', name: 'Heat Wave', line: 'A blazing trail that slows bugs' } },
+  posthog_ai: { name: 'PostHog AI', line: 'Max AI: a drone that fixes the biggest bug first', upgrade: 'Faster, smarter bolts', short: 'Max AI',
+    evo: { passive: 'growth', name: 'Deep Research', line: 'Triple bolts that jump to the next bug' } },
+  data_warehouse: { name: 'Data Warehouse', line: 'Warehouse Vault: heavy data drums orbit you', upgrade: '+1 drum, harder hits', short: 'Warehouse' },
+  workflows: { name: 'Workflows', line: 'Pipeline: a zap that hops from bug to bug', upgrade: 'Longer chains, more often', short: 'Workflows' },
 };
 
 /** Hidden super evolution: two evolved weapons + a chest. */
@@ -123,14 +137,43 @@ export const ELITES_EARLY = [45, 85, 125, 165];
 
 // ---------------------------------------------------------------- events
 
-export type EventId = 'ring' | 'stampede' | 'pack';
+export type EventId = 'ring' | 'stampede' | 'pack' | 'spike' | 'incident';
 export const EVENTS: Record<EventId, { title: string; body: string }> = {
   ring: { title: 'SURROUNDED!', body: 'Break out of the ring of {n0}s' },
   stampede: { title: 'STAMPEDE!', body: 'A herd of {n1}s is crossing: dodge!' },
   pack: { title: 'ELITE PACK!', body: 'Big bugs with chests. Evolve your weapons!' },
+  spike: { title: 'TRAFFIC SPIKE!', body: 'Launch day: twice the bugs for 10 s' },
+  incident: { title: 'INCIDENT!', body: 'Bugs pouring in from every side: keep moving' },
 };
 export const EVENT_TIMES = [60, 120, 180];
 export const EVENT_ORDER: EventId[] = ['ring', 'stampede', 'pack'];
+
+// ---------------------------------------------------------------- act 2
+// Beating the 3:30 boss is "ACT 1 CLEAR": cash out (today's win) or continue. Act 2 is 3:00 of harder traffic with
+// the new tools and more powerups, then the final boss (the theme boss as "<name> 2.0"). Times are seconds after
+// Act 2 starts.
+// Bug HP ramps from hp0 to hp1 over Act 2 on top of the usual time scaling; bugs hit harder (dmg) and come faster (spawn).
+export const ACT2 = { len: 180, spawn: 1.35, hp0: 1.3, hp1: 2.6, dmg: 1.3, bossHp: 7, bossScale: 1.35, bossTint: 0xd8b8f8 };
+export const ACT2_SPAWN: { at: number; w: Partial<Record<ArchId, number>> }[] = [
+  { at: 0, w: { swarmer: 0.3, splitter: 0.2, exploder: 0.12, charger: 0.14, tank: 0.12, spitter: 0.12 } },
+  { at: 60, w: { swarmer: 0.24, splitter: 0.18, exploder: 0.14, charger: 0.16, tank: 0.14, spitter: 0.14 } },
+  { at: 120, w: { swarmer: 0.2, splitter: 0.16, exploder: 0.14, charger: 0.18, tank: 0.16, spitter: 0.16 } },
+];
+export const ACT2_ELITES = [15, 50, 85, 125];
+export const ACT2_EVENTS: { at: number; id: EventId }[] = [
+  { at: 20, id: 'spike' }, { at: 60, id: 'stampede' }, { at: 100, id: 'incident' }, { at: 150, id: 'pack' },
+];
+
+// ---------------------------------------------------------------- powerups
+// Timed pickups: rare in Act 1 (elites, crates, the odd bug), common in Act 2.
+export type PowerId = 'autopilot' | 'freeze' | 'shipit' | 'rewind';
+export const POWERUPS: Record<PowerId, { name: string; line: string; secs: number; weight: number; col: number }> = {
+  autopilot: { name: 'SELF-DRIVING MODE', line: 'Hands off! Autopilot, and nothing can touch you', secs: 5, weight: 0.3, col: 0x3cbcfc },
+  freeze: { name: 'FEATURE FREEZE', line: 'Every bug is paused for 4 s', secs: 4, weight: 0.25, col: 0xa4e4fc },
+  shipit: { name: 'SHIP IT!', line: 'Weapons fire twice as fast for 8 s', secs: 8, weight: 0.25, col: 0xfca044 },
+  rewind: { name: 'REWIND!', line: 'Session Replay rolls your HP back 5 s', secs: 1.5, weight: 0.2, col: 0xf8b800 },
+};
+export const POWER_IDS = Object.keys(POWERUPS) as PowerId[];
 
 // ---------------------------------------------------------------- heat
 
@@ -142,7 +185,7 @@ export const HEAT: HeatDef[] = [
   { desc: 'Faster bugs' },
   { desc: 'Elites come early' },
   { desc: 'Less healing' },
-  { desc: 'Boss rage + overtime' },
+  { desc: 'Boss rage + overtime after the final boss' },
 ];
 export const OVERTIME_S = 45;
 
@@ -193,7 +236,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'daily', name: 'Daily Standup', desc: 'Finish a daily run' },
   { id: 'endless10', name: 'On Call', desc: 'Survive 10:00 in endless' },
   { id: 'rich', name: 'Series A', desc: 'Earn 500 gold in total' },
-  { id: 'heat5', name: 'Meltdown', desc: 'Win on heat 5' },
+  { id: 'heat5', name: 'Meltdown', desc: 'Clear both acts on heat 5' },
+  { id: 'act2', name: 'Scale Up', desc: 'Continue into Act 2' },
+  { id: 'full_clear', name: 'Full Stack Clear', desc: 'Beat the final boss in Act 2' },
+  { id: 'hands_off', name: 'Hands Off', desc: 'Ride out Self-Driving Mode' },
+  { id: 'tools3', name: 'Power User', desc: 'Hold 3 Act 2 tools in one run' },
   { id: 'super', name: 'Full Stack Nova', desc: 'Fuse two evolved weapons', hidden: true },
 ];
 

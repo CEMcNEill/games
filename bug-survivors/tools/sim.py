@@ -91,7 +91,8 @@ async def one(browser, url, a, i):
             "hp": s.get("hp"), "bossKills": s.get("bossKills"), "gold": s.get("gold"), "chests": s.get("chests"), "elites": s.get("elites"),
             "evolutions": s.get("evolutions"), "weapons": s.get("weapons"), "passives": s.get("passives"),
             "dmg": s.get("dmg"), "hurtBy": s.get("hurtBy"), "fps": last.get("fps"), "bank": end["meta"]["coins"], "errors": errors,
-            "run": last.get("run")}
+            "run": last.get("run"), "act": s.get("act"), "act2At": s.get("act2At"), "fullClear": s.get("fullClear"),
+            "powerups": s.get("powerups"), "tools": s.get("tools")}
 
 
 async def main():
@@ -102,7 +103,7 @@ async def main():
     ap.add_argument("--heat", type=int, default=0)
     ap.add_argument("--mode", type=int, default=0)
     ap.add_argument("--speed", type=int, default=6)
-    ap.add_argument("--timeout", type=int, default=200)
+    ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--shop", default="")
     ap.add_argument("--hero", default="max")
     ap.add_argument("--god", action="store_true")
@@ -128,7 +129,8 @@ async def main():
                 r = await one(browser, url, a, i)
                 ev = ",".join(r["evolutions"] or [])
                 print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
-                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} evo [{ev}] fps {r['fps']} err {len(r['errors'])} hurt {r['hurtBy']}", flush=True)
+                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} act {r['act']} act2@{r['act2At']} full {r['fullClear']} "
+                      f"pu {r['powerups']} tools {r['tools']} evo [{ev}] fps {r['fps']} err {len(r['errors'])} hurt {r['hurtBy']}", flush=True)
                 results.append(r)
         await asyncio.gather(*(guarded(i) for i in range(a.n)))
         await browser.close()
@@ -138,7 +140,8 @@ async def main():
     avg = lambda k: round(sum((r[k] or 0) for r in results) / max(1, len(results)), 1)
     print(f"SUMMARY diff={a.diff} heat={a.heat} mode={a.mode} n={len(results)} wins={wins} "
           f"avg game_s={avg('game_s')} level={avg('level')} kills={avg('kills')} gold={avg('gold')} chests={avg('chests')} "
-          f"evolved={sum(bool(r['evolutions']) for r in results)}")
+          f"evolved={sum(bool(r['evolutions']) for r in results)} reached_act2={sum((r['act'] or 1) >= 2 for r in results)} "
+          f"full_clears={sum(bool(r['fullClear']) for r in results)}")
     if a.json:
         json.dump(results, open(a.json, "w"), indent=1)
 

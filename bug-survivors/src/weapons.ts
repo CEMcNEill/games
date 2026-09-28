@@ -1,16 +1,18 @@
 // Weapon behaviours: one entry per PostHog product, each with its base (levels 1-5) and evolved form.
 // Damage passed to g.damage() is before might/crit; the scene applies those.
 import Phaser from 'phaser';
-import { spr } from '@shared/kit';
+import { spr, anim } from '@shared/kit';
 import { burst } from '@shared/juice';
 import type { GameScene, Enemy } from './game';
-import type { ProductId, Stats } from './content';
+import type { WeaponId, Stats } from './content';
 
 export interface Flag { s: Phaser.GameObjects.Image; life: number; zap: number }
 export interface Ring { r: number; max: number; hit: Set<Enemy>; x: number; y: number; dmg: number; kb: number }
 
+export interface Spot { x: number; y: number; t: number; life: number; r: number }
+
 export interface WState {
-  id: ProductId;
+  id: WeaponId;
   level: number;
   evo: boolean;
   timer: number;
@@ -18,10 +20,13 @@ export interface WState {
   flags: Flag[];
   orbs: Phaser.GameObjects.Image[];
   rings: Ring[];
-  nova: number; // super evolution timer
+  nova: number; // super evolution timer (heatmaps: damage tick timer)
+  spots: Spot[];                          // heatmaps: hot tiles on the floor
+  drone: Phaser.GameObjects.Sprite | null; // posthog_ai: the Max AI drone
 }
 
-export const newWeapon = (id: ProductId): WState => ({ id, level: 1, evo: false, timer: 0.3, angle: 0, flags: [], orbs: [], rings: [], nova: 1 });
+export const newWeapon = (id: WeaponId): WState => ({ id, level: 1, evo: false, timer: 0.3, angle: 0, flags: [], orbs: [], rings: [], nova: 1,
+  spots: [], drone: null });
 
 const GOLD = 0xf8d878;
 
@@ -204,15 +209,184 @@ const surveys: Fn = (g, w, dt) => {
     { speed: 25, gravity: 20, life: 0.6, size: 1 });
 };
 
-export const WEAPON_FNS: Record<ProductId, Fn> = {
-  experiments, error_tracking: errorTracking, session_replay: sessionReplay, feature_flags: featureFlags,
-  product_analytics: productAnalytics, surveys,
+// ---------------------------------------------------------------- Act 2 tools
+
+/** Beam geometry for Web Analytics (also used by the drawing). */
+export function beams(w: WState, s: Stats) {
+  const n = Math.min(4, (w.level >= 4 ? 2 : 1) + s.amount);
+  const len = (70 + 10 * w.level) * s.area;
+  return { n, len, angles: Array.from({ length: n }, (_, b) => w.angle + (b * Math.PI * 2) / n) };
+}
+
+const webAnalytics: Fn = (g, w, dt) => {
+  const s = g.st, p = g.player, L = w.level;
+  // Hot Reload and Ship It spin the beam faster.
+  w.angle += dt * (1.5 + 0.15 * L) / Math.max(0.5, s.cd);
+  w.timer -= dt;
+  if (w.timer > 0) return;
+  w.timer = 0.06;
+  const { len, angles } = beams(w, s);
+  const dmg = 6 + 3 * L;
+  for (const a of angles) {
+    const cx = Math.cos(a), cy = Math.sin(a);
+    for (const e of g.near(p.x + (cx * len) / 2, p.y + (cy * len) / 2, len / 2 + 4)) {
+      const rx = e.s.x - p.x, ry = e.s.y - p.y;
+      const along = rx * cx + ry * cy;
+      if (along < 0 || along > len + e.r) continue;
+      if (Math.abs(-rx * cy + ry * cx) > e.r + 3) continue;
+      if ((e.hitAt.beam ?? 0) > g.elapsed) continue;
+      e.hitAt.beam = g.elapsed + 0.35;
+      g.damage(e, dmg, cx * 30, cy * 30, 'web_analytics');
+    }
+  }
 };
 
-/** Rings (analytics) and the survey aura, drawn each frame. */
+const heatmaps: Fn = (g, w, dt) => {
+  const s = g.st, p = g.player, L = w.level;
+  const r = (w.evo ? 16 : 8 + 1.5 * L) * s.area;
+  w.timer -= dt;
+  if (w.timer <= 0) {
+    w.timer = 0.2 * Math.max(0.5, s.cd);
+    const last = w.spots[w.spots.length - 1];
+    // A new hot tile when the hog has moved on, or when the one underfoot is getting old.
+    if (!last || Math.hypot(last.x - p.x, last.y - p.y - 6) > r * 0.8 || last.t > 0.7) {
+      w.spots.push({ x: p.x, y: p.y + 6, t: 0, life: w.evo ? 4 : 2 + 0.3 * L, r });
+      if (w.spots.length > 60) w.spots.shift();
+    }
+  }
+  w.nova -= dt;
+  const tick = w.nova <= 0;
+  if (tick) w.nova = 0.25;
+  const dmg = w.evo ? 15 : 4 + 2.5 * L;
+  for (let i = w.spots.length - 1; i >= 0; i--) {
+    const q = w.spots[i];
+    q.t += dt;
+    if (q.t >= q.life) { w.spots.splice(i, 1); continue; }
+    if (!tick) continue;
+    for (const e of g.near(q.x, q.y, q.r)) {
+      if ((e.hitAt.heat ?? 0) > g.elapsed) continue;
+      e.hitAt.heat = g.elapsed + 0.3;
+      if (w.evo) e.hitAt.slowUntil = g.elapsed + 0.6; // Heat Wave: bugs wade through it
+      g.damage(e, dmg, 0, 0, 'heatmaps', true);
+    }
+  }
+};
+
+const posthogAi: Fn = (g, w, dt) => {
+  const s = g.st, p = g.player, L = w.level;
+  if (!w.drone) {
+    w.drone = g.add.sprite(p.x, p.y - 16, spr('drone')).setDepth(11);
+    w.drone.play(anim('drone'));
+    if (w.evo) w.drone.setTint(GOLD);
+  }
+  const d = w.drone;
+  const a = g.elapsed * 1.3;
+  const tx = p.x + Math.cos(a) * 20, ty = p.y - 16 + Math.sin(a * 2) * 4;
+  const k = Math.min(1, dt * 6);
+  d.x += (tx - d.x) * k;
+  d.y += (ty - d.y) * k;
+  d.setFlipX(tx < p.x);
+  w.timer -= dt;
+  if (w.timer > 0) return;
+  // Max AI goes for the biggest problem first: the highest-HP bug in range (the boss, if it's close).
+  let best: Enemy | null = null, bh = 0;
+  for (const e of g.near(p.x, p.y, 240)) if (e.arch !== 'crate' && e.hp > bh) { bh = e.hp; best = e; }
+  if (!best) { w.timer = 0.2; return; }
+  w.timer = (w.evo ? 0.45 : 1.25 - 0.12 * L) * s.cd;
+  const n = (w.evo ? 3 : 1 + (L >= 3 ? 1 : 0) + (L >= 5 ? 1 : 0)) + Math.min(2, s.amount);
+  const sp = 230;
+  for (let i = 0; i < n; i++) {
+    const ang = Math.atan2(best.s.y - d.y, best.s.x - d.x) + (i - (n - 1) / 2) * 0.5;
+    const pr = g.shoot('ai_bolt', d.x, d.y, Math.cos(ang) * sp, Math.sin(ang) * sp, w.evo ? 36 : 14 + 5 * L, 2.2, w.evo ? 2 : 1, 'posthog_ai');
+    pr.homing = best; pr.speed = sp;
+    if (w.evo) pr.chain = 1;
+  }
+  g.sfx('zap', 0.25, 90);
+};
+
+const dataWarehouse: Fn = (g, w) => {
+  const s = g.st, p = g.player, L = w.level;
+  const n = Math.min(4, 1 + Math.floor(L / 2) + s.amount);
+  while (w.orbs.length < n) w.orbs.push(g.add.image(p.x, p.y, spr('vault')).setDepth(9).setScale(1.25));
+  while (w.orbs.length > n) w.orbs.pop()!.destroy();
+  const rad = (56 + 4 * L) * s.area;
+  const spin = -g.elapsed * 1.15;
+  const dmg = 20 + 8 * L;
+  w.orbs.forEach((o, i) => {
+    const a = spin + (i / n) * Math.PI * 2;
+    o.setPosition(p.x + Math.cos(a) * rad, p.y + Math.sin(a) * rad).setRotation(Math.sin(g.elapsed * 2 + i) * 0.15);
+    for (const e of g.near(o.x, o.y, 9)) {
+      if ((e.hitAt.vault ?? 0) > g.elapsed) continue;
+      e.hitAt.vault = g.elapsed + 0.7;
+      const dx = e.s.x - p.x, dy = e.s.y - p.y, d = Math.hypot(dx, dy) || 1;
+      g.damage(e, dmg, (dx / d) * 260, (dy / d) * 260, 'data_warehouse');
+    }
+  });
+};
+
+const workflows: Fn = (g, w, dt) => {
+  w.timer -= dt;
+  if (w.timer > 0) return;
+  const s = g.st, p = g.player, L = w.level;
+  let t = g.nearest(p.x, p.y, 150 * s.area);
+  if (!t) { w.timer = 0.2; return; }
+  w.timer = (1.7 - 0.15 * L) * s.cd;
+  const hops = 2 + L + s.amount, dmg = 12 + 5 * L, reach = 90 * s.area;
+  const hit = new Set<Enemy>();
+  let lx = p.x, ly = p.y;
+  for (let k = 0; k < hops && t; k++) {
+    g.zapLine(lx, ly, t.s.x, t.s.y, 0xfca044);
+    hit.add(t);
+    lx = t.s.x; ly = t.s.y;
+    g.damage(t, dmg, 0, 0, 'workflows');
+    let next: Enemy | null = null, nd = reach * reach;
+    for (const e of g.near(lx, ly, reach)) {
+      if (hit.has(e) || e.arch === 'crate') continue;
+      const dd = (e.s.x - lx) ** 2 + (e.s.y - ly) ** 2;
+      if (dd < nd) { nd = dd; next = e; }
+    }
+    t = next;
+  }
+  g.sfx('zap', 0.35, 90);
+};
+
+export const WEAPON_FNS: Record<WeaponId, Fn> = {
+  experiments, error_tracking: errorTracking, session_replay: sessionReplay, feature_flags: featureFlags,
+  product_analytics: productAnalytics, surveys,
+  web_analytics: webAnalytics, heatmaps, posthog_ai: posthogAi, data_warehouse: dataWarehouse, workflows,
+};
+
+/** Rings (analytics), the survey aura, heat tiles and traffic beams, drawn each frame. */
 export function drawWeapons(g: GameScene, fx: Phaser.GameObjects.Graphics, auraG: Phaser.GameObjects.Graphics) {
   const sv = g.weapons.get('surveys');
   auraG.clear();
+  const hm = g.weapons.get('heatmaps');
+  if (hm) {
+    for (const q of hm.spots) {
+      const k = 1 - q.t / q.life;
+      const flick = 0.85 + 0.15 * Math.sin(g.time.now / 60 + q.x);
+      auraG.fillStyle(hm.evo ? 0xf8b800 : 0xf83800, 0.28 * k * flick).fillEllipse(q.x, q.y, q.r * 2, q.r * 1.4);
+      auraG.fillStyle(hm.evo ? 0xfcfcfc : 0xfca044, 0.34 * k * flick).fillEllipse(q.x, q.y, q.r * 1.2, q.r * 0.8);
+      if (k > 0.5) auraG.fillStyle(0xf8d878, 0.4 * k).fillEllipse(q.x, q.y, q.r * 0.5, q.r * 0.35);
+    }
+  }
+  const wa = g.weapons.get('web_analytics');
+  if (wa) {
+    const { len, angles } = beams(wa, g.st);
+    const px = g.player.x, py = g.player.y;
+    for (const a of angles) {
+      const ex = px + Math.cos(a) * len, ey = py + Math.sin(a) * len;
+      fx.lineStyle(5, 0x00b800, 0.25).lineBetween(px, py, ex, ey);
+      fx.lineStyle(3, 0x58d854, 0.55).lineBetween(px, py, ex, ey);
+      fx.lineStyle(1, 0xfcfcfc, 0.9).lineBetween(px, py, ex, ey);
+      // Packets of traffic running out along the beam.
+      for (let i = 0; i < 4; i++) {
+        const f = ((g.time.now / 400 + i / 4) % 1);
+        fx.fillStyle(0xb8f818, 1).fillRect(Math.round(px + Math.cos(a) * len * f) - 1, Math.round(py + Math.sin(a) * len * f) - 1, 2, 2);
+      }
+      fx.fillStyle(0xfcfcfc, 0.8).fillCircle(ex, ey, 2);
+    }
+  }
   if (sv) {
     const { r: r0 } = aura(sv, g.st);
     const r = r0 + Math.sin(g.time.now / 200) * 2;
@@ -239,6 +413,8 @@ export function drawWeapons(g: GameScene, fx: Phaser.GameObjects.Graphics, auraG
 export function resetVisuals(w: WState) {
   w.orbs.forEach((o) => o.destroy());
   w.orbs = [];
+  w.drone?.destroy();
+  w.drone = null;
   w.flags.forEach((f) => f.s.destroy());
   w.flags = [];
 }

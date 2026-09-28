@@ -34,5 +34,17 @@
   {"id": "icon_crit", "w": 16, "h": 16, "frames": 1},
   {"id": "icon_growth", "w": 16, "h": 16, "frames": 1},
   {"id": "icon_luck", "w": 16, "h": 16, "frames": 1},
-  {"id": "icon_revive", "w": 16, "h": 16, "frames": 1}
+  {"id": "icon_revive", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_web_analytics", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_heatmaps", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_posthog_ai", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_data_warehouse", "w": 16, "h": 16, "frames": 1},
+  {"id": "icon_workflows", "w": 16, "h": 16, "frames": 1},
+  {"id": "drone", "w": 12, "h": 12, "frames": 2, "fps": 8},
+  {"id": "ai_bolt", "w": 8, "h": 8, "frames": 1},
+  {"id": "vault", "w": 12, "h": 12, "frames": 1},
+  {"id": "autopilot", "w": 16, "h": 16, "frames": 1},
+  {"id": "freeze", "w": 16, "h": 16, "frames": 1},
+  {"id": "shipit", "w": 16, "h": 16, "frames": 1},
+  {"id": "rewind", "w": 16, "h": 16, "frames": 1}
 ]

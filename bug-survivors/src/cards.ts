@@ -1,20 +1,22 @@
 // Level-up cards: a weighted pool that leans toward the player's current build (owned items and
 // evolution partners), plus the autopilot's ranking so the test bot builds toward evolutions.
-import { WEAPONS, PASSIVES, MAX_LEVEL, MAX_PASSIVES, ProductId, PassiveId } from './content';
+import { WEAPONS, PASSIVES, MAX_LEVEL, MAX_PASSIVES, WeaponId, PassiveId } from './content';
 import type { WState } from './weapons';
 
 export interface Card { kind: 'weapon' | 'passive' | 'heal' | 'gold'; id: string }
 
 export interface Build {
-  weapons: Map<ProductId, WState>;
+  weapons: Map<WeaponId, WState>;
   passives: Map<PassiveId, number>;
   banished: Set<string>;
-  products: ProductId[];
+  products: WeaponId[];   // theme products, plus the Act 2 tools once unlocked
   luck: number;
 }
 
 /** Passives that evolve a weapon the player holds (and hasn't evolved yet). */
-export const partnersOf = (b: Build) => new Set([...b.weapons.values()].filter((w) => !w.evo).map((w) => WEAPONS[w.id].evo.passive));
+export const partnersOf = (b: Build) => new Set([...b.weapons.values()].filter((w) => !w.evo && WEAPONS[w.id].evo)
+  .map((w) => WEAPONS[w.id].evo!.passive));
+const evoPassive = (id: WeaponId) => WEAPONS[id].evo?.passive;
 
 export function cardPool(b: Build): { c: Card; w: number }[] {
   const pool: { c: Card; w: number }[] = [];
@@ -24,7 +26,10 @@ export function cardPool(b: Build): { c: Card; w: number }[] {
     if (b.banished.has(id)) continue;
     const w = b.weapons.get(id);
     if (!w) pool.push({ c: { kind: 'weapon', id }, w: nW < 3 ? 2.4 : nW < 4 ? 1.3 : 0.8 });
-    else if (w.level < MAX_LEVEL) pool.push({ c: { kind: 'weapon', id }, w: 3 + (b.passives.has(WEAPONS[id].evo.passive) ? 1.5 * b.luck : 0) });
+    else if (w.level < MAX_LEVEL) {
+      const ep = evoPassive(id);
+      pool.push({ c: { kind: 'weapon', id }, w: 3 + (ep && b.passives.has(ep) ? 1.5 * b.luck : 0) });
+    }
   }
   for (const id of Object.keys(PASSIVES) as PassiveId[]) {
     if (b.banished.has(id)) continue;
@@ -56,9 +61,10 @@ export function drawCards(b: Build, rnd: () => number, n = 3): Card[] {
 export function botRank(c: Card, b: Build): number {
   const partners = partnersOf(b);
   if (c.kind === 'weapon') {
-    const w = b.weapons.get(c.id as ProductId);
+    const w = b.weapons.get(c.id as WeaponId);
     if (!w) return b.weapons.size < 3 ? 9 : b.weapons.size < 4 ? 5 : 2;
-    return 7 + w.level + (b.passives.has(WEAPONS[w.id].evo.passive) ? 4 : 0);
+    const ep = evoPassive(w.id);
+    return 7 + w.level + (ep && b.passives.has(ep) ? 4 : 0);
   }
   if (c.kind === 'passive') {
     const id = c.id as PassiveId;

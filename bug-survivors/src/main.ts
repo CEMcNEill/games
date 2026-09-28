@@ -29,7 +29,7 @@ startKit({
   gameScene: 'Game',
   howTo: (t) => {
     const lines = [
-      `Bugs are swarming ${t.prospect.name}. Survive until ${theName(t.game.boss.name)} shows up, then squash it.`,
+      `Bugs are swarming ${t.prospect.name}. Survive until ${theName(t.game.boss.name)} shows up, then squash it. Beat it to unlock Act 2.`,
       'Move with the ARROW KEYS or WASD. Your PostHog weapons fire on their own.',
       'Grab the blue gems. Each level-up lets you pick a new PostHog product or an upgrade (LEFT/RIGHT, ENTER).',
       `You start with ${productName(t.game.starting_product)}. Elites drop chests. ESC pauses.`,

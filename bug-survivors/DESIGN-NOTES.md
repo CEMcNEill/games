@@ -185,3 +185,31 @@ spawn after the win; Meltdown (heat 5) isn't awarded in endless (no overtime the
 gold picked up (the run isn't recorded); the shop hand-off listener is module-scoped so `off()` works; invalid banish
 gives feedback; daily how-to text no longer promises identical drops (shop luck still differs between players).
 Checks after: easy novice n=8 8/8 (223-291 s), normal h5 n=4 2/4, 0 page errors; Gate 1 PASS.
+
+## 2026-09-28: Act 2 (more after the boss)
+Ask: "more after the current boss", new abilities from other PostHog products and tools, new powerups including a
+self-driving mode. What: the 3:30 boss is now ACT 1 CLEAR with CONTINUE / CASH OUT, a free PostHog Toolbox pick, a
+3:00 Act 2 and a final "<boss> 2.0" with a Rollout attack. Five kit-fixed tools (Web Analytics, Heatmaps, PostHog AI,
+Data Warehouse, Workflows; two evolve with the free passives Hedgehog Sprint and Docs Day) and four powerups
+(Self-Driving Mode, Feature Freeze, Ship It, Rewind). Act 1 is untouched through the boss. Details in KIT.md.
+Why CASH OUT: prospects who want the 4-minute version still get it, and "keep going?" is the one-more-run pull
+inside a run. Why tools are kit-fixed: the theme contract stays unchanged, so every existing prospect theme
+gets Act 2 on reassembly.
+Fixes found on the way: the boss dash telegraph was drawn during the step and cleared by draw() before it showed
+(now drawn in draw()); the Act 1 boss respawned during the act break (nextBossAt is parked until Act 2 starts).
+Sprites: CC0 bases (Kenney 1-Bit flame, snowflake, rocket, wheel silhouettes) + hand grids, 3-tone ramps, outlines
+(tools/make_act2_sprites.py).
+
+### Balance (tools/sim.py, speed 6, n=4-6; bot takes CONTINUE)
+Act 1 first: same-load A/B of the committed build vs this one (normal, smart, n=15 each, Act 1 only): base 2 losses,
+new 0. Act 1 boss still falls at 3:40-4:10 (act2@221-255 s).
+First tuning (spawn x1.15, boss HP x2.2): every bot that reached Act 2 cleared it at full HP and the final boss died in
+~13 s. Now: spawns x1.35, bug HP x1.3 ramping to x2.6, damage x1.3, final boss HP x7.
+| config | reached Act 2 | full clears | run length (game s) |
+|---|---|---|---|
+| easy h0 novice | 10/10 | 10/10 | 417-530 |
+| normal h0 smart | 5/6 | 5/5 | 413-478 (final boss 12-43 s) |
+| normal h0 novice | 5/6 | 4/5 (one death 1:37 into Act 2) | 449-541 |
+| normal h5 smart | 2/4 | 2/2 (overtime after the final boss) | 465-471 |
+| endless normal | 2/2 | - (toolbox after boss 1; 4 bosses by 11:00) | - |
+Powerups collected per run: Act 1 ~0-2, Act 2 ~2-8 (smart bot, which walks to them). Gate 1: PASS (bot win at 419 s).
