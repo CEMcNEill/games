@@ -462,7 +462,7 @@ export class GameScene extends Phaser.Scene {
     this.elapsed += dt;
     this.numBudget = Math.min(14, this.numBudget + dt * 40);
     this.invuln = Math.max(0, this.invuln - dt);
-    const regen = this.diff.regen * (this.heat >= 4 ? 0.5 : 1);
+    const regen = this.heat >= 4 ? 0 : this.diff.regen;
     this.hp = Math.min(this.st.maxHp, this.hp + regen * dt);
     this.movePlayer(dt);
     this.spawn(dt);
@@ -545,8 +545,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- spawning
-  private heatSpawn() { return this.heat >= 1 ? 1.3 : 1; }
-  private heatSpeed() { return this.heat >= 2 ? 1.15 : 1; }
+  // Named heat modifiers stack (1 more, 2 faster, 3 elites early, 4 less healing, 5 boss rage + overtime); on top,
+  // every heat level adds general pressure: +8% bug HP, +6% damage, +6% spawns.
+  private heatSpawn() { return (this.heat >= 1 ? 1.3 : 1) * (1 + 0.06 * this.heat); }
+  private heatSpeed() { return this.heat >= 2 ? 1.18 : 1; }
+  private heatHp() { return 1 + 0.08 * this.heat; }
+  private heatDmg() { return 1 + 0.06 * this.heat; }
 
   private spawn(dt: number) {
     const t = this.elapsed;
@@ -602,7 +606,7 @@ export class GameScene extends Phaser.Scene {
     e.s.anims.setProgress(Math.random());
     const tint = elite ? ELITE_MODS[elite].tint : A.tint ?? null;
     const speed = A.speed * Phaser.Math.FloatBetween(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1);
-    Object.assign(e, { arch, type, hp: A.hp * this.diff.hp * scale * (elite ? 9 : 1), speed, dmg: A.dmg * this.diff.dmg * (elite ? 1.4 : 1),
+    Object.assign(e, { arch, type, hp: A.hp * this.diff.hp * scale * this.heatHp() * (elite ? 9 : 1), speed, dmg: A.dmg * this.diff.dmg * this.heatDmg() * (elite ? 1.4 : 1),
       xp: A.xp * (elite ? 5 : 1), r: A.r * sc, kx: 0, ky: 0, flash: 0, slow: 1, hitAt: {}, alive: true, boss: false, elite, mode: 0,
       t: Phaser.Math.FloatBetween(1.5, 3.5), vx: 0, vy: 0, acc: 0, accT: 0, accCrit: false, armour: (A.armour ?? 1) * (elite === 'shield' ? 0.45 : 1),
       kb: (A.kb ?? 1) * (elite ? 0.3 : 1), tint });

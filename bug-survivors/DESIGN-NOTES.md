@@ -68,3 +68,23 @@ time + kills. Daily: seeded weapon, spawns, drops, events, cards; best daily sco
 
 ## Balance log
 (filled in as measured)
+
+### 2026-09-27 ~22:40, after P0 (bot = autopilot at speed 6, `tools/sim.py`, 4 runs each)
+Before tonight: bot won easy at 227 s, level 22, 766 kills; KIT.md said it usually died near the boss on normal.
+| config | wins | avg game s | avg level | kills | gold | evolved runs |
+|---|---|---|---|---|---|---|
+| easy h0 | 4/4 | 242 | 22.5 | 1153 | 103 | 4/4 |
+| normal h0 | 4/4 | 226 | 23.8 | 1588 | 62 | 3/4 |
+| hard h0 | 1/4 | 154 | 17 | 932 | 29 | 1/4 |
+First heat pass (spawn x1.3, speed x1.15, early elites, half regen): normal h1 4/4, h3 2/2, h5 2/4: heat didn't bite
+(more bugs = more XP = snowball). Added a per-heat pressure layer: +15% HP, +10% dmg, +12% spawns per level:
+h3 0/4 and h5 0/4 (deaths at 70-130 s): too steep. Settled at +8% HP, +6% dmg, +6% spawns, speed x1.18, no regen at h4+:
+| config | wins | avg game s | avg level | gold |
+|---|---|---|---|---|
+| normal h1 | 4/4 | 279 | 31.8 | 150 |
+| normal h3 | 3/4 | 218 | 34 | 258 |
+| normal h5 | 1/4 | 136 | 23 | 187 |
+Runs are bimodal at high heat: die in the first two minutes, or snowball into 3-4 evolutions. That's the genre's shape;
+the shop's might/HP levels exist to smooth the early phase.
+Boss HP 950 -> 1250 base so the fight lasts ~15-30 s for the bot instead of ~5 s.
+Perf: `flood(300)` twice with every weapon evolved, the fusion, and 6 passives at level 5: 60 fps, ~90 projectiles.

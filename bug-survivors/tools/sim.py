@@ -53,16 +53,21 @@ async def one(browser, url, a, i):
     if a.hero != "max":
         setup.append(f"__game.meta.kit.hero = '{a.hero}'")
     if setup:
-        await page.evaluate("; ".join(setup) + "; __game.debug.goto('Title')")
-        await page.wait_for_timeout(700)
+        # debug.goto('Title') from the title leaves it stopped, so save and reload instead.
+        await page.evaluate("; ".join(setup) + "; __game.debug.meta({})")
+        await page.reload()
+        await page.wait_for_function("window.__game && window.__game.ready", timeout=20000)
+        await page.wait_for_timeout(800)
     for _ in range(a.mode):
         await page.keyboard.press("ArrowRight")
-        await page.wait_for_timeout(60)
+        await page.wait_for_timeout(150)
     if a.heat:
+        await page.wait_for_timeout(150)
         await page.keyboard.press("ArrowDown")
+        await page.wait_for_timeout(150)
         for _ in range(a.heat):
             await page.keyboard.press("ArrowRight")
-            await page.wait_for_timeout(60)
+            await page.wait_for_timeout(150)
     await page.keyboard.press("Enter")
     await page.wait_for_timeout(700)
     await page.keyboard.press("Enter")
@@ -119,7 +124,7 @@ async def main():
             async with sem:
                 r = await one(browser, url, a, i)
                 ev = ",".join(r["evolutions"] or [])
-                print(f"run {i}: {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
+                print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
                       f"hp {r['hp']} gold {r['gold']} chests {r['chests']} evo [{ev}] fps {r['fps']} err {len(r['errors'])}", flush=True)
                 results.append(r)
         await asyncio.gather(*(guarded(i) for i in range(a.n)))
