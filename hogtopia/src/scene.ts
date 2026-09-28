@@ -730,6 +730,7 @@ export class MapScene extends Phaser.Scene {
       return;
     }
     if (code === 'Escape' || (code === 'KeyT' && m.kind === 'tech')) { this.closeMenu(); return; }
+    if (code === 'KeyE' && !repeat) { this.closeMenu(); if (!this.menu) void this.endTurn(); return; } // E still ends the turn
     if (m.kind === 'train') {
       const n = TRAINABLE.length + 1;
       if (up || down) { m.sel = (m.sel + (up ? n - 1 : 1)) % n; K.play('move', 0.3); this.drawMenu(); return; }
