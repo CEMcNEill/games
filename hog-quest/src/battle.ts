@@ -6,14 +6,14 @@ import Phaser from 'phaser';
 import { K, spr, anim } from '@shared/kit';
 import { hooks } from '@shared/hooks';
 import { capture } from '@shared/analytics';
-import { achieve } from '@shared/meta';
+import { achieve, meta } from '@shared/meta';
 import { shake, hitstop, hitstopped, flash, burst, floatText, punch } from '@shared/juice';
 import { text, bar, PixelText, W } from '@shared/ui';
 import { R, BOSS, MINI, MAX_CONTINUES, encDef, endData, productName, EncDef, route, heat } from './state';
 import { item, itemLine } from './items';
 import { Box } from './patterns';
 import { Typewriter } from './typewriter';
-import { makePuzzle, hint, Puzzle, VERBS, verbLabel } from './acts';
+import { makePuzzle, hint, Puzzle, VERBS, verbLabel, wantOf } from './acts';
 import { enemySteps, enemyStep, bossStep, Step } from './choreo';
 import { Dodge } from './dodge';
 import { battleMusic, stopBattleMusic } from './music';
@@ -113,6 +113,7 @@ export class BattleScene extends Phaser.Scene {
   private hitsThis = 0;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private clockT: PixelText | null = null;
+  private lastMood: Mood | '' = '';
 
   constructor() { super('Battle'); }
 
@@ -124,7 +125,7 @@ export class BattleScene extends Phaser.Scene {
     this.isMini = this.enc === MINI;
     this.maxHp = this.hp = this.isBoss ? (this.hell ? 80 : 70) : this.isMini ? 50 : 36;
     Object.assign(this, { mercy: 0, solved: false, annoyed: false, progress: 0, checked: false, turn: 0, mode: 'menu', sel: 0,
-      subSel: 0, tp: 0, next: null, botT: 0, finished: false, btns: [], choices: [], hitsThis: 0, live: false, turnPats: [] });
+      subSel: 0, tp: 0, next: null, botT: 0, finished: false, btns: [], choices: [], hitsThis: 0, live: false, turnPats: [], lastMood: '' });
     this.used = new Set();
     this.fx = { slow: false, shield: false, crit: false, short: false };
     this.boxNow = { ...TEXT_BOX };
@@ -145,7 +146,7 @@ export class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: this.enemy, y: this.enemy.y - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.dust = this.sampleColours();
     this.nameT = text(this, 24, 8, this.def.name, { color: ui.textInt });
-    this.moodT = text(this, 24, 8, '', { color: ui.dimInt });
+    this.moodT = text(this, 26, 39, '', { color: ui.dimInt });
     text(this, 26, 19, 'HP', { color: ui.dimInt });
     this.hpBar = bar(this, 62, 21, 70, 3, 0x58d854, 0x7c7c7c, 0x000000);
     text(this, 26, 29, 'MERCY', { color: ui.dimInt });
@@ -180,7 +181,8 @@ export class BattleScene extends Phaser.Scene {
     this.events.once('shutdown', () => kb.off('keydown', this.onKey, this));
     this.keys = kb.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>;
     battleMusic(this, this.isBoss);
-    this.say(this.hell ? `${this.def.intro} It has seen what you did. It will not listen.` : this.def.intro, null);
+    const tip = this.enc === 0 && meta.data.runs === 0 ? ' (New here? ACT > CHECK says what it wants.)' : '';
+    this.say(this.hell ? `${this.def.intro} It has seen what you did. It will not listen.` : `${this.def.intro}${tip}`, null);
     this.mode = 'menu';
     this.drawAll();
     if (R.showcase) { R.showcase = false; this.time.delayedCall(250, () => this.showcase()); }
@@ -192,7 +194,8 @@ export class BattleScene extends Phaser.Scene {
     this.clearChoices();
     this.fightG.clear();
     const step = R.flood ? { pats: ['spiral', 'laser', 'rain', 'orbit'], busy: 2.2 }
-      : R.showPattern ? { pats: [R.showPattern], busy: 1.2 } : this.isBoss ? bossStep(this.def.patterns, 1, 1, true) : enemyStep(this.steps, 3);
+      : R.showPattern ? { pats: [R.showPattern], busy: 1.2 } : this.isBoss ? bossStep(this.def.patterns, 1, 1, true)
+      : { pats: [enemyStep(this.steps, 0).pats[0], 'laser'], busy: 1.1 };
     this.startTurn(R.flood ? 60 : 8, 1.5, step);
   }
 
@@ -230,14 +233,20 @@ export class BattleScene extends Phaser.Scene {
     this.btns.forEach(({ g, t }, i) => {
       const x = BTN_X(i);
       const on = i === this.sel && this.mode === 'menu';
-      const col = on ? ui.accentInt : 0xf83800;
+      const ready = i === 4 && this.sparable();
+      const col = on ? ui.accentInt : ready ? 0xf8d878 : 0xf83800;
       g.clear().lineStyle(2, col, 1).strokeRect(x + 1, 219, 83, 20);
       t.setColor(col);
     });
     const mood = this.mood();
     this.nameT.setColor(mood === 'ready' ? ui.accentInt : ui.textInt);
+    if (mood !== this.lastMood && this.enemy.alpha > 0.5 && this.mode !== 'end') {
+      if (mood === 'annoyed' || mood === 'furious') this.enemy.setTint(0xff9c9c); else this.enemy.clearTint();
+      if (mood === 'ready' && this.lastMood) { K.play('spare', 0.35); burst(this, this.enemy.x, this.enemy.y - 20, 0xf8d878, 10, { gravity: -30, speed: 50 }); }
+      this.lastMood = mood;
+    }
     const tag = { calm: 'CALM', annoyed: 'ANNOYED', ready: 'READY TO SPARE', furious: 'FURIOUS' }[mood];
-    this.moodT.setText(tag).setX(24 + this.nameT.textWidth + 10)
+    this.moodT.setText(tag)
       .setColor(mood === 'ready' ? ui.accentInt : mood === 'calm' ? ui.dimInt : 0xf83800);
     this.hpBar.draw(this.hp / this.maxHp);
     this.mercyBar.draw(this.hell ? 0 : this.mercy / 100);
@@ -414,9 +423,14 @@ export class BattleScene extends Phaser.Scene {
     this.clearChoices();
     const name = this.def.name;
     if (id === 'check') {
-      this.checked = true;
-      const h = this.hell ? 'It is past talking. Only FIGHT will do now.' : hint(this.puzzle);
-      this.result(`${name.toUpperCase()}: ${this.def.pain} ${h}`);
+      // The boss only shows what it wants right now: its mood shifts after every right act.
+      const next = this.puzzle.seq[this.progress];
+      const h = this.hell ? 'It is past talking. Only FIGHT will do now.'
+        : this.sparable() ? 'It is ready to be spared.'
+        : this.isBoss ? `Right now it ${wantOf(next)}. Its mood will shift after.` : hint(this.puzzle);
+      const msg = `${name.toUpperCase()}: ${this.def.pain} ${h}`;
+      // The first CHECK in a battle is free (no enemy turn): a first-timer should never pay to learn.
+      if (!this.checked) { this.checked = true; this.info(msg); } else this.result(msg);
       return;
     }
     const verb = VERBS.find((v) => v.id === id)!;
@@ -432,7 +446,9 @@ export class BattleScene extends Phaser.Scene {
       const line = talk[Math.min(this.progress - 1, talk.length - 1)];
       K.play('product', 0.6);
       punch(this.enemy, 0.08);
-      this.result(`You ${verb.label.toLowerCase()}. ${line}${this.mercy >= 100 ? ` ${name} seems ready to be spared.` : ''}`);
+      const shift = this.isBoss && this.mercy < 100 ? ` Its mood shifts. It ${wantOf(this.puzzle.seq[this.progress])} now.` : '';
+      // Theme talk lines usually start with "You ...", so lead in without naming the verb again.
+      this.result(`It liked that. ${line}${this.mercy >= 100 ? ` ${name} seems ready to be spared.` : shift}`);
       return;
     }
     if (this.puzzle.seq.slice(0, this.progress).includes(id)) {
@@ -547,6 +563,12 @@ export class BattleScene extends Phaser.Scene {
         }
       });
     }
+  }
+
+  /** Show a message, then back to the menu without an enemy turn. */
+  private info(msg: string) {
+    this.mode = 'result';
+    this.say(msg, () => { this.mode = 'menu'; this.say(this.flavour(), null); this.drawAll(); });
   }
 
   private result(msg: string) {

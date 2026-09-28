@@ -42,4 +42,7 @@ export function hint(p: Puzzle): string {
   return `It ${w[0]} first, then ${w[1]}, and last it ${w[2]}.`;
 }
 
+/** "wants to be heard" for a verb id. */
+export const wantOf = (id: string | undefined) => VERBS.find((v) => v.id === id)?.want ?? 'wants something';
+
 export const verbLabel = (id: string) => VERBS.find((v) => v.id === id)?.label ?? id.toUpperCase();
