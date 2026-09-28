@@ -15,7 +15,7 @@ import { SECRETS, SECRET_TEXT, SecretId, QUEST, WYRM_LINES, chestContents, rollE
 import { rng } from '@shared/meta';
 import { autoEquip, gearDef, gearLine, SHOP, price, RARE_POOL } from './gear';
 import { checkFinds, fmtTime, onWin } from './progress';
-import { ICON, HEAT as HEAT_T } from './rules';
+import { ICON, HEAT as HEAT_T, STATUS, StatusId } from './rules';
 import { toast } from '@shared/juice';
 import { beginRun } from '@shared/kit';
 
@@ -943,6 +943,8 @@ export class ExploreScene extends Phaser.Scene {
       fight: (n: number) => { if (!battleOn()) { this.skipDialogue(); if (n === MIMIC) this.mimicAt = 0; this.startBattle(Math.max(0, Math.min(10, Math.floor(n)))); } },
       wyrm: () => { if (!battleOn()) { this.skipDialogue(); this.startBattle(WYRM); } },
       secrets: () => [...R.secrets],
+      // Give party member i a status (leak, frozen, throttled, focused) for screenshots and tests.
+      status: (i = 0, id = 'leak', turns = 3) => { const m = R.party[i]; if (m && id in STATUS) m.status[id as StatusId] = turns; if (battleOn()) battle().refreshRows(); return m?.status; },
       botGoal: () => this.bot.goal,
       events: () => ({ merchant: this.ev.merchant, stock: this.ev.stock, chests: this.evChests.map((c) => ({ x: c.x, y: c.y, mimic: c.mimic, opened: c.opened })) }),
       mimic: () => { if (!battleOn()) { this.skipDialogue(); this.mimicAt = this.evChests.findIndex((c) => !c.opened); this.startBattle(MIMIC); } },

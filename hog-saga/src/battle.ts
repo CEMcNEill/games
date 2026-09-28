@@ -17,6 +17,7 @@ import {
   BREAK_MULT, LEAK_FRAC, CRIT_BASE, CRIT_FOCUSED, BACK_ROW, SOLO,
 } from './rules';
 import { foeMove, partyMove, randomVictim, BattleView, FoeMove } from './ai';
+import { FOE_MOVES, SELF_MOVES } from './foemoves';
 import { onWin, onBattleEnd } from './progress';
 import { hasFx } from './gear';
 import { MIMIC as MIMIC_DEF } from './world';
@@ -311,7 +312,7 @@ export class BattleScene extends Phaser.Scene {
   private alertX(f: Foe) { return isBossLike(f) ? f.x + f.s.displayWidth / 2 + 10 : f.x; }
   private alertY(f: Foe) { return Math.max(50, f.y - f.s.displayHeight - 8); }
 
-  private refreshRows() {
+  refreshRows() {
     const ui = K.ui;
     R.party.forEach((m, i) => {
       const r = this.rows[i];
@@ -469,7 +470,8 @@ export class BattleScene extends Phaser.Scene {
       this.tipShown = true;
       this.msg.setText('Tip: SCAN a foe to see its weak spot (W).');
     } else {
-      this.msg.setText(`${m.name}'s turn. What will ${m.name} do?`);
+      const st = (Object.keys(m.status) as StatusId[]).filter((k) => (m.status[k] ?? 0) > 0).map((k) => STATUS[k].name);
+      this.msg.setText(st.length ? `${m.name}'s turn (${st.join(', ')}). What will ${m.name} do?` : `${m.name}'s turn. What will ${m.name} do?`);
     }
     this.openCmd();
   }
@@ -1122,146 +1124,26 @@ export class BattleScene extends Phaser.Scene {
 
   private foeDo(f: Foe, mv: FoeMove, weak: number, done: (ms: number) => void) {
     const v = mv.target && mv.target.hp > 0 ? mv.target : randomVictim();
+    if (!v && !SELF_MOVES.has(mv.id)) { done(100); return; }
     const boss = isBossLike(f);
     const p2 = boss ? 1 + 0.2 * (f.phase - 1) : 1;
-    const strike = (m: Member, mult = 1) => this.hurt(m, this.phys(f.atk * weak * p2, stat(m, 'def')) * mult * (m.row === 'back' ? BACK_ROW : 1), f);
-    const spell = (m: Member, mult: number) => this.hurt(m, Math.max(1, f.mag * mult * weak * p2 - stat(m, 'def') * 0.3), f);
-    if (!v && !['guard', 'harden', 'cure', 'focus', 'windup', 'charge', 'rollback'].includes(mv.id)) { done(100); return; }
-    switch (mv.id) {
-      case 'attack':
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} attacks ${v!.name}!`);
-        strike(v!);
-        this.inflict(v!, mv.status);
-        done(800);
-        return;
-      case 'double':
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} darts at ${v!.name}!`);
-        strike(v!);
-        this.inflict(v!, mv.status);
-        this.wait(350, () => {
-          const v2 = randomVictim();
-          if (!v2) return;
-          this.foeLunge(f);
-          this.msg.setText(`${f.name} strikes again!`);
-          strike(v2);
-          this.refreshRows();
-        });
-        done(1100);
-        return;
-      case 'windup':
-        f.windup = true;
-        this.msg.setText(`${f.name} winds up a heavy blow! DEFEND or BREAK it!`);
-        K.play('status', 0.5);
-        this.tweens.add({ targets: f.s, angle: -8, duration: 150 / R.speed, yoyo: true });
-        done(900);
-        return;
-      case 'heavy':
-        f.windup = false;
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} lands a heavy blow on ${v!.name}!`);
-        strike(v!, 1.8);
-        shake(this, 4, 200);
-        this.inflict(v!, mv.status);
-        done(900);
-        return;
-      case 'miss':
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} swings wildly and misses!`);
-        done(700);
-        return;
-      case 'guard':
-        f.guarding = mv.ally!;
-        mv.ally!.guardedBy = f;
-        this.msg.setText(`${f.name} guards ${mv.ally!.name}!`);
-        K.play('shield', 0.5);
-        done(800);
-        return;
-      case 'harden':
-        f.hardened = 2;
-        this.msg.setText(`${f.name} hardens its shell!`);
-        K.play('shield', 0.5);
-        done(700);
-        return;
-      case 'cure': {
-        const a = mv.ally!;
-        for (const k of Object.keys(a.status) as StatusId[]) if (!STATUS[k].good) delete a.status[k];
-        if (a.broken) { a.broken = 0; a.shield = a.maxShield; }
-        a.hp = Math.min(a.maxHp, a.hp + Math.round(a.maxHp * 0.15));
-        this.msg.setText(`${f.name} patches up ${a.name}!`);
-        K.play('heal', 0.5);
-        sparkle(this, a.x, a.y - a.s.displayHeight / 2, 0x58d854);
-        done(800);
-        return;
-      }
-      case 'focus': {
-        const a = mv.ally!;
-        a.status.focused = 3;
-        this.msg.setText(`${f.name} FOCUSES ${a.name}!`);
-        K.play('status', 0.5);
-        sparkle(this, a.x, a.y - a.s.displayHeight / 2, STATUS.focused.color);
-        done(800);
-        return;
-      }
-      case 'storm':
-        this.foeLunge(f);
-        this.msg.setText(boss ? `${f.name} triggers a system-wide outage!` : `${f.name} casts a storm on the whole party!`);
-        this.cameras.main.flash(120, 248, 56, 0);
-        for (const m of this.aliveParty()) spell(m, boss ? 0.98 : 0.7);
-        done(900);
-        return;
-      case 'hex':
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} casts a hex on ${v!.name}!`);
-        spell(v!, 1.15);
-        this.inflict(v!, mv.status);
-        done(900);
-        return;
-      case 'charge':
-        f.telegraph = true;
-        this.msg.setText(`${f.name} is charging a MASS OUTAGE! DEFEND!`);
-        K.play('boss', 0.5);
-        this.tweens.add({ targets: f.s, scaleX: f.s.scaleX * 1.1, scaleY: f.s.scaleY * 1.1, duration: 200 / R.speed, yoyo: true, repeat: 1 });
-        done(1100);
-        return;
-      case 'outage':
-        f.telegraph = false;
-        this.foeLunge(f);
-        this.msg.setText(`${f.name} unleashes a MASS OUTAGE!`);
-        this.cameras.main.flash(200, 248, 56, 0);
-        shake(this, 6, 300);
-        for (const m of this.aliveParty()) spell(m, OUTAGE);
-        done(1200);
-        return;
-      case 'slam':
-        this.tweens.add({ targets: f.s, scaleX: f.s.scaleX * 1.05, scaleY: f.s.scaleY * 1.05, duration: 120, yoyo: true });
-        this.msg.setText(`${f.name} slams ${v!.name}!`);
-        strike(v!);
-        this.inflict(v!, mv.status);
-        if (f.phase >= 2 && Math.random() < (f.phase >= 3 ? 0.6 : 0.3)) {
-          this.wait(500, () => {
-            const v2 = randomVictim();
-            if (!v2) return;
-            this.msg.setText(`${f.name} deploys again!`);
-            strike(v2);
-            this.refreshRows();
-          });
-          done(1300);
-          return;
-        }
-        done(1000);
-        return;
-      case 'rollback':
-        f.canRollback = false;
-        f.hp = Math.min(f.maxHp, f.hp + Math.round(f.maxHp * 0.15));
-        this.msg.setText(`${f.name} ROLLS BACK and restores itself!`);
-        K.play('heal');
-        this.cameras.main.flash(200, 216, 0, 204);
-        this.drawFoeBar(f);
-        done(1100);
-        return;
-    }
+    FOE_MOVES[mv.id]({
+      f, mv, v, boss,
+      strike: (m, mult = 1) => this.hurt(m, this.phys(f.atk * weak * p2, stat(m, 'def')) * mult * (m.row === 'back' ? BACK_ROW : 1), f),
+      spell: (m, mult) => this.hurt(m, Math.max(1, f.mag * mult * weak * p2 - stat(m, 'def') * 0.3), f),
+      inflict: (m, st) => this.inflict(m, st),
+      aliveParty: () => this.aliveParty(),
+      done,
+      say: (t) => this.msg.setText(t),
+      lunge: () => this.foeLunge(f),
+      wait: (ms, fn) => this.wait(ms, fn),
+      shake: (px, ms) => shake(this, px, ms),
+      flashCam: (ms, r, g, b) => this.cameras.main.flash(ms, r, g, b),
+      tween: (cfg) => this.tweens.add(cfg),
+      sparkle: (o, colour) => sparkle(this, o.x, o.y - o.s.displayHeight / 2, colour),
+      redraw: (o) => this.drawFoeBar(o),
+      refresh: () => this.refreshRows(),
+    });
   }
 
   // ---------------------------------------------------------------- endings
@@ -1347,9 +1229,6 @@ export class BattleScene extends Phaser.Scene {
     this.scene.wake('Explore', { result, enc: this.enc });
   }
 }
-
-/** MASS OUTAGE power (telegraphed a turn ahead; DEFEND and Feature Flags each halve it). */
-const OUTAGE = 1.7;
 
 export const WYRM = 9;
 export const MIMIC = 10;
