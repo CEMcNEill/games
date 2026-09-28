@@ -98,6 +98,7 @@ export class BattleScene extends Phaser.Scene {
     this.ui = { mode: 'none', sel: 0, member: null, pending: null, list: [] };
     this.xpGain = 0;
     this.breaks = 0;
+    this.meterBlink = null;
     this.minHp = 1;
     this.startRounds = R.rounds;
     this.startHp = Math.round((R.party.reduce((a, m) => a + m.hp, 0) / R.party.reduce((a, m) => a + m.maxHp, 0)) * 100) / 100;
@@ -160,8 +161,8 @@ export class BattleScene extends Phaser.Scene {
   private startRounds = 0;
   private startHp = 1;
 
-  private logBattle() {
-    onBattleEnd(this.enc, this.battleBreaks());
+  private logBattle(won: boolean) {
+    onBattleEnd(this.enc, this.battleBreaks(), won);
     R.log.push({ enc: this.enc, rounds: R.rounds - this.startRounds, startHp: this.startHp, minHp: Math.round(this.minHp * 100) / 100,
       ko: R.party.filter((m) => m.hp <= 0).length, lv: R.party[0].lv });
   }
@@ -663,6 +664,11 @@ export class BattleScene extends Phaser.Scene {
     } else if (mode === 'ally') {
       const t = this.ui.list[this.ui.sel] as Member;
       const p = this.ui.pending!;
+      if (p.kind === 'item' && ((p.id === 'hotfix') !== (t.hp <= 0))) {
+        K.play('bump');
+        this.msg.setText(p.id === 'hotfix' ? `${t.name} is fine. Save the Hotfix!` : `${t.name} is knocked out. Use a Hotfix.`);
+        return;
+      }
       K.play('select');
       if (p.kind === 'skill') this.commit({ ...p, target: t });
       else if (p.kind === 'item') this.commit({ ...p, target: t });
@@ -1051,8 +1057,9 @@ export class BattleScene extends Phaser.Scene {
     this.pendingPhase = 0;
     if (!f.alive) { this.nextTurn(); return; }
     f.key = p === 2 ? 'boss2' : 'boss3';
-    f.maxShield = f.shield = AFFINITY[f.key].shield;
-    f.broken = 0;
+    // New weak spot and shield; a BREAK from the same hit still stands (the shield refills when it ends).
+    f.maxShield = AFFINITY[f.key].shield;
+    if (!f.broken) f.shield = f.maxShield;
     f.telegraph = false;
     K.play('boss');
     shake(this, 5, 400);
@@ -1148,7 +1155,7 @@ export class BattleScene extends Phaser.Scene {
   private victory() {
     if (this.over) return;
     this.over = true;
-    this.logBattle();
+    this.logBattle(true);
     this.clearMenu();
     const boss = this.enc === BOSS;
     for (const m of R.party) m.status = {};
@@ -1159,6 +1166,7 @@ export class BattleScene extends Phaser.Scene {
       this.msg.setText(`${K.theme.game.boss.name} is defeated!`);
       this.cameras.main.flash(500, 255, 255, 255);
       burst(this, this.foes[0].x, 90, 0xf8b800, 40, { colours: [0xfcfcfc, K.ui.accentInt], speed: 160 });
+      R.cleared.add(BOSS);
       onWin();
       this.time.delayedCall(Math.max(200, 1800 / R.speed), () => {
         R.over = true;
@@ -1198,7 +1206,7 @@ export class BattleScene extends Phaser.Scene {
   private defeat() {
     if (this.over) return;
     this.over = true;
-    this.logBattle();
+    this.logBattle(false);
     this.clearMenu();
     this.msg.setText('The party has fallen...');
     K.play('lose', 0.6);

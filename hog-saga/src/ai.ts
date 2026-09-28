@@ -138,7 +138,7 @@ function attackOptions(m: Member, foes: Foe[]): Option[] {
 
 export function bestCombo(v: BattleView, m: Member): ComboId | null {
   if (R.meter < METER.max) return null;
-  const up = (c: string) => R.party.some((p) => p.cls === c && p.hp > 0 && p !== m);
+  const up = (c: string) => R.party.some((p) => p.cls === c && p.hp > 0 && p !== m && !(p.status.frozen ?? 0));
   const opts = (Object.keys(COMBOS) as ComboId[]).filter((id) => {
     const pair = COMBOS[id].pair;
     if (!pair.includes(m.cls)) return false;

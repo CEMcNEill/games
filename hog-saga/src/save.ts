@@ -70,6 +70,13 @@ export const ngReady = () => { const s = saga(); return !!s.ngParty && s.ngParty
 export function saveWin(party: Member[], cycle: number, timeS: number, speedrun: boolean, keepParty = true) {
   if (!keepParty) return;
   const s = saga();
+  // Keep whichever party is further along, so a plain win after NG+ doesn't reset the NG+ party.
+  const total = (ms: { lv: number }[]) => ms.reduce((a, m) => a + m.lv, 0);
+  if (s.ngParty && total(s.ngParty) > total(party)) {
+    patch({ ngCycle: Math.max(s.ngCycle, cycle),
+      bestTimeS: speedrun && timeS > 0 && (s.bestTimeS === 0 || timeS < s.bestTimeS) ? Math.round(timeS) : s.bestTimeS });
+    return;
+  }
   // Keep saved members this run didn't have (if any).
   const keep = party.map((m) => ({ cls: m.cls, lv: m.lv, xp: m.xp, maxHp: m.maxHp, maxMp: m.maxMp, atk: m.atk, def: m.def, mag: m.mag,
     spd: m.spd, skills: [...m.skills], gear: { ...m.gear } }));

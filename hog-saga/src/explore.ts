@@ -534,6 +534,11 @@ export class ExploreScene extends Phaser.Scene {
     const chest = M.chests.findIndex((p) => p.x === t.x && p.y === t.y);
     if (chest >= 0 && !R.chests.has(chest)) { this.openChest(chest); return; }
     const enc = this.encAt(t.x, t.y);
+    if (enc === WYRM && !R.flags.has('wyrm_warned')) {
+      R.flags.add('wyrm_warned');
+      this.say([{ speaker: WYRM_NAME, text: '...' }, { text: WYRM_LINES.warn }], () => {});
+      return;
+    }
     if (enc >= 0) { this.startBattle(enc); return; }
     const gate = Object.entries(M.gates).find(([gk, ps]) => !this.open.has(gk) && ps.some((p) => p.x === t.x && p.y === t.y));
     if (gate) this.gateMessage(gate[0]);

@@ -39,13 +39,13 @@ export function titleMenu(): TitleRow[] {
   return rows;
 }
 
-export function onBattleEnd(enc: number, breaks: number) {
+export function onBattleEnd(enc: number, breaks: number, won: boolean) {
   addBreaks(breaks);
   if (breaks > 0) achieve('break1');
   if (saga().totalBreaks >= 30) achieve('break30');
   if (R.scans > 0) achieve('scan');
   if (R.combos > 0) achieve('combo');
-  if (enc === 9) { markWyrm(); achieve('wyrm'); }
+  if (enc === 9 && won) { markWyrm(); achieve('wyrm'); }
   void enc === BOSS;
 }
 
