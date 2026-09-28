@@ -31,13 +31,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 export function checkAchievements(w: World, over: Over, s: RunSetup, run: { lostUnits: number }) {
   try {
     const won = over.won && over.reason !== 'debug';
-    const kd = meta.kitData({ beaten: [] as string[], mapsWon: [] as string[] });
+    const kd = meta.kitData({ beaten: [] as string[], mapsWon: [] as string[], bestGrade: '' as string });
     if (!Array.isArray(kd.beaten)) kd.beaten = [];
     if (!Array.isArray(kd.mapsWon)) kd.mapsWon = [];
     if (w.units.some((u) => u.owner === 0 && u.vet)) achieve('veteran');
     if (w.units.some((u) => u.owner === 0 && u.type === 'giant')) achieve('giant');
     if (w.monuments.filter((m) => m.o === 0).length >= 3) achieve('wonders');
     if (!won) return;
+    const g = grade(w.score(0) + over.bonus, w, over);
+    const best = typeof kd.bestGrade === 'string' ? kd.bestGrade : '';
+    if (!best || 'SABCD'.indexOf(g) < 'SABCD'.indexOf(best)) (kd as Record<string, unknown>).bestGrade = g;
     if (!kd.beaten.includes(w.f[1].persona.id)) kd.beaten.push(w.f[1].persona.id);
     if (!kd.mapsWon.includes(w.mapType)) kd.mapsWon.push(w.mapType);
     meta.save();
@@ -65,10 +68,14 @@ export function endSummary(d: EndData): string[] {
     .filter(([, v]) => v).map(([k, v]) => `${k} ${v}`);
   const lines = [parts.join('  ')];
   const top = meta.heatUnlocked();
-  let beaten = 0;
-  try { const kd = meta.kitData({ beaten: [] as string[] }); beaten = Array.isArray(kd.beaten) ? kd.beaten.length : 0; } catch { beaten = 0; }
+  let beaten = 0, best = '';
+  try {
+    const kd = meta.kitData({ beaten: [] as string[], bestGrade: '' as string });
+    beaten = Array.isArray(kd.beaten) ? kd.beaten.length : 0;
+    best = typeof kd.bestGrade === 'string' ? kd.bestGrade : '';
+  } catch { beaten = 0; }
   const next = top > 0 ? `next: a new map, or HEAT ${top}` : 'next: a new map and rival';
-  lines.push(d.won ? `Rivals beaten ${beaten}/${PERSONALITY_IDS.length}   ${next}` : 'Tip: gather 3 units before you attack a city');
+  lines.push(d.won ? `Rivals beaten ${beaten}/${PERSONALITY_IDS.length}${best ? ` - best grade ${best}` : ''} - ${next}` : 'Tip: gather 3 units before you attack a city');
   return lines;
 }
 

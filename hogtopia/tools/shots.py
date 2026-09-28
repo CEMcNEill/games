@@ -61,6 +61,11 @@ with sync_playwright() as p:
         pg.evaluate("__game.debug.trainMenu()"); pg.wait_for_timeout(300)
         shot(pg, "train"); pg.keyboard.press("Escape"); pg.keyboard.press("t"); pg.wait_for_timeout(300); shot(pg, "tech-owned")
         pg.close()
+    if "mass" in want:
+        pg = start(b)
+        pg.evaluate("__game.debug.mass()"); pg.wait_for_timeout(500); shot(pg, "mass-warning")
+        pg.wait_for_timeout(1700); shot(pg, "mass-marker")
+        pg.close()
     if "heat" in want:
         pg = start(b)
         pg.evaluate("__game.debug.heat(5)"); pg.wait_for_timeout(800); pg.evaluate("__game.debug.reveal()"); pg.wait_for_timeout(300); shot(pg, "heat5")

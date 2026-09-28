@@ -123,7 +123,7 @@ export class MapScene extends Phaser.Scene {
     this.setup = chooseSetup(data && typeof data === 'object' ? data : {});
     const s = this.setup;
     this.w = new World({
-      seed: s.seed, biome: g.biome, difficulty: g.difficulty, products: K.theme.products, map: s.map, heat: s.heat, personality: s.personality, firstGame: s.runIndex === 0 && !s.daily,
+      seed: s.seed, biome: g.biome, difficulty: g.difficulty, products: K.theme.products, map: s.map, heat: s.heat, personality: s.personality, firstGame: s.runIndex === 0 && !s.daily && s.heat === 0,
       names: { capital: g.faction.capital, cities: g.cities, rivalCapital: g.rival.capital || `${rivalShort} HQ`.slice(0, 14), rivalShort },
     });
     const w = this.w;
@@ -312,6 +312,13 @@ export class MapScene extends Phaser.Scene {
   private drawCursor() {
     const g = this.curG.clear();
     if (this.menu || this.w.over) return;
+    // The city the rival is massing against shows a blinking red "!" badge.
+    const tc = this.w.cities[this.warned];
+    if (tc && tc.owner === 0 && Math.floor(this.time.now / 300) % 3 !== 0) {
+      const x0 = this.px(tc.x) + T - 5, y0 = this.py(tc.y) - 3;
+      g.fillStyle(0x000000, 1).fillRect(x0 - 1, y0 - 1, 7, 11).fillStyle(0xf83800, 1).fillRect(x0, y0, 5, 9)
+        .fillStyle(0xfcfcfc, 1).fillRect(x0 + 2, y0 + 1, 1, 4).fillRect(x0 + 2, y0 + 7, 1, 1);
+    }
     const on = Math.floor(this.time.now / 300) % 3 !== 0;
     const x = this.px(this.cx), y = this.py(this.cy);
     g.lineStyle(1, on ? K.ui.accentInt : 0xfcfcfc, 1);
@@ -417,7 +424,7 @@ export class MapScene extends Phaser.Scene {
     const keys = ['TAB next unit', 'T tech', 'E end turn'];
     if (this.sel && w.has(0, 'session_replay') && this.sel.prev && !w.f[0].undoUsed) keys.unshift('U rewind');
     if (this.sel && w.canCapture(this.sel)) keys.unshift('C capture');
-    this.ctx2.setText(keys.join('   ') + '   ESC cancel');
+    this.ctx2.setText(keys.join(' - ') + ' - ESC cancel');
     hooks.stats = {
       turn: w.turn, stars: w.f[0].stars, income: w.income(0), techs: [...w.f[0].techs],
       cities: w.myCities(0).length, rivalCities: w.cities.filter((c) => c.owner > 0).length,
@@ -436,7 +443,7 @@ export class MapScene extends Phaser.Scene {
     const w = this.w;
     if (this.busy) return hooks.state === 'aiturn' ? `${K.theme.game.rival.name} is moving...` : '...';
     if (this.menu) {
-      return { tech: 'ARROWS choose   ENTER research   ESC close', train: 'UP/DOWN choose   ENTER train   ESC close', reward: 'LEFT/RIGHT choose   ENTER take it', truce: 'LEFT/RIGHT choose   ENTER answer' }[this.menu.kind];
+      return { tech: 'ARROWS choose - ENTER research - ESC close', train: 'UP/DOWN choose - ENTER train - ESC close', reward: 'LEFT/RIGHT choose - ENTER take it', truce: 'LEFT/RIGHT choose - ENTER answer' }[this.menu.kind];
     }
     const u = w.unitAt(this.cx, this.cy);
     const i = w.idx(this.cx, this.cy);
@@ -779,7 +786,7 @@ export class MapScene extends Phaser.Scene {
     if (first) this.say('advisor', `Welcome to ${K.theme.game.faction.capital}! ${tips[0] ?? ''}`);
     if (first && (this.setup.runIndex > 0 || this.setup.daily || w.heat > 0) && !this.fast()) {
       const mt = MAP_TYPES[w.mapType]?.name ?? w.mapType;
-      this.time.delayedCall(300, () => this.banner(`${this.setup.daily ? 'DAILY MAP: ' : ''}${mt.toUpperCase()}${w.heat ? `   HEAT ${w.heat}` : ''}${w.rivals().length > 1 ? '   TWO RIVALS' : ''}`));
+      this.time.delayedCall(300, () => this.banner(`${this.setup.daily ? 'DAILY ' : ''}${mt.toUpperCase()} MAP${w.heat ? ` - HEAT ${w.heat}` : ''}${w.rivals().length > 1 ? ' - TWO RIVALS' : ''}`));
     }
     else if (w.turn === 2) this.say('advisor', PERSONA_TIPS[w.f[1].persona.id] ?? tips[0]);
     else if (w.turn === MAX_TURNS) this.say('advisor', 'Last turn! Grab every point you can.');
@@ -815,7 +822,7 @@ export class MapScene extends Phaser.Scene {
     const w = this.w;
     const r = w.f[this.lead()];
     const tgt = w.cities[r.ai.target];
-    if (!tgt || tgt.owner !== 0) return;
+    if (!tgt || tgt.owner !== 0) { this.warned = -1; return; }
     const near = w.units.filter((u) => u.owner > 0 && cheb(u.x, u.y, tgt.x, tgt.y) <= 4).length;
     if (near >= 2 && (this.warned !== tgt.id || r.ai.assault)) {
       this.summary.unshift(r.ai.assault ? `is attacking ${tgt.name} with ${near} units` : `is massing ${near} units near ${tgt.name}`);
@@ -998,6 +1005,19 @@ export class MapScene extends Phaser.Scene {
       truce: () => {
         if (this.menu) { this.menu.objs.forEach((o) => o.destroy()); this.menu = null; }
         this.truceOffered = true; this.menu = { kind: 'truce', sel: 1, objs: [] }; hooks.state = 'truce'; this.drawMenu();
+      },
+      // Three rival units gather near your capital, as if the rival had massed there (tests the warning + marker).
+      mass: () => {
+        const W0 = w(), cap = W0.capital(0)!;
+        let n = 0;
+        for (let r = 3; r <= 4 && n < 3; r++) for (let dy = -r; dy <= r && n < 3; dy++) for (let dx = -r; dx <= r && n < 3; dx++) {
+          const x = cap.x + dx, y = cap.y + dy;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !W0.inMap(x, y) || W0.unitAt(x, y) || W0.cityAt(x, y) || !(W0.tile(x, y).t === 'plain' || W0.tile(x, y).t === 'forest')) continue;
+          W0.addUnit(1, (['warrior', 'archer', 'catcher'] as UnitType[])[n], x, y); W0.tile(x, y).seen = true; n++;
+        }
+        W0.f[1].ai.target = cap.id; W0.f[1].ai.assault = false;
+        this.summary = []; this.readRival(); this.startPlayerTurn();
+        return n;
       },
       summary: () => { this.summary.push('took Test Town', 'promoted a veteran'); this.startPlayerTurn(); },
       turn: (n: number) => { w().turn = Math.max(1, Math.min(MAX_TURNS, Math.floor(n))); this.redraw(); },

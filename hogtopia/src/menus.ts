@@ -31,7 +31,7 @@ export function drawTech(scene: Phaser.Scene, w: World, row: number, col: number
   const grid = techGrid(w);
   const bx = 8, by = 20, bw = 464, bh = 30 + grid.length * 17 + 46;
   o.push(box(scene, bx, by, bw, bh, ui.bgInt, ui.textInt, ui.panelInt).setDepth(30));
-  o.push(text(scene, bx + bw / 2, by + 6, `RESEARCH   you have ${w.f[0].stars} stars`, { align: 'center', color: ui.accentInt, depth: 31 }));
+  o.push(text(scene, bx + bw / 2, by + 6, `RESEARCH - you have ${w.f[0].stars} stars`, { align: 'center', color: ui.accentInt, depth: 31 }));
   grid.forEach((ids, r) => {
     const y = by + 22 + r * 17;
     if (r === 0) {
@@ -103,7 +103,7 @@ export function drawReward(scene: Phaser.Scene, c: City, level: number, sel: num
     o.push(text(scene, x + 50, y + 7, r.name, { align: 'center', depth: 32, color: i === sel ? ui.accentInt : ui.textInt, maxWidth: 94, maxLines: 1 }));
     o.push(text(scene, x + 50, y + 20, r.desc, { align: 'center', depth: 32, color: i === sel ? ui.textInt : ui.dimInt, maxWidth: 92, maxLines: 2 }));
   });
-  o.push(text(scene, bx + bw / 2, by + bh - 14, 'LEFT/RIGHT choose   ENTER take it', { align: 'center', color: ui.dimInt, depth: 32 }));
+  o.push(text(scene, bx + bw / 2, by + bh - 14, 'LEFT/RIGHT choose - ENTER take it', { align: 'center', color: ui.dimInt, depth: 32 }));
   return o;
 }
 
