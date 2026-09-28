@@ -22,6 +22,8 @@ const MAX_ENEMIES = 320;
 const MAX_GEMS = 350;
 const MAX_ITEMS = 40;
 const HEAL_AMOUNT = 25;
+/** HUD, banners and modals sit above the shared juice layer (particles + float text at depth 1000). */
+const UI = 1100;
 // Where the hero's hat sits on the 24x24 hog (facing right).
 const HAT_DX = 9;
 const HAT_DY = -3;
@@ -112,6 +114,7 @@ export class GameScene extends Phaser.Scene {
   bossPhase = 0;
   bossKills = 0;
   bossLast = '';
+  bossAt = 0;     // when the current boss arrived
   nextBossAt = BOSS_AT;
   overtime = -1;
   won = false;
@@ -145,6 +148,7 @@ export class GameScene extends Phaser.Scene {
   diff = DIFF.normal;
   god = false;
   autopilot = false;
+  novice = false; // autopilot style: first card, no rerolls, ignores pickups (first-run approachability checks)
   simSpeed = 1;
   pauseObjs: Phaser.GameObjects.GameObject[] = [];
 
@@ -189,7 +193,7 @@ export class GameScene extends Phaser.Scene {
     this.add.graphics().setDepth(-9).lineStyle(4, K.ui.panelInt, 1).strokeRect(-2, -2, WORLD_W + 4, WORLD_H + 4);
     this.auraG = this.add.graphics().setDepth(-5);
     this.fx = this.add.graphics().setDepth(20);
-    this.warnG = this.add.graphics().setDepth(85).setScrollFactor(0);
+    this.warnG = this.add.graphics().setDepth(UI + 85).setScrollFactor(0);
     this.player = this.add.sprite(WORLD_W / 2, WORLD_H / 2, spr('player')).setDepth(10);
     this.player.play(anim('player'));
     this.heroTint();
@@ -319,15 +323,15 @@ export class GameScene extends Phaser.Scene {
     this.paused = true;
     hooks.state = 'paused';
     const ui = K.ui;
-    const g = box(this, W / 2 - 120, H / 2 - 50, 240, 100, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(100);
+    const g = box(this, W / 2 - 120, H / 2 - 50, 240, 100, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 100);
     const o: Phaser.GameObjects.GameObject[] = [g];
-    o.push(text(this, W / 2, H / 2 - 38, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt, fixed: true, depth: 101 }));
-    o.push(text(this, W / 2, H / 2 - 12, 'ENTER resume   Q quit', { align: 'center', fixed: true, depth: 101 }));
-    o.push(text(this, W / 2, H / 2 + 2, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: 101 }));
-    o.push(text(this, W / 2, H / 2 + 14, 'M mute', { align: 'center', color: ui.dimInt, fixed: true, depth: 101 }));
+    o.push(text(this, W / 2, H / 2 - 38, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt, fixed: true, depth: UI + 101 }));
+    o.push(text(this, W / 2, H / 2 - 12, 'ENTER resume   Q quit', { align: 'center', fixed: true, depth: UI + 101 }));
+    o.push(text(this, W / 2, H / 2 + 2, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
+    o.push(text(this, W / 2, H / 2 + 14, 'M mute', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
     const info = [this.heat ? `HEAT ${this.heat}` : '', this.mode !== 'standard' ? this.mode.toUpperCase() : '', `HERO ${this.hero.name.toUpperCase()}`]
       .filter(Boolean).join('   ');
-    o.push(text(this, W / 2, H / 2 + 30, info, { align: 'center', color: ui.dimInt, fixed: true, depth: 101 }));
+    o.push(text(this, W / 2, H / 2 + 30, info, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
     this.pauseObjs = o;
   }
 
@@ -342,18 +346,18 @@ export class GameScene extends Phaser.Scene {
   private buildHud() {
     const ui = K.ui;
     const xp = bar(this, 2, 2, W - 4, 4, ui.accentInt, 0x000000, ui.panelInt);
-    xp.g.setDepth(90);
+    xp.g.setDepth(UI + 90);
     xp.draw(0);
     const hpBar = this.add.graphics().setDepth(11);
-    const time = text(this, W / 2, 10, '0:00', { scale: 2, align: 'center', fixed: true, depth: 90 });
-    const lv = text(this, W - 4, 10, 'LV 1', { align: 'right', color: ui.accentInt, fixed: true, depth: 90 });
-    const kills = text(this, W - 4, 20, 'BUGS 0', { align: 'right', fixed: true, depth: 90 });
-    const gold = text(this, W - 4, 30, 'GOLD 0', { align: 'right', color: 0xf8d878, fixed: true, depth: 90 });
-    text(this, 4, 10, K.theme.prospect.short.toUpperCase(), { color: ui.dimInt, fixed: true, depth: 90, maxWidth: 170, maxLines: 1 });
+    const time = text(this, W / 2, 10, '0:00', { scale: 2, align: 'center', fixed: true, depth: UI + 90 });
+    const lv = text(this, W - 4, 10, 'LV 1', { align: 'right', color: ui.accentInt, fixed: true, depth: UI + 90 });
+    const kills = text(this, W - 4, 20, 'BUGS 0', { align: 'right', fixed: true, depth: UI + 90 });
+    const gold = text(this, W - 4, 30, 'GOLD 0', { align: 'right', color: 0xf8d878, fixed: true, depth: UI + 90 });
+    text(this, 4, 10, K.theme.prospect.short.toUpperCase(), { color: ui.dimInt, fixed: true, depth: UI + 90, maxWidth: 170, maxLines: 1 });
     const tags = [this.heat ? `HEAT ${this.heat}` : '', this.mode === 'daily' ? 'DAILY' : this.mode === 'endless' ? 'ENDLESS' : ''].filter(Boolean);
-    if (tags.length) text(this, 4, 20, tags.join(' '), { color: 0xf87858, fixed: true, depth: 90 });
-    const icons = this.add.container(4, H - 20).setScrollFactor(0).setDepth(90);
-    const arrow = this.add.image(0, 0, spr('boss_shot')).setScrollFactor(0).setDepth(95).setVisible(false).setScale(2);
+    if (tags.length) text(this, 4, 20, tags.join(' '), { color: 0xf87858, fixed: true, depth: UI + 90 });
+    const icons = this.add.container(4, H - 20).setScrollFactor(0).setDepth(UI + 90);
+    const arrow = this.add.image(0, 0, spr('boss_shot')).setScrollFactor(0).setDepth(UI + 95).setVisible(false).setScale(2);
     this.hud = { xp, hpBar, time, lv, kills, gold, icons, bossBar: null, bossName: null, arrow };
   }
 
@@ -412,9 +416,9 @@ export class GameScene extends Phaser.Scene {
     if (!b) { this.bannerBusy = false; return; }
     this.bannerBusy = true;
     const ui = K.ui;
-    const g = box(this, 60, 30, W - 120, 34, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(80);
-    const t1 = text(this, W / 2, 35, b.title, { align: 'center', color: ui.accentInt, fixed: true, depth: 81, maxWidth: W - 140, maxLines: 1 });
-    const t2 = text(this, W / 2, 48, b.body, { align: 'center', fixed: true, depth: 81, maxWidth: W - 140, maxLines: 1 });
+    const g = box(this, 60, 30, W - 120, 34, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 80);
+    const t1 = text(this, W / 2, 35, b.title, { align: 'center', color: ui.accentInt, fixed: true, depth: UI + 81, maxWidth: W - 140, maxLines: 1 });
+    const t2 = text(this, W / 2, 48, b.body, { align: 'center', fixed: true, depth: UI + 81, maxWidth: W - 140, maxLines: 1 });
     this.bannerObjs = [g, t1, t2];
     if (this.modal) this.showBanner(false);
     this.time.delayedCall(this.banners.length > 2 ? 1600 : 2600, () => {
@@ -507,7 +511,7 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.enemies) {
       const dx = p.x - e.s.x, dy = p.y - e.s.y;
       const d2 = dx * dx + dy * dy;
-      const reach = e.boss ? 160 : e.mode === 3 ? 70 : e.arch === 'runner' || e.mode >= 1 ? 120 : 90;
+      const reach = e.boss ? (this.hp < this.st.maxHp * 0.5 || e.mode >= 1 ? 160 : 70) : e.mode === 3 ? 70 : e.arch === 'runner' || e.mode >= 1 ? 120 : 90;
       if (d2 < reach * reach && d2 > 1) {
         const w = (e.boss ? 6 : e.mode === 3 ? 5 : e.arch === 'runner' ? 3 : e.elite ? 2 : 1) / d2;
         fx += dx * w; fy += dy * w;
@@ -522,7 +526,7 @@ export class GameScene extends Phaser.Scene {
     // Targets: chests and hotfixes first, food when hurt, then the nearest gem.
     let gx = 0, gy = 0, best = 1e9;
     const hurt = this.hp < this.st.maxHp * 0.6;
-    for (const it of this.items) {
+    for (const it of this.novice ? [] : this.items) {
       if (it.kind === 'food' && !hurt) continue;
       const d = Phaser.Math.Distance.Between(p.x, p.y, it.s.x, it.s.y) * (it.kind === 'chest' ? 0.3 : it.kind === 'coin' ? 1.2 : 0.6);
       if (d < best) { best = d; gx = it.s.x - p.x; gy = it.s.y - p.y; }
@@ -564,7 +568,7 @@ export class GameScene extends Phaser.Scene {
     this.runStampede(dt);
     const angry = this.boss && this.bossPhase >= 2;
     if (this.boss && !angry) return; // quiet while the boss fights, until it's angry
-    let rate = (1.1 + Math.min(t, 420) * 0.034) * this.diff.spawn * this.heatSpawn() * (this.boss ? 0.5 : 1);
+    let rate = (1.1 + Math.min(t, this.mode === 'endless' ? 900 : 420) * 0.034) * this.diff.spawn * this.heatSpawn() * (this.boss ? 0.5 : 1);
     if (this.overtime > 0) rate *= 1.6;
     this.spawnAcc += rate * dt;
     const row = [...SPAWN_TABLE].reverse().find((r) => t >= r.at) ?? SPAWN_TABLE[0];
@@ -593,7 +597,10 @@ export class GameScene extends Phaser.Scene {
     y = Phaser.Math.Clamp(y, 8, WORLD_H - 8);
     const A = ARCH[arch];
     const type = A.sprite;
-    const scale = 1 + this.elapsed / 150;
+    // Bugs toughen over time; in endless they ramp up hard after 5:00 so every run ends eventually.
+    const over = this.mode === 'endless' ? Math.max(0, (this.elapsed - 300) / 60) : 0; // minutes past 5:00
+    const late = over ** 2;
+    const scale = 1 + this.elapsed / 150 + late;
     let e = this.pool.pop();
     const key = spr(`enemy_${type + 1}`);
     if (!e) {
@@ -605,8 +612,8 @@ export class GameScene extends Phaser.Scene {
     e.s.play(anim(`enemy_${type + 1}`));
     e.s.anims.setProgress(Math.random());
     const tint = elite ? ELITE_MODS[elite].tint : A.tint ?? null;
-    const speed = A.speed * Phaser.Math.FloatBetween(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1);
-    Object.assign(e, { arch, type, hp: A.hp * this.diff.hp * scale * this.heatHp() * (elite ? 9 : 1), speed, dmg: A.dmg * this.diff.dmg * this.heatDmg() * (elite ? 1.4 : 1),
+    const speed = A.speed * Phaser.Math.FloatBetween(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1) * Math.min(1.8, 1 + 0.08 * over);
+    Object.assign(e, { arch, type, hp: A.hp * this.diff.hp * scale * this.heatHp() * (elite ? 9 : 1), speed, dmg: A.dmg * this.diff.dmg * this.heatDmg() * (elite ? 1.4 : 1) * (1 + 0.25 * over),
       xp: A.xp * (elite ? 5 : 1), r: A.r * sc, kx: 0, ky: 0, flash: 0, slow: 1, hitAt: {}, alive: true, boss: false, elite, mode: 0,
       t: Phaser.Math.FloatBetween(1.5, 3.5), vx: 0, vy: 0, acc: 0, accT: 0, accCrit: false, armour: (A.armour ?? 1) * (elite === 'shield' ? 0.45 : 1),
       kb: (A.kb ?? 1) * (elite ? 0.3 : 1), tint });
@@ -1069,16 +1076,16 @@ export class GameScene extends Phaser.Scene {
     const ui = K.ui;
     const objs: Phaser.GameObjects.GameObject[] = [];
     this.showBanner(false);
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setScrollFactor(0).setDepth(100));
-    objs.push(text(this, W / 2, 20, 'LEVEL UP!', { scale: 2, align: 'center', color: ui.accentInt, fixed: true, depth: 101 }));
-    objs.push(text(this, W / 2, 40, 'Pick a PostHog product or upgrade', { align: 'center', color: ui.dimInt, fixed: true, depth: 101 }));
+    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
+    objs.push(text(this, W / 2, 20, 'LEVEL UP!', { scale: 2, align: 'center', color: ui.accentInt, fixed: true, depth: UI + 101 }));
+    objs.push(text(this, W / 2, 40, 'Pick a PostHog product or upgrade', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
     const cw = 136, gap = 12, x0 = (W - (cw * cards.length + gap * (cards.length - 1))) / 2;
     const partners = partnersOf(this.build());
     cards.forEach((c, i) => {
       const x = x0 + i * (cw + gap), y = 56;
-      objs.push(box(this, x, y, cw, 156, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(101));
+      objs.push(box(this, x, y, cw, 156, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
       const iconKey = c.kind === 'heal' ? spr('food') : c.kind === 'gold' ? spr('coin') : spr(`icon_${c.id}`);
-      objs.push(this.add.image(x + cw / 2, y + 24, iconKey).setScale(2).setScrollFactor(0).setDepth(102));
+      objs.push(this.add.image(x + cw / 2, y + 24, iconKey).setScale(2).setScrollFactor(0).setDepth(UI + 102));
       let name: string, tag: string, line: string, hint = '';
       if (c.kind === 'weapon') {
         const w = this.weapons.get(c.id as ProductId);
@@ -1097,16 +1104,16 @@ export class GameScene extends Phaser.Scene {
         if (w && partners.has(id)) hint = `Evolves ${productName(w.id)}`;
       } else if (c.kind === 'heal') { name = 'Snack'; tag = ''; line = 'Heal 30 HP'; }
       else { name = 'Bonus'; tag = ''; line = '+10 gold'; }
-      objs.push(text(this, x + cw / 2, y + 44, name, { align: 'center', color: ui.textInt, fixed: true, depth: 102, maxWidth: cw - 12, maxLines: 2 }));
-      objs.push(text(this, x + cw / 2, y + 68, tag, { align: 'center', color: ui.accentInt, fixed: true, depth: 102 }));
-      objs.push(text(this, x + cw / 2, y + 82, line, { align: 'center', color: ui.dimInt, fixed: true, depth: 102, maxWidth: cw - 14, maxLines: 4 }));
-      if (hint) objs.push(text(this, x + cw / 2, y + 128, hint, { align: 'center', color: 0xf8d878, fixed: true, depth: 102, maxWidth: cw - 10, maxLines: 2 }));
+      objs.push(text(this, x + cw / 2, y + 44, name, { align: 'center', color: ui.textInt, fixed: true, depth: UI + 102, maxWidth: cw - 12, maxLines: 2 }));
+      objs.push(text(this, x + cw / 2, y + 68, tag, { align: 'center', color: ui.accentInt, fixed: true, depth: UI + 102 }));
+      objs.push(text(this, x + cw / 2, y + 82, line, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 102, maxWidth: cw - 14, maxLines: 4 }));
+      if (hint) objs.push(text(this, x + cw / 2, y + 128, hint, { align: 'center', color: 0xf8d878, fixed: true, depth: UI + 102, maxWidth: cw - 10, maxLines: 2 }));
     });
-    const sel = this.add.graphics().setScrollFactor(0).setDepth(103);
+    const sel = this.add.graphics().setScrollFactor(0).setDepth(UI + 103);
     objs.push(sel);
     const acts = [`R REROLL ${this.rerolls}`, `X SKIP ${this.skips}`, `B BANISH ${this.banishes}`];
-    objs.push(text(this, W / 2, 222, acts.join('    '), { align: 'center', color: ui.textInt, fixed: true, depth: 101 }));
-    objs.push(text(this, W / 2, 238, 'LEFT/RIGHT choose   ENTER pick', { align: 'center', color: ui.dimInt, fixed: true, depth: 101 }));
+    objs.push(text(this, W / 2, 222, acts.join('    '), { align: 'center', color: ui.textInt, fixed: true, depth: UI + 101 }));
+    objs.push(text(this, W / 2, 238, 'LEFT/RIGHT choose   ENTER pick', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
     const m: Modal = { kind: 'levelup', cards, sel: 0, objs, armed: false };
     this.modal = m;
     // Ignore Enter for a moment so a held key doesn't pick blindly.
@@ -1120,7 +1127,7 @@ export class GameScene extends Phaser.Scene {
     m.sel = i;
     const n = m.cards.length;
     const cw = 136, gap = 12, x0 = (W - (cw * n + gap * (n - 1))) / 2;
-    const g = m.objs.find((o) => o instanceof Phaser.GameObjects.Graphics && o.depth === 103) as Phaser.GameObjects.Graphics;
+    const g = m.objs.find((o) => o instanceof Phaser.GameObjects.Graphics && o.depth === UI + 103) as Phaser.GameObjects.Graphics;
     g.clear().lineStyle(2, K.ui.accentInt, 1).strokeRect(x0 + i * (cw + gap) - 2, 54, cw + 4, 160);
     if (!silent) this.sfx('move', 0.5);
   }
@@ -1194,6 +1201,7 @@ export class GameScene extends Phaser.Scene {
   private botModal() {
     const m = this.modal!;
     if (m.kind === 'chest') { this.closeModal(); return; }
+    if (this.novice) { this.selectCard(0, true); this.pickCard(); return; }
     const b = this.build();
     const ranks = m.cards.map((c) => botRank(c, b));
     const best = Math.max(...ranks);
@@ -1276,14 +1284,14 @@ export class GameScene extends Phaser.Scene {
     this.showBanner(false);
     const h = 44 + lines.length * 20;
     const y0 = Math.round(H / 2 - h / 2);
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setScrollFactor(0).setDepth(100));
-    objs.push(box(this, W / 2 - 130, y0, 260, h, ui.bgInt, 0xf8d878, ui.panelInt).setScrollFactor(0).setDepth(101));
-    objs.push(this.add.image(W / 2 - 110, y0 + 16, spr('chest'), 1).setScale(2).setScrollFactor(0).setDepth(102));
-    objs.push(text(this, W / 2 + 10, y0 + 9, title, { scale: 2, align: 'center', color: 0xf8d878, fixed: true, depth: 102 }));
+    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
+    objs.push(box(this, W / 2 - 130, y0, 260, h, ui.bgInt, 0xf8d878, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+    objs.push(this.add.image(W / 2 - 110, y0 + 16, spr('chest'), 1).setScale(2).setScrollFactor(0).setDepth(UI + 102));
+    objs.push(text(this, W / 2 + 10, y0 + 9, title, { scale: 2, align: 'center', color: 0xf8d878, fixed: true, depth: UI + 102 }));
     lines.forEach(([a, b, col], i) => {
       const y = y0 + 34 + i * 20;
-      objs.push(text(this, W / 2, y, a, { align: 'center', color: col, fixed: true, depth: 102, maxWidth: 240, maxLines: 1 }));
-      if (b) objs.push(text(this, W / 2, y + 9, b, { align: 'center', color: ui.dimInt, fixed: true, depth: 102, maxWidth: 240, maxLines: 1 }));
+      objs.push(text(this, W / 2, y, a, { align: 'center', color: col, fixed: true, depth: UI + 102, maxWidth: 240, maxLines: 1 }));
+      if (b) objs.push(text(this, W / 2, y + 9, b, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 102, maxWidth: 240, maxLines: 1 }));
     });
     hooks.state = 'chest';
     const m: Modal = { kind: 'chest', cards: [], sel: 0, objs, armed: false };
@@ -1406,7 +1414,8 @@ export class GameScene extends Phaser.Scene {
     const b = this.boss;
     if (!b || !b.alive) return;
     this.bossTimer -= dt;
-    if (this.bossPhase === 1 && b.hp < b.maxHp * 0.5) {
+    // Angry at half HP, or after 50 s so a weak build still finishes the fight in good time.
+    if (this.bossPhase === 1 && (b.hp < b.maxHp * 0.5 || this.elapsed - this.bossAt > 50)) {
       this.bossPhase = 2;
       this.banner(`${K.theme.game.boss.name.toUpperCase()} IS ANGRY!`, 'It is calling in more bugs');
     }
@@ -1445,8 +1454,9 @@ export class GameScene extends Phaser.Scene {
       }
       if (b.t <= 0) b.mode = 0;
     } else if (this.bossPhase > 0) {
-      b.s.x += (dx / d) * b.speed * b.slow * dt;
-      b.s.y += (dy / d) * b.speed * b.slow * dt;
+      const sp = b.speed * b.slow * (this.bossPhase >= 2 ? 1.5 : 1);
+      b.s.x += (dx / d) * sp * dt;
+      b.s.y += (dy / d) * sp * dt;
     }
     b.s.x = Phaser.Math.Clamp(b.s.x, 32, WORLD_W - 32);
     b.s.y = Phaser.Math.Clamp(b.s.y, 32, WORLD_H - 32);
@@ -1501,7 +1511,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.add.sprite(x, y, spr('boss')).setDepth(6);
     s.play(anim('boss'));
     const n = this.bossKills;
-    const hp = 1250 * this.diff.boss * (1 + this.level / 20) * (1 + this.heat * 0.12) * 1.6 ** n;
+    const hp = 1100 * this.diff.boss * (1 + Math.min(this.level, 25) / 25) * (1 + this.heat * 0.12) * 2 ** n;
     const b: Enemy = { s, arch: 'tank', type: 3, hp, maxHp: hp, speed: 24 * (1 + 0.1 * n), dmg: 20 * this.diff.dmg * (1 + 0.15 * n), xp: 0, r: 22,
       kx: 0, ky: 0, flash: 0, slow: 1, hitAt: {}, alive: true, boss: true, elite: null, mode: 0, t: 0, vx: 0, vy: 0, acc: 0, accT: 0,
       accCrit: false, armour: 1, kb: 0, tint: null };
@@ -1509,6 +1519,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.push(b);
     this.boss = b;
     this.bossPhase = 1;
+    this.bossAt = this.elapsed;
     this.bossTimer = 2.5;
     hooks.state = 'boss';
     this.sfx('boss');
@@ -1518,9 +1529,9 @@ export class GameScene extends Phaser.Scene {
     this.banner(n ? `${name} IS BACK!` : name, n ? `Round ${n + 1}. Stronger than ever.` : `"${K.theme.game.boss.taunt}"`);
     if (!this.hud.bossBar) {
       const bb = bar(this, 250, H - 9, W - 256, 5, 0xf83800, 0x000000, K.ui.textInt);
-      bb.g.setDepth(90);
+      bb.g.setDepth(UI + 90);
       this.hud.bossBar = bb;
-      this.hud.bossName = text(this, W - 6, H - 21, K.theme.game.boss.name, { align: 'right', color: K.ui.accentInt, fixed: true, depth: 90,
+      this.hud.bossName = text(this, W - 6, H - 21, K.theme.game.boss.name, { align: 'right', color: K.ui.accentInt, fixed: true, depth: UI + 90,
         maxWidth: W - 256, maxLines: 1 });
     }
     this.hud.bossBar.g.setVisible(true);
@@ -1647,7 +1658,7 @@ export class GameScene extends Phaser.Scene {
       warp: (s: number) => { this.elapsed = s; this.evQueue = this.evQueue.filter((e) => e.at > s); this.eliteQueue = this.eliteQueue.filter((t) => t > s); },
       speed: (n: number) => { this.simSpeed = Math.max(1, Math.min(8, Math.round(n))); setJuiceSpeed(this.simSpeed); },
       god: (on = true) => { this.god = !!on; },
-      autopilot: (on = true) => { this.autopilot = !!on; },
+      autopilot: (on = true, style = '') => { this.autopilot = !!on; this.novice = style === 'novice'; },
       spawnBoss: () => { this.elapsed = Math.max(this.elapsed, this.nextBossAt); },
       hurtBoss: (frac = 1) => { if (this.boss) this.damage(this.boss, (this.boss.maxHp * frac) / this.st.might, 0, 0, 'debug', true); },
       giveAll: () => { prods().forEach((id) => this.addWeapon(id)); },

@@ -72,7 +72,7 @@ async def one(browser, url, a, i):
     await page.wait_for_timeout(700)
     await page.keyboard.press("Enter")
     await page.wait_for_timeout(700)
-    await page.evaluate(f"__game.debug.autopilot(true); __game.debug.speed({a.speed}); {'__game.debug.god(true);' if a.god else ''}")
+    await page.evaluate(f"__game.debug.autopilot(true, '{"novice" if a.novice else ""}'); __game.debug.speed({a.speed}); {'__game.debug.god(true);' if a.god else ''}")
     t0 = time.time()
     last = {}
     while time.time() - t0 < a.timeout:
@@ -86,7 +86,7 @@ async def one(browser, url, a, i):
     s = last.get("stats", {}) or {}
     return {"i": i, "outcome": end["s"] if end["s"] in ("win", "lose") else "timeout", "real_s": round(time.time() - t0),
             "game_s": round(last.get("e", 0)), "score": end["score"], "level": s.get("level"), "kills": s.get("kills"),
-            "hp": s.get("hp"), "gold": s.get("gold"), "chests": s.get("chests"), "elites": s.get("elites"),
+            "hp": s.get("hp"), "bossKills": s.get("bossKills"), "gold": s.get("gold"), "chests": s.get("chests"), "elites": s.get("elites"),
             "evolutions": s.get("evolutions"), "weapons": s.get("weapons"), "passives": s.get("passives"),
             "dmg": s.get("dmg"), "fps": last.get("fps"), "bank": end["meta"]["coins"], "errors": errors,
             "run": last.get("run")}
@@ -104,6 +104,7 @@ async def main():
     ap.add_argument("--shop", default="")
     ap.add_argument("--hero", default="max")
     ap.add_argument("--god", action="store_true")
+    ap.add_argument("--novice", action="store_true")
     ap.add_argument("--theme", default="")
     ap.add_argument("--json", default="")
     a = ap.parse_args()
@@ -125,7 +126,7 @@ async def main():
                 r = await one(browser, url, a, i)
                 ev = ",".join(r["evolutions"] or [])
                 print(f"run {i}: h{(r['run'] or {}).get('heat')} {(r['run'] or {}).get('mode')} {r['outcome']:7} game {r['game_s']:4}s real {r['real_s']:3}s lv {r['level']} kills {r['kills']} "
-                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} evo [{ev}] fps {r['fps']} err {len(r['errors'])}", flush=True)
+                      f"hp {r['hp']} gold {r['gold']} chests {r['chests']} bosses {r['bossKills']} evo [{ev}] fps {r['fps']} err {len(r['errors'])}", flush=True)
                 results.append(r)
         await asyncio.gather(*(guarded(i) for i in range(a.n)))
         await browser.close()

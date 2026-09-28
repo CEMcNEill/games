@@ -88,3 +88,17 @@ Runs are bimodal at high heat: die in the first two minutes, or snowball into 3-
 the shop's might/HP levels exist to smooth the early phase.
 Boss HP 950 -> 1250 base so the fight lasts ~15-30 s for the bot instead of ~5 s.
 Perf: `flood(300)` twice with every weapon evolved, the fusion, and 6 passives at level 5: 60 fps, ~90 projectiles.
+
+### ~23:10: first-run approachability + endless
+Added `autopilot(true, 'novice')`: always takes the first card, never rerolls, ignores chests and food.
+Novice easy h0 first pass: 4/4 wins but runs of 245-499 s: boss HP scaled with level (1 + lv/20) and a kiting
+bot with short-range weapons never engaged the slow boss. Fix: boss HP 1100 x (1 + min(lv, 25)/25); boss gets angry
+after 50 s (not only at 50% HP) and moves 1.5x when angry; the autopilot only keeps the boss at 160 px when hurt.
+| config | wins | game s (each run) |
+|---|---|---|
+| easy h0 novice | 4/4 | 228, 242, 232, 241 |
+| normal h0 smart | 4/4 | 227, 221, 260, 247 (4/4 evolved) |
+| normal h0 novice (before the boss fix) | 3/4 | 234 (lose), 277, 300, 365 |
+Endless: bugs toughen 1 + t/150 + (minutes past 5:00)^2, +8%/min speed (max x1.8), +25%/min damage; boss HP x2 per
+return. The smart bot still survives 15:00 at normal (level ~90, 3-5 bosses); pressure is visibly building by 12:00.
+Human players will die well before that; left as is.
