@@ -371,7 +371,7 @@ export class MapScene extends Phaser.Scene {
 
   /** A line in the rival's personality voice (fixed kit lines), once in a while. */
   private personaLine() {
-    const lines = this.w.f[1].persona.lines;
+    const lines = this.w.f[this.lead()].persona.lines;
     if (lines.length) this.say('rival', lines[(this.w.turn >> 2) % lines.length]);
   }
 
@@ -500,8 +500,8 @@ export class MapScene extends Phaser.Scene {
     if (this.sel) {
       const s = this.sel;
       const tgt = w.targets(s).find((t) => t.x === this.cx && t.y === this.cy);
-      if (tgt) { void this.doAttack(s, tgt); return; }
-      if (w.reachable(s).has(w.idx(this.cx, this.cy))) { void this.doMove(s, this.cx, this.cy); return; }
+      if (tgt) { void this.act(() => this.doAttack(s, tgt)); return; }
+      if (w.reachable(s).has(w.idx(this.cx, this.cy))) { void this.act(() => this.doMove(s, this.cx, this.cy)); return; }
       if (u === s && w.canCapture(s)) { this.doCapture(s); return; }
       this.sel = null;
       this.redraw();
@@ -518,6 +518,13 @@ export class MapScene extends Phaser.Scene {
       this.redraw();
       this.openPendingReward();
     }
+  }
+
+  /** The player's own move/attack: input is ignored until its animation has resolved. */
+  private async act(fn: () => Promise<void>) {
+    this.busy = true;
+    try { await fn(); } finally { if (this.alive && !this.w.over) this.busy = false; }
+    this.openPendingReward();
   }
 
   private async doMove(u: Unit, x: number, y: number) {
@@ -749,7 +756,8 @@ export class MapScene extends Phaser.Scene {
 
   private answerTruce(accept: boolean) {
     const w = this.w;
-    const p = w.f[1].persona = { ...w.f[1].persona };
+    const lead = this.lead();
+    const p = w.f[lead].persona = { ...w.f[lead].persona };
     if (accept) { w.truce = 5; p.expand += 0.6; p.aggroTurn += 2; this.say('rival', 'A wise choice. For now.'); }
     else { p.risk -= 1; p.aggroTurn = Math.min(p.aggroTurn, w.turn); p.mass = Math.max(2, p.mass - 1); this.say('rival', 'Then we fight. Starting now.'); }
     track('hogtopia_truce', { accept });
@@ -799,10 +807,13 @@ export class MapScene extends Phaser.Scene {
     if (this.autopilot) void this.playerAuto();
   }
 
+  /** The rival that speaks for the rivals: rival 1, or rival 2 once rival 1 is out. */
+  private lead() { return this.w.rivals()[0] ?? 1; }
+
   /** Tell the player what the rival is up to: an army gathering near one of their cities. */
   private readRival() {
     const w = this.w;
-    const r = w.f[1];
+    const r = w.f[this.lead()];
     const tgt = w.cities[r.ai.target];
     if (!tgt || tgt.owner !== 0) return;
     const near = w.units.filter((u) => u.owner > 0 && cheb(u.x, u.y, tgt.x, tgt.y) <= 4).length;
@@ -885,7 +896,7 @@ export class MapScene extends Phaser.Scene {
     for (const o of w.owners().slice(1)) {
       if (!w.f[o].alive) { if (o === w.f.length - 1) w.endTurn(o); continue; }
       w.startTurn(o);
-      if (o === 1) {
+      if (o === this.lead()) {
         if (w.turn === 1) this.taunt(0);
         else if (w.turn === MAX_TURNS - 4) this.taunt(3);
         else if (w.turn % 5 === 0) this.personaLine();
@@ -984,12 +995,15 @@ export class MapScene extends Phaser.Scene {
         w().checkMonuments(); this.redraw();
         return w().monuments;
       },
-      truce: () => { this.truceOffered = true; this.menu = { kind: 'truce', sel: 1, objs: [] }; hooks.state = 'truce'; this.drawMenu(); },
+      truce: () => {
+        if (this.menu) { this.menu.objs.forEach((o) => o.destroy()); this.menu = null; }
+        this.truceOffered = true; this.menu = { kind: 'truce', sel: 1, objs: [] }; hooks.state = 'truce'; this.drawMenu();
+      },
       summary: () => { this.summary.push('took Test Town', 'promoted a veteran'); this.startPlayerTurn(); },
       turn: (n: number) => { w().turn = Math.max(1, Math.min(MAX_TURNS, Math.floor(n))); this.redraw(); },
       rivalTurn: () => this.endTurn(),
       techTree: () => { this.openTech(); },
-      research: (id: string) => { const f = w().f[0]; for (const t of [TECHS[id]?.requires, id]) if (t && !f.techs.includes(t)) f.techs.push(t); w().updateFog(); this.redraw(); return [...f.techs]; },
+      research: (id: string) => { const f = w().f[0]; for (const t of [TECHS[id]?.requires, id]) if (t && TECHS[t] && !f.techs.includes(t)) w().gainTech(0, t); this.redraw(); return [...f.techs]; },
       trainMenu: () => { const c = w().capital(0); if (c && c.owner === 0) this.openTrain(c); },
       // Load test: fill the map with units on both sides (every tile they can stand on, up to n each).
       flood: (n = 45) => {

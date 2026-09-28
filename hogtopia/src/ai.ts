@@ -115,7 +115,7 @@ export function* aiTurn(w: World, o: Owner): Generator<Action, void, void> {
   let target = enemyCities.find((c) => c.id === f.ai.target) ?? null;
   if (aggro && (!target || w.rand() < 0.1)) {
     const garrison = (c: City) => { const u = w.unitAt(c.x, c.y); return u ? w.stats(u).def * (u.hp / u.maxHp) * 3 : 0; };
-    const cost = (c: City) => (home?.[w.idx(c.x, c.y)] ?? 20) + garrison(c) + threatAt(w, o === 0 ? 1 : 0, c, 2) - (c.capital ? 4 : 0) - (P.id === 'opportunist' ? -garrison(c) * 2 : 0);
+    const cost = (c: City) => (home?.[w.idx(c.x, c.y)] ?? 20) + garrison(c) + threatAt(w, o, c, 2) - (c.capital ? 4 : 0) - (P.id === 'opportunist' ? -garrison(c) * 2 : 0);
     target = [...enemyCities].sort((a, b) => cost(a) - cost(b))[0] ?? null;
   }
   f.ai.target = target?.id ?? -1;

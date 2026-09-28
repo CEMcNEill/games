@@ -50,7 +50,8 @@ export function generateMap(seed: number, biome: string, typeId = 'classic', rui
   const bio = BIOME_SHARES[biome] ?? [0.25, 0.12, 0.12];
   // Classic keeps the biome's own shares (and the exact original random sequence).
   const shares = mt.water < 0 ? bio : [mt.forest, mt.mountain, mt.water];
-  for (let attempt = 0; attempt < 80; attempt++) {
+  // Classic keeps the original 60 attempts so its fallback cases match the old generator too.
+  for (let attempt = 0, n = mt.id === 'classic' ? 60 : 80; attempt < n; attempt++) {
     const r = rng(seed + attempt * 7919);
     const m = tryGenerate(r, mt, shares, ruins);
     if (m) return m;

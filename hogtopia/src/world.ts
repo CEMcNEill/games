@@ -247,8 +247,10 @@ export class World {
     return u;
   }
 
-  freeNeighbour(x: number, y: number): [number, number] | null {
-    for (const [dx, dy] of DIRS) {
+  freeNeighbour(x: number, y: number, r = 1): [number, number] | null {
+    const ring: number[][] = [...DIRS];
+    if (r > 1) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) ring.push([dx, dy]);
+    for (const [dx, dy] of ring) {
       const nx = x + dx, ny = y + dy;
       if (this.inMap(nx, ny) && land(this.tile(nx, ny)) && !this.unitAt(nx, ny)) return [nx, ny];
     }
@@ -265,11 +267,14 @@ export class World {
     const t = this.tile(x, y);
     if (t.ruins) this.explore(u, t);
     this.updateFog();
+    this.checkMonuments();
     return true;
   }
 
   undo(u: Unit) {
     if (u.owner !== 0 || !this.has(0, 'session_replay') || this.f[0].undoUsed || !u.prev || u.attacked) return false;
+    const there = this.unitAt(u.prev.x, u.prev.y);
+    if (there && there !== u) return false;
     u.x = u.prev.x; u.y = u.prev.y;
     u.prev = null; u.moved = false; u.done = false;
     this.f[0].undoUsed = true;
@@ -342,12 +347,13 @@ export class World {
     u.done = true; u.moved = true; u.attacked = true;
     this.updateFog();
     this.onEvent('capture', { city: c, from, by: u.owner });
+    this.checkMonuments();
     if (c.capital && from >= 0) this.capitalFell(c, from, u.owner);
     return c;
   }
 
   private capitalFell(c: City, from: Owner, by: Owner) {
-    if (from === 0) { this.over = { won: false, reason: 'lost', bonus: 0 }; return; }
+    if (from === 0) { if (c.home === 0) this.over = { won: false, reason: 'lost', bonus: 0 }; return; }
     // A rival whose home capital falls is out of the game (its units disband).
     if (c.home === from) {
       this.f[from].alive = false;
@@ -417,9 +423,9 @@ export class World {
     const f = this.f[o];
     c.perks.push(id);
     if (id === 'explorer' || id === 'giant') {
-      const at = !this.unitAt(c.x, c.y) ? [c.x, c.y] : this.freeNeighbour(c.x, c.y);
+      const at = !this.unitAt(c.x, c.y) ? [c.x, c.y] : this.freeNeighbour(c.x, c.y, 2);
       if (at) this.addUnit(o, id === 'explorer' ? 'scout' : 'giant', at[0], at[1]);
-      else if (id === 'explorer') f.stars += 3;
+      else f.stars += id === 'explorer' ? 3 : 12; // no room: pay out instead
     } else if (id === 'stockpile') f.stars += 6;
     else if (id === 'borders') this.growBorders(c);
     else if (id === 'growth') this.grow(c, 3);
@@ -482,7 +488,7 @@ export class World {
     return true;
   }
 
-  private gainTech(o: Owner, tech: string) {
+  gainTech(o: Owner, tech: string) {
     this.f[o].techs.push(tech);
     // Tech that raises max HP applies to units already on the map.
     for (const u of this.myUnits(o)) {
