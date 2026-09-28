@@ -13,7 +13,7 @@ import { save } from './save';
 interface Pal { s: Phaser.GameObjects.Image; t: number; off: number }
 interface Agent { s: Phaser.GameObjects.Image; life: number; a: number }
 interface Scout { s: Phaser.GameObjects.Image; a: number; t: number }
-export interface Drive { horiz: boolean; pos: number; dir: number; t: number; s: Phaser.GameObjects.Image | null; hitHog: boolean }
+export interface Drive { id: number; horiz: boolean; pos: number; dir: number; t: number; s: Phaser.GameObjects.Image | null; hitHog: boolean }
 interface Runner { s: Phaser.GameObjects.Image; vx: number; vy: number; life: number }
 
 export interface SysState {
@@ -120,7 +120,7 @@ export function selfDrivingPr(g: GameScene) {
   if (!best) return;
   const x = best.s.x, y = best.s.y;
   for (const e of g.near(x, y, 70)) {
-    if (e.boss) g.damage(e, e.maxHp * 0.03, 0, 0, 'selfdriving', true, true);
+    if (e.boss || e.twin) g.damage(e, e.maxHp * 0.03, 0, 0, 'selfdriving', true, true);
     else if (!e.reaper) g.damage(e, e.maxHp * 0.4 + 30 * waveMul(g), 0, 0, 'selfdriving', true, true);
   }
   g.blast(x, y, 70, 0, 'selfdriving');
@@ -136,7 +136,7 @@ export function selfDrivingPr(g: GameScene) {
 export function startDriveBy(g: GameScene) {
   if (g.xs.drive) return;
   const horiz = Math.random() < 0.6;
-  g.xs.drive = { horiz, pos: horiz ? g.player.y : g.player.x, dir: Math.random() < 0.5 ? 1 : -1, t: 0, s: null, hitHog: false };
+  g.xs.drive = { id: 1 + Math.floor(Math.random() * 1e6), horiz, pos: horiz ? g.player.y : g.player.x, dir: Math.random() < 0.5 ? 1 : -1, t: 0, s: null, hitHog: false };
   g.sfx('charge', 0.9, 100);
 }
 
@@ -161,15 +161,15 @@ function tickDrive(g: GameScene, dt: number) {
   // Everything in the lane near the car gets flattened (bosses take a chip).
   const x = d.s.x, y = d.s.y + (d.horiz ? 8 : 0);
   for (const e of g.near(x, y, 30)) {
-    if ((e.hitAt.drive ?? 0) > 0 || e.reaper) continue;
-    e.hitAt.drive = 1;
+    if (e.hitAt.drive === d.id || e.reaper) continue;
+    e.hitAt.drive = d.id;
     if (e.boss || e.twin) g.damage(e, e.maxHp * 0.04, 0, 0, 'hogzilla', true, true);
     else g.damage(e, e.hp + 1, d.horiz ? d.dir * 300 : 0, d.horiz ? 0 : d.dir * 300, 'hogzilla', true, true);
   }
   const p = g.player;
   if (!d.hitHog && Math.hypot(p.x - x, p.y - y) < 22) {
     d.hitHog = true;
-    if (g.pu.autopilot <= 0 && g.pu.hogzilla <= 0 && g.invuln <= 0) {
+    if (g.pu.autopilot <= 0 && g.pu.hogzilla <= 0 && g.invuln <= 0 && !g.interlude && !g.won) {
       floatText(g, p.x, p.y - 30, 'RUN OVER BY HOGZILLA', 0x58d854, 0.9);
       g.earn('youtube');
       g.hurt(g.st.maxHp * 0.25 / Math.max(0.3, 1 - g.st.armour), 'hogzilla', true);

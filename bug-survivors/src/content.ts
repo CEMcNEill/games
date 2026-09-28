@@ -250,19 +250,20 @@ export const REAPER_WAVE = 13;
 
 /** Scaling. Wave 1-2 keep their tuned numbers; wave 3+ bug HP grows by g per wave (1.9 from wave 9). */
 export const WAVE = {
-  len: 180,             // seconds of traffic before each boss (wave 2+)
-  g: 2.1, gLate: 2.5, lateFrom: 9,
-  dmg: 1.25,            // bug damage per wave from wave 3
+  len: 180,             // seconds of traffic before wave 2's boss
+  lenLate: 150,         // ...and before each boss from wave 3
+  g: 2.35, gLate: 2.7, lateFrom: 9,
+  dmg: 1.3,             // bug damage per wave from wave 3
   speed: 0.05,          // bug speed +5% per wave from wave 3 (max x1.4)
   spawn: 0.1,           // spawn rate +10% per wave from wave 3
   hitCap: 0.35,         // one hit takes at most 35% of max HP (after armour)
   xp: 0,                // gem XP per wave (more bugs already means more XP)
-  bossFocus: 0.45,      // wave 2+ boss HP = recent DPS x focus x target s (bosses take ~45% of the build's spread DPS)
+  bossFocus: 0.35,      // wave 2+ boss HP = recent DPS x focus x target s (focus shrinks per version: affixes soak damage)
   bossT3: 45,           // wave 3+ boss fights last about this long
   funding: 0.15,        // +15% damage per boss cleared ("funding round")
   fundingHp: 10,        // +10 max HP per boss cleared
   bossT: 60,            // wave 2+ boss fights last about this long
-  crumble: 55,          // ...crumbling (taking more and more damage) from here
+  crumble: 40,          // ...crumbling (taking more and more damage) from here
 };
 /** Wave 2 = the old Act 2 (spawn/hp/dmg ramps), kept as tuned. */
 export const ACT2 = { spawn: 1.35, hp0: 1.3, hp1: 2.6, dmg: 1.3, bossScale: 1.35, bossTint: 0xd8b8f8 };

@@ -203,7 +203,8 @@ function runQuery(g: GameScene, w: WState) {
   for (const e of [...g.enemies]) {
     if (!e.alive || e.arch === 'crate') continue;
     if (e.s.x < cam.scrollX - 8 || e.s.x > cam.scrollX + W + 8 || e.s.y < cam.scrollY - 8 || e.s.y > cam.scrollY + H + 8) continue;
-    if (e.boss) { g.damage(e, e.maxHp * 0.008, 0, 0, 'hogql', true, true); continue; }
+    if (e.reaper) continue;
+    if (e.boss || e.twin) { g.damage(e, e.maxHp * 0.008, 0, 0, 'hogql', true, true); continue; }
     if (e.hp < e.maxHp * thr) { n++; g.damage(e, e.hp + 1, 0, 0, 'hogql', true, true); }
   }
   const p = g.player;

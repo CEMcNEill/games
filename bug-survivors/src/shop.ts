@@ -55,6 +55,8 @@ export class ShopScene extends Phaser.Scene {
 
   private setTab(i: number) {
     this.tab = ((i % TABS.length) + TABS.length) % TABS.length;
+    if (this.tab === 2) this.sel = Math.min(this.sel, CREST_LIST.length - 1);
+    if (this.tab === 1) this.sel = Math.max(0, HOGS.findIndex((h) => h.id === save().hog));
     this.row = 0;
     this.flash = '';
     K.play('move', 0.5);
@@ -241,7 +243,7 @@ export class ShopScene extends Phaser.Scene {
       const open = hasCrest(c.id);
       if (!open) im.setTintFill(0x2c2c2c);
       this.objs.push(im);
-      if (i === this.sel % CREST_LIST.length) this.objs.push(this.add.rectangle(x - 15, y - 14, 30, 28).setOrigin(0).setStrokeStyle(2, ui.accentInt));
+      if (i === this.sel) this.objs.push(this.add.rectangle(x - 15, y - 14, 30, 28).setOrigin(0).setStrokeStyle(2, ui.accentInt));
     });
     const c = CREST_LIST[Math.min(this.sel, CREST_LIST.length - 1)];
     const open = hasCrest(c.id);

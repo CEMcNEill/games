@@ -1,5 +1,13 @@
 # Bug Survivors: the Wave Ladder (plan, 2026-09-28, rev 2)
 
+> **Status (built, 2026-09-28):** everything below is implemented except the leaderboard (skipped for now, by
+> request). KIT.md describes the shipped game; DESIGN-NOTES.md has the balance log. Changes from this plan made
+> while tuning: bug HP x2.1 per wave (x2.5 from wave 9), not x1.6, because player DPS grew ~x2.2 per wave; bug damage
+> x1.25 per wave; no extra XP per wave (a steeper level curve past 40 instead); waves 3+ are 2:30, not 3:00; the
+> wave 2 boss is sized for ~60 s and later ones ~45 s from the build's measured DPS; ENDLESS folded into RUN, its
+> slot is YOLO; heat 5's overtime became an extra boss affix. The handbook-value passives join from wave 2 (in wave 1
+> they diluted a novice's first run).
+
 Ask: more than 2 waves, enemies keep scaling, bosses become markers between waves (not the end), player power keeps
 scaling so it stays hard but possible (difficulty and heat still apply). More PostHog abilities, powerups and lore.
 Rev 2 adds data pipelines, a simple leaderboard, something unhinged, **hoggies as the player characters** (unlocked

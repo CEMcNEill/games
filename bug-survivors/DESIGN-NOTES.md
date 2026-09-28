@@ -213,3 +213,53 @@ First tuning (spawn x1.15, boss HP x2.2): every bot that reached Act 2 cleared i
 | normal h5 smart | 2/4 | 2/2 (overtime after the final boss) | 465-471 |
 | endless normal | 2/2 | - (toolbox after boss 1; 4 bosses by 11:00) | - |
 Powerups collected per run: Act 1 ~0-2, Act 2 ~2-8 (smart bot, which walks to them). Gate 1: PASS (bot win at 419 s).
+
+## 2026-09-28: the wave ladder, hoggies, crests
+Ask: more than 2 waves with enemies that keep scaling; bosses as markers between waves, not the end; player power
+that keeps pace so it stays hard but possible; lots more PostHog (abilities, powerups, lore), data pipelines, something
+unhinged; hoggies (brand.posthog.com) as the player characters, unlocked as you play; crests as the achievements.
+Plan and decisions: PLAN-WAVES.md. What shipped: KIT.md.
+
+Why each piece:
+- **Waves as data, bosses as releases.** Act 1/Act 2 were hard-coded; the ladder is `wave` + tables. The theme has one
+  boss, so later bosses are "<boss> N.0" with kit affixes; the theme contract is unchanged, so every prospect build
+  gets the ladder on reassembly.
+- **Open-ended power.** Weapons capped at LV 5 and passives capped, so a finished build drew heal/gold filler and a
+  long run flatlined. Patches (x1.12 compounding per card), v2.0 majors, releases and funding rounds keep every card
+  meaningful. Percentage effects (HogQL execute, Batch Export shares, Scouts' +40%) scale with any wave.
+- **Push-your-luck gold** makes CASH OUT a real decision after every boss.
+- **Hoggies at 32 px.** A downscale test (overnight-shots/hoggie-scale-test.png) showed the illustrations read well next to
+  16 px bugs with a hard alpha edge and a 1 px outline; single poses are animated in code (bob, squash, tilt).
+- **Crest minis as icons.** The 115 px crest badges stay legible at 16 px, so tools, value passives, releases and
+  powerups use them instead of new pixel icons (crests16.png).
+
+Bugs caught on the way: `sys` on the scene shadowed Phaser's own `Scene.sys` (renamed `xs`); the NEW HOGGIES reveal
+blocked the end screen long enough to fail Gate 1's fuzz step (5 s auto-close, debug.lose skips it); a read-only review
+agent found 12 more (the Reaper was swept up by the post-boss field clear and unlocked Angel for free; Angel's revive
+never worked; the Race Condition enrage could hit a recycled bug; instant-kill effects hit the boss's fork; the Security
+crest survived a revive; the frame kept running after death; bugs spawned during the field clear; the SHIPPED screen over
+the pause panel; the YouTube crest during the interlude; the drive-by hit marker never cleared). All fixed.
+
+### Balance (tools/sim.py, speed 8, n=6-16; bot plays the ladder until death unless --cash)
+Wave 1 must stay the old first run. Same-load A/B vs the committed build, novice bot, normal, wave 1 only: new 12/16,
+base 13/16 (and a god-mode probe of kills/level/damage at 30-180 s matched within noise). One regression found and fixed:
+the five handbook-value passives diluted a novice's wave 1 card pool (4/8 wins); they now join from wave 2.
+Smart wave 1: 7/8; easy novice wave 1: 8/8.
+First ladder pass (bug HP x1.6 per wave): the bots never got hurt; player DPS grew ~x2-3 per wave (new tools, patches,
+funding). Logs did 5-10x any other weapon (screen-wide lines hitting every bug each pass): nerfed lines, rate and damage.
+Then HP x2.1: deaths all piled up at wave 8 regardless of skill. The damage logs showed why: nothing melee ever reaches a
+late build; deaths come from spitter shots and bosses. HP growth isn't the binding constraint, damage is. Now: HP x2.35
+per wave (x2.7 from 9), bug damage x1.3 per wave, speed +5%, a softer ice floor, waves 3+ at 2:30.
+Boss sizing from the build's DPS (last 20 s): a flat share gave 7-100 s fights, because early bosses take most of the
+build's damage and later affixes (plates, blinking, forks) soak it. Focus 0.35 / (1 + 0.35 x (version - 3)): fights now
+~55-70 s at wave 2 and ~45-65 s after.
+| config | death waves (n=6) | notes |
+|---|---|---|
+| normal h0 smart | 5, 5, 7, 8, 9, 11 | ~18-40 min runs; deaths: spitter shots, bosses, nests, Hogzilla |
+| normal h0 novice | 1, 1, 3, 5, 5, 6 | median 5 |
+| easy h0 novice | 8, 8, 9, 9, 10, 11 -> 5, 5, 6, 7, 8, 9 | easy's damage/HP discounts now fade to normal from wave 3 to 6 |
+| normal h5 smart, wave 1 only | 5/8 clear (base build 2/8, same load) | heat 5 stays the hard mode |
+| YOLO normal smart | 8, 8 | 90 s waves, ~19 min |
+Exponential scaling squeezes every config into a few waves of each other, so difficulty and heat mostly shift the
+start; the spread between bots comes from dodging (spitters, bosses, the drive-by). A human novice gets hit far more
+than the novice bot, so real first ladders should end around waves 3-5.

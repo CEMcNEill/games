@@ -10,7 +10,7 @@
     "cto",
     "devops"
   ],
-  "summary": "The PostHog hedgehog survives 3:30 of swarming bugs named after the prospect's pain points, picks PostHog products as auto-firing weapons on level-up, beats a boss, then can continue into Act 2: new PostHog tools, powerups and a final boss.",
+  "summary": "A PostHog hoggie survives 3:30 of swarming bugs named after the prospect's pain points, picks PostHog products as auto-firing weapons on level-up and beats a boss; then cashes out or climbs the wave ladder (every boss a release: 2.0, 3.0...) with PostHog tools, releases, powerups, hoggies to unlock and crests to earn.",
   "products": [
     "session_replay",
     "feature_flags",

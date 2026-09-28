@@ -1,9 +1,11 @@
 # Theme writer: Bug Survivors
 
-Bug Survivors is a Vampire Survivors-style game. The PostHog hedgehog stands in the prospect's
+Bug Survivors is a Vampire Survivors-style game. A PostHog hoggie stands in the prospect's
 "arena" while swarms of bugs close in. Weapons fire on their own; every weapon is a PostHog
-product. After 3:30 a boss arrives; beating it wins the game. A run lasts about 4 minutes. Returning
-players get harder heat levels, a shop, heroes, endless and a daily run; none of that needs theme text.
+product. After 3:30 a boss arrives; beating it wins the game (about 4 minutes). Players can then cash
+out or climb the wave ladder, where the same boss returns as "<boss name> 2.0", "3.0" and so on, so
+pick a boss name that still reads well with a version number after it. Returning players get heat
+levels, a shop, hoggies to unlock, crests, YOLO mode and a daily run; none of that needs theme text.
 
 What you write, and where the player sees it:
 - title (max 30): the game's name on the title screen. Work in the prospect's name or world if it

@@ -229,6 +229,7 @@ export class GameScene extends Phaser.Scene {
   simSpeed = 1;
   holdLevels = false; // debug: no level-up cards (screenshot tours)
   skipReveal = false; // debug.lose(): straight to the end screen
+  revealing = false;  // the NEW HOGGIES screen after the run
   pauseObjs: Phaser.GameObjects.GameObject[] = [];
 
   constructor() { super('Game'); }
@@ -249,7 +250,7 @@ export class GameScene extends Phaser.Scene {
       toolsOpen: false, interlude: false, cashedOut: false, forceWin: false, botCashAt: 2,
       waveFlags: { offsite: false, killswitch: false, minHp: 1 },
       pu: { autopilot: 0, freeze: 0, shipit: 0, webhook: 0, party: 0, hogzilla: 0, troop: 0, sampling: 0 }, hist: [], histT: 0, spikeT: 0,
-      incident: null, hogqlFlash: 0, recalcT: 0, tokenT: 0, dynaT: 60, weirdT: 0, xs: newSys(), moving: false,
+      incident: null, holdLevels: false, skipReveal: false, revealing: false, hogqlFlash: 0, recalcT: 0, tokenT: 0, dynaT: 60, weirdT: 0, xs: newSys(), moving: false,
     });
     this.vel = new Phaser.Math.Vector2(0, 0);
     setJuiceSpeed(1);
@@ -396,6 +397,7 @@ export class GameScene extends Phaser.Scene {
       case 'panic': s.speed *= 1 + 0.5 * (1 - hpFrac); s.cd *= 1 - 0.3 * (1 - hpFrac); break;
       case 'sleepy': s.speed *= 0.85; s.regen += 2; break;
       case 'crit': s.crit += 0.08; break;
+      case 'angel': s.revives += 1; break;
       case 'amount': s.amount += 1; break;
       default: break;
     }
@@ -475,7 +477,7 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- input
   private onKey(e: KeyboardEvent) {
-    if (this.over) return;
+    if (this.over && !(this.revealing && this.modal)) return;
     const m = this.modal;
     if (m) {
       if (m.kind === 'chest' || m.kind === 'reveal') {
@@ -772,9 +774,12 @@ export class GameScene extends Phaser.Scene {
     this.fireWeapons(dt);
     tickSystems(this, dt);
     this.moveProjectiles(dt);
+    if (this.over) return;
     this.moveGems(dt);
     this.moveItems(dt);
+    if (this.over) return;
     this.touchPlayer(dt);
+    if (this.over) return;
     this.runBoss(dt);
     this.runWaveTimers(dt);
     if (this.pendingLevels > 0 && !this.modal && this.slowmo <= 0 && !this.over && !this.won && !this.interlude) this.levelFanfare();
@@ -845,7 +850,7 @@ export class GameScene extends Phaser.Scene {
     if (this.boss && this.bossAffixes.includes('backpressure')) sp *= Math.max(0.6, 1 - this.enemies.length / 500);
     if (this.waveMods.includes('freeze') && this.trait !== 'superhero' && !driving) {
       // Code Freeze: an icy floor, you keep sliding.
-      const kk = Math.min(1, dt * 2.2);
+      const kk = Math.min(1, dt * 4.5);
       this.vel.x += (dx * sp - this.vel.x) * kk;
       this.vel.y += (dy * sp - this.vel.y) * kk;
     } else {
@@ -922,7 +927,7 @@ export class GameScene extends Phaser.Scene {
 
   /** How far through the current wave (0-1). */
   waveFrac() { return this.wave === 1 ? 0 : Phaser.Math.Clamp((this.elapsed - this.waveAt) / this.waveLen(), 0, 1); }
-  waveLen() { return this.yolo ? YOLO.bossEvery : WAVE.len; }
+  waveLen() { return this.yolo ? YOLO.bossEvery : this.wave >= 3 ? WAVE.lenLate : WAVE.len; }
   /** Wave 3+: the product of each wave's growth factor, up to (w - 3 + f). */
   gpow(w: number, f: number) {
     let m = 1;
@@ -935,6 +940,8 @@ export class GameScene extends Phaser.Scene {
     const t = (1 + this.elapsed / 150);
     return this.wave === 2 ? t * (ACT2.hp0 + (ACT2.hp1 - ACT2.hp0) * this.waveFrac()) : t;
   }
+  /** Easy's discounts (below 1) fade to normal from wave 3 to wave 6, so an easy run still ends. */
+  ease(m: number) { return m >= 1 ? m : m + (1 - m) * Phaser.Math.Clamp((this.wave - 2) / 4, 0, 1); }
   dmgScale() { return this.wave >= 2 ? ACT2.dmg * WAVE.dmg ** Math.max(0, this.wave - 2) * (this.yolo ? YOLO.dmg : 1) : 1; }
   xpScale() { return (1 + WAVE.xp * (this.wave - 1)) * (this.waveMods.includes('hyper') ? 1.3 : 1) * (this.yolo ? YOLO.xp : 1); }
   /** The version number of the next/current boss. */
@@ -1009,7 +1016,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   addEnemy(arch: ArchId, x: number, y: number, elite: EliteMod | null = null): Enemy | null {
-    if (this.won) return null;
+    if (this.won || this.interlude) return null;
     if (this.enemies.length >= MAX_ENEMIES && !elite) return null;
     x = Phaser.Math.Clamp(x, 8, WORLD_W - 8);
     y = Phaser.Math.Clamp(y, 8, WORLD_H - 8);
@@ -1028,8 +1035,8 @@ export class GameScene extends Phaser.Scene {
     else { e.s.play(anim(`enemy_${type + 1}`)); e.s.anims.setProgress(Math.random()); }
     const tint = elite ? ELITE_MODS[elite].tint : A.tint ?? null;
     const speed = A.speed * Phaser.Math.FloatBetween(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1) * Math.min(1.4, 1 + WAVE.speed * Math.max(0, this.wave - 2));
-    const hp = A.hp * this.diff.hp * scale * this.heatHp() * (elite ? 9 : 1);
-    const dmg = A.dmg * this.diff.dmg * this.heatDmg() * (elite ? 1.4 : 1) * this.dmgScale();
+    const hp = A.hp * this.ease(this.diff.hp) * scale * this.heatHp() * (elite ? 9 : 1);
+    const dmg = A.dmg * this.ease(this.diff.dmg) * this.heatDmg() * (elite ? 1.4 : 1) * this.dmgScale();
     let armour = (A.armour ?? 1) * (elite === 'shield' ? 0.45 : 1);
     if (this.waveMods.includes('enterprise') && arch !== 'crate') armour *= 0.65;
     Object.assign(e, { arch, type, hp, speed, dmg, xp: A.xp * (elite ? 5 : 1), r: A.r * sc, kx: 0, ky: 0, flash: 0, slow: 1, hitAt: {}, alive: true,
@@ -1269,7 +1276,7 @@ export class GameScene extends Phaser.Scene {
           if (d < 100) { mx = -dx; my = -dy; sp *= 0.7; } else if (d < 150) { mx = -dy; my = dx; sp *= 0.5; }
           if (e.t <= 0 && d < 230) {
             e.t = Phaser.Math.FloatBetween(2.4, 3.2);
-            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.diff.dmg * this.dmgScale(), 4, 1, 'spit', true).s.setScale(0.75);
+            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.ease(this.diff.dmg) * this.dmgScale(), 4, 1, 'spit', true).s.setScale(0.75);
             this.sfx('spit', 0.3, 120);
           }
           break;
@@ -1314,7 +1321,7 @@ export class GameScene extends Phaser.Scene {
         e.speed = Math.min(210, e.speed + dt * 4);
         sp = e.speed; e.slow = 1; e.kx = 0; e.ky = 0;
       }
-      if (sampling && e.seed! < 0.9 && !e.reaper && e.arch !== 'crate') e.s.setAlpha(0.35);
+      if (sampling && e.seed! < 0.9 && !e.reaper && e.arch !== 'crate' && this.visible(e)) e.s.setAlpha(0.35);
       else if (e.arch !== 'flaky' && e.arch !== 'heisen' && e.s.alpha !== 1 && !e.reaper) e.s.setAlpha(1);
       // Separation from neighbours in the same cell keeps swarms readable.
       let sx = 0, sy = 0;
@@ -1451,7 +1458,7 @@ export class GameScene extends Phaser.Scene {
       e.accCrit ||= crit;
     }
     // Default to Transparency: weak bugs die on the next hit.
-    if (e.hp > 0 && !e.boss && !e.reaper && this.releases.has('transparency') && e.hp < e.maxHp * 0.12) e.hp = 0;
+    if (e.hp > 0 && !e.boss && !e.twin && !e.reaper && this.releases.has('transparency') && e.hp < e.maxHp * 0.12) e.hp = 0;
     if (e.hp <= 0) {
       this.kill(e, crit, false, src);
     } else {
@@ -1529,10 +1536,10 @@ export class GameScene extends Phaser.Scene {
     if (e.arch === 'nest' && this.RD.next() < 0.35) this.dropItem('chest', e.s.x, e.s.y);
     if (e.arch === 'race' && e.link?.alive) {
       // The partner has 2 s to die too, or it enrages.
-      const o = e.link;
+      const o = e.link, seed = o.seed;
       o.link = null;
       this.time.delayedCall(2000, () => {
-        if (!o.alive) return;
+        if (!o.alive || o.seed !== seed) return; // dead, or the pooled object is a new bug now
         o.speed *= 2; o.dmg *= 1.5; o.tint = 0xf83800; this.restoreTint(o);
         floatText(this, o.s.x, o.s.y - 12, 'RACE LOST', 0xf83800, 0.6);
       });
@@ -1558,7 +1565,7 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     let n = 0;
     for (const o of [...this.enemies]) {
-      if (o.boss || o.reaper || o.arch === 'crate' || o.hp > o.maxHp * 0.2) continue;
+      if (o.boss || o.twin || o.reaper || o.arch === 'crate' || o.hp > o.maxHp * 0.2) continue;
       if (o.s.x < cam.scrollX || o.s.x > cam.scrollX + W || o.s.y < cam.scrollY || o.s.y > cam.scrollY + H) continue;
       n++;
       this.damage(o, o.hp + 1, 0, 0, 'reaper', true, true);
@@ -1722,7 +1729,7 @@ export class GameScene extends Phaser.Scene {
   /** Kill Switch: the most common kind of bug on screen is switched off. */
   private killSwitch() {
     const cam = this.cameras.main;
-    const on = this.enemies.filter((e) => !e.boss && !e.reaper && e.arch !== 'crate' && e.s.x > cam.scrollX && e.s.x < cam.scrollX + W
+    const on = this.enemies.filter((e) => !e.boss && !e.twin && !e.reaper && e.arch !== 'crate' && e.s.x > cam.scrollX && e.s.x < cam.scrollX + W
       && e.s.y > cam.scrollY && e.s.y < cam.scrollY + H);
     const count = new Map<string, number>();
     for (const e of on) count.set(e.arch, (count.get(e.arch) ?? 0) + 1);
@@ -1860,6 +1867,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private collect(it: Item) {
+    if (this.over) return;
     const p = this.player;
     switch (it.kind) {
       case 'coin': {
@@ -2207,6 +2215,7 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- chests + evolutions
   private openChest(big = false) {
+    if (this.over) return;
     const R = this.RD;
     this.run.chests++;
     const sv = save();
@@ -2445,6 +2454,7 @@ export class GameScene extends Phaser.Scene {
   /** Rollback: back to half HP, a shockwave clears space. */
   private revive() {
     this.revivesUsed++;
+    this.waveFlags.minHp = 0;
     const sv = save();
     sv.revives++;
     persist();
@@ -2686,7 +2696,7 @@ export class GameScene extends Phaser.Scene {
     this.bossLast = pick;
     const pace = (rage ? 0.65 : angry ? 0.8 : 1) * Math.max(0.6, 1 - 0.04 * (v - 1));
     const px = this.player.x, py = this.player.y;
-    const dm = this.diff.dmg * this.dmgScale();
+    const dm = this.ease(this.diff.dmg) * this.dmgScale();
     if (pick === 'ring') {
       const n = (angry ? 18 : 12) + Math.min(8, v - 1);
       const off = Math.random() * Math.PI;
@@ -2738,7 +2748,9 @@ export class GameScene extends Phaser.Scene {
     if (v >= 2) {
       // A marker, not a wall: sized so the build's real DPS takes about a minute (floor: the wave's HP curve).
       const floor = base * 2.5 * (this.wave >= 3 ? this.gpow(this.wave, 0) : 1);
-      hp = Math.max(floor, this.dps() * WAVE.bossFocus * (this.wave === 2 ? WAVE.bossT : WAVE.bossT3));
+      // Later bosses' affixes (plates, blinking, forks) soak more of the build's damage, so they need less HP per DPS.
+      const focus = WAVE.bossFocus / (1 + 0.35 * Math.max(0, v - 3));
+      hp = Math.max(floor, this.dps() * focus * (this.wave === 2 ? WAVE.bossT : WAVE.bossT3));
     }
     const sc = v >= 2 ? ACT2.bossScale : 1;
     const b: Enemy = { s, arch: 'tank', type: 3, hp, maxHp: hp, speed: 24 * (1 + 0.08 * (v - 1)), dmg: 20 * this.diff.dmg * this.dmgScale(), xp: 0,
@@ -2771,6 +2783,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private bossDown(b: Enemy) {
+    if (this.over) return;
     this.kills++;
     this.sfx('explode');
     shake(this, 8, 700);
@@ -2792,6 +2805,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The wave's boss (and its fork) are down: crests, lore, then SHIPPED (continue / cash out). */
   private waveClear() {
+    if (this.over) return;
     this.bossKills++;
     const v = this.bossVersion();
     const sv = save();
@@ -2832,7 +2846,7 @@ export class GameScene extends Phaser.Scene {
     this.nextBossAt = Infinity; // startWave schedules the next boss
     hooks.state = 'actbreak';
     for (const pr of this.projs) if (pr.hostile) { pr.life = 0; pr.s.setVisible(false); }
-    for (const e of [...this.enemies]) if (!e.boss && e.arch !== 'crate') this.kill(e);
+    for (const e of [...this.enemies]) if (!e.boss && !e.reaper && e.arch !== 'crate') this.kill(e);
     this.gems.forEach((g) => { g.pull = true; g.t = Math.max(g.t, 0); }); // the field's XP flies in during the victory beat
     this.items.forEach((it) => { if (it.kind !== 'chest') it.pull = true; }); // lore and coins too
     const v = this.bossVersion();
@@ -2842,7 +2856,7 @@ export class GameScene extends Phaser.Scene {
 
   private openActBreak() {
     if (this.over || this.won) return;
-    if (this.modal) { this.time.delayedCall(300, () => this.openActBreak()); return; } // a chest is still open
+    if (this.modal || this.paused) { this.time.delayedCall(300, () => this.openActBreak()); return; } // a chest is open, or paused
     const ui = K.ui;
     const objs: Phaser.GameObjects.GameObject[] = [];
     this.showBanner(false);
@@ -2918,7 +2932,7 @@ export class GameScene extends Phaser.Scene {
 
   waveName(n: number) {
     if (WAVES[n]) return WAVES[n].name;
-    return n > REAPER_WAVE ? `SCALE ${n - 8}` : `SCALE ${n - 8}`;
+    return `SCALE ${n > REAPER_WAVE ? n - 9 : n - 8}`;
   }
 
   /** Start wave n: its modifiers, events, elites and boss timer; full HP; wave-start perks. */
@@ -2934,7 +2948,7 @@ export class GameScene extends Phaser.Scene {
     this.waveMods = def ? (def.mod === 'none' ? [] : [def.mod]) : this.R.shuffle([...SCALE_MODS]).slice(0, 2);
     if (n > REAPER_WAVE) this.waveMods.push('reaper');
     const evs = n === 2 ? ACT2_EVENTS : LATE_EVENTS;
-    const ts = this.yolo ? YOLO.bossEvery / WAVE.len : 1;
+    const ts = this.yolo ? YOLO.bossEvery / WAVE.len : n >= 3 ? WAVE.lenLate / WAVE.len : 1;
     const extra = this.waveMods.includes('spikes') ? [{ at: 40, id: 'spike' as EventId }, { at: 135, id: 'spike' as EventId }] : [];
     this.evQueue = [...this.evQueue, ...[...evs, ...extra].map((e) => ({ at: T + e.at * ts, id: e.id }))].sort((a, b) => a.at - b.at);
     this.eliteQueue = [...this.eliteQueue, ...(n === 2 ? ACT2_ELITES : LATE_ELITES).map((t) => T + t * ts)].sort((a, b) => a - b);
@@ -2969,7 +2983,8 @@ export class GameScene extends Phaser.Scene {
     if (this.trait === 'selfdrive') this.pu.autopilot = 5 * this.st.dur;
     if (this.trait === 'rewind') this.dropItem('rewind', p.x + 30, p.y + 30);
     if (this.trait === 'angel' && this.revivesUsed > 0) { this.revivesUsed = Math.max(0, this.revivesUsed - 1); this.recalc(); }
-    if (n === REAPER_WAVE) { this.unlock('reaper'); this.time.delayedCall(20000, () => { if (!this.over && this.wave >= REAPER_WAVE) spawnReaper(this); }); }
+    if (n === REAPER_WAVE) this.unlock('reaper');
+    if (n >= REAPER_WAVE) this.time.delayedCall(20000 / this.simSpeed, () => { if (!this.over && this.wave >= REAPER_WAVE) spawnReaper(this); });
     if (n > prevBest && n >= 3 && this.mode !== 'daily') {
       this.time.delayedCall(1200, () => { if (!this.over) { this.banner('NEW PERSONAL BEST!', `Wave ${n}. The whole company showed up`); allHands(this, 24); } });
     }
@@ -3005,7 +3020,7 @@ export class GameScene extends Phaser.Scene {
     this.pendingLevels = 0; // no level-up cards on the victory beat
     // Expire hostile shots (don't splice: this can run inside the projectile loop, when a shot kills the boss).
     for (const pr of this.projs) if (pr.hostile) { pr.life = 0; pr.s.setVisible(false); }
-    for (const e of [...this.enemies]) if (!e.boss) this.kill(e);
+    for (const e of [...this.enemies]) if (!e.boss && !e.reaper) this.kill(e);
     this.time.delayedCall(1600, () => this.finish(true));
   }
 
@@ -3150,13 +3165,13 @@ export class GameScene extends Phaser.Scene {
     });
     if (ids.length > 8) objs.push(text(this, W / 2, 240, `+${ids.length - 8} more in the SHOP`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
     objs.push(text(this, W / 2, 252, 'Pick one in SHOP > HOGGIES.   ENTER', { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
-    this.over = false; // let the key through
+    this.revealing = true; // onKey lets the reveal's ENTER through while the run is over
     const m: Modal = { kind: 'reveal', cards: [], sel: 0, objs, armed: false };
     this.modal = m;
     hooks.state = 'reveal';
     this.time.delayedCall(700 + 250 * show.length, () => (m.armed = true));
     const origClose = this.closeModal.bind(this);
-    this.closeModal = () => { origClose(); this.closeModal = origClose; this.over = true; then(); };
+    this.closeModal = () => { origClose(); this.closeModal = origClose; this.revealing = false; then(); };
     this.time.delayedCall(5000, () => { if (this.modal === m) this.closeModal(); });
   }
 
