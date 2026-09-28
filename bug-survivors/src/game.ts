@@ -336,17 +336,31 @@ export class GameScene extends Phaser.Scene {
 
   private pause() {
     this.paused = true;
+    this.showBanner(false);
     hooks.state = 'paused';
     const ui = K.ui;
-    const g = box(this, W / 2 - 120, H / 2 - 50, 240, 100, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 100);
+    // Build overview: each weapon with its evolution status, so players can plan the next picks.
+    const rows = [...this.weapons.values()];
+    const h = 96 + rows.length * 11;
+    const y0 = Math.round(H / 2 - h / 2);
+    const g = box(this, W / 2 - 170, y0, 340, h, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 100);
     const o: Phaser.GameObjects.GameObject[] = [g];
-    o.push(text(this, W / 2, H / 2 - 38, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt, fixed: true, depth: UI + 101 }));
-    o.push(text(this, W / 2, H / 2 - 12, 'ENTER resume   Q quit', { align: 'center', fixed: true, depth: UI + 101 }));
-    o.push(text(this, W / 2, H / 2 + 2, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
-    o.push(text(this, W / 2, H / 2 + 14, 'M mute', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
+    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => o.push(text(this, x, y, str, { fixed: true, depth: UI + 101, ...opts }));
+    T(W / 2, y0 + 10, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt });
+    rows.forEach((w, i) => {
+      const y = y0 + 34 + i * 11;
+      const pid = WEAPONS[w.id].evo.passive;
+      T(W / 2 - 158, y, w.evo ? WEAPONS[w.id].evo.name : `${productName(w.id)} LV ${w.level}`, { color: w.evo ? 0xf8d878 : ui.textInt });
+      const has = this.passives.has(pid), max = w.level >= MAX_LEVEL;
+      const status = w.evo ? 'EVOLVED' : max && has ? 'READY: open a chest' : max ? `needs ${PASSIVES[pid].name}` : has ? 'needs LV 5' : `LV 5 + ${PASSIVES[pid].name}`;
+      T(W / 2 + 158, y, status, { align: 'right', color: w.evo ? 0xf8d878 : status.startsWith('READY') ? 0x58d854 : ui.dimInt });
+    });
+    const yb = y0 + 40 + rows.length * 11;
+    T(W / 2, yb, 'ENTER resume   Q quit', { align: 'center' });
+    T(W / 2, yb + 13, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
     const info = [this.heat ? `HEAT ${this.heat}` : '', this.mode !== 'standard' ? this.mode.toUpperCase() : '', `HERO ${this.hero.name.toUpperCase()}`]
       .filter(Boolean).join('   ');
-    o.push(text(this, W / 2, H / 2 + 30, info, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
+    T(W / 2, yb + 29, info, { align: 'center', color: ui.dimInt });
     this.pauseObjs = o;
   }
 
@@ -355,6 +369,7 @@ export class GameScene extends Phaser.Scene {
     hooks.state = this.boss ? 'boss' : 'playing';
     this.pauseObjs.forEach((o) => o.destroy());
     this.pauseObjs = [];
+    this.showBanner(true);
   }
 
   // ---------------------------------------------------------------- HUD
