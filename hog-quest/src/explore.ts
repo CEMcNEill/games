@@ -7,8 +7,16 @@ import { text, box, blink, PixelText, W } from '@shared/ui';
 import {
   buildRoom, cellFrames, cellX, cellY, colOf, rowOf, RoomMap, Spot, COLS, ROWS, OX, OY, DOOR_ROW, TILE,
 } from './rooms';
-import { R, BOSS, encDef, resetRun, endData } from './state';
+import { R, BOSS, MINI, MAX_CONTINUES, encDef, resetRun, endData, endingFor, endingPages, heat, snapshot, restore } from './state';
+import { extrasFor, Extras } from './extras';
+import { Shop, buyItem } from './shop';
+import { item, MAX_ITEMS } from './items';
+import { addSecret, patchHq } from './save';
+import { addEnding, hq, HQSave } from './save';
+import { achieve } from '@shared/meta';
 import { Typewriter, paginate } from './typewriter';
+import { preloadMusic, stopBattleMusic } from './music';
+import { setJuiceSpeed, shake } from '@shared/juice';
 
 interface Page { speaker?: string; text: string }
 interface NpcPlace { i: number; room: number; spot: Spot }
@@ -32,9 +40,17 @@ export class ExploreScene extends Phaser.Scene {
   private hud!: { name: PixelText; desc: PixelText; hp: PixelText };
   private dlg: { pages: Page[]; i: number; tw: Typewriter; objs: Phaser.GameObjects.GameObject[]; speaker: PixelText; more: PixelText; done: () => void; wait: number } | null = null;
   private busy = false; // room transition or battle launch in progress
-  private bot = { path: [] as Spot[], goal: '' as string, push: null as null | { x: number; y: number }, stuckT: 0, lastX: 0, lastY: 0, talkTo: -1 };
+  private shop: Shop | null = null;
+  private props: Phaser.GameObjects.GameObject[] = [];
+  private propTimers: Phaser.Time.TimerEvent[] = [];
+  private onSave = false; // standing on this room's save star (it triggers once per step onto it)
+  private memory: HQSave | null = null;
+  private bot = { path: [] as Spot[], goal: '' as string, push: null as null | { x: number; y: number }, stuckT: 0, lastX: 0, lastY: 0, talkTo: -1,
+    shopped: new Set<number>() };
 
   constructor() { super('Explore'); }
+
+  preload() { preloadMusic(this); }
 
   create() {
     resetRun();
@@ -46,6 +62,11 @@ export class ExploreScene extends Phaser.Scene {
     this.dlg = null;
     const n = Math.min(4, Math.max(3, g.rooms.length));
     this.rooms = g.rooms.slice(0, n).map((r: any, i: number) => buildRoom(r.layout, i > 0, i < n - 1));
+    // Vending machines stand in every room after the first: solid, like furniture.
+    this.rooms.forEach((room, i) => { if (i > 0) { const v = this.ext(i).vend; room.solid[v.row][v.col] = true; } });
+    this.shop = null;
+    this.onSave = false;
+    this.bot.shopped = new Set();
     this.placeActors(n);
     this.cameras.main.setBackgroundColor(K.ui.bg);
     this.layer = this.add.container(0, 0);
@@ -66,8 +87,38 @@ export class ExploreScene extends Phaser.Scene {
     this.events.on('wake', this.onWake, this);
     this.events.once('shutdown', () => this.events.off('wake', this.onWake, this));
     this.enterRoom(0, this.rooms[0].spots.s);
-    this.say((g.intro as string[]).map((t) => ({ text: t })), () => {});
     this.installDebug();
+    this.memory = hq();
+    patchHq({ visits: this.memory.visits + 1 });
+    if (K.run.mode === 'rush') { this.startRush(); return; }
+    this.say((g.intro as string[]).map((t) => ({ text: t })), () => {});
+  }
+
+  // ---------------------------------------------------------------- boss rush
+  /** Boss rush: all four problems back to back against the clock, half a coffee between fights. */
+  private startRush() {
+    R.rush = 0;
+    this.actors.filter((a) => a.kind === 'enc').forEach((a) => a.s.setVisible(false));
+    this.say([{ text: 'BOSS RUSH. Every problem, back to back. The clock is running.' }], () => this.encounter(0));
+  }
+
+  private rushNext(how: 'spared' | 'debugged', enc: number) {
+    if (enc === BOSS) {
+      R.rushTime = Math.round(hooks.elapsed * 10) / 10;
+      R.ending = '';
+      const best = hq().rushBest;
+      const counts = !R.god; // god-mode (test) runs don't set records
+      if (counts && (!best || R.rushTime < best)) patchHq({ rushBest: R.rushTime });
+      achieve('rush');
+      if (R.heat >= 3) achieve('heat3');
+      this.say([{ text: `Rush cleared in ${R.rushTime.toFixed(1)} seconds.${counts && (!best || R.rushTime < best) ? ' A new best time!' : ''}` }], () => this.finish(true));
+      return;
+    }
+    R.cleared.add(enc);
+    R.hp = Math.min(R.maxHp, R.hp + Math.ceil(R.maxHp * 0.5));
+    const nextEnc = enc + 1;
+    this.say([{ text: `${encDef(enc).name} ${how === 'spared' ? 'is spared' : 'is debugged'}. Half a coffee. Next: ${encDef(nextEnc).name}!` }],
+      () => this.encounter(nextEnc));
   }
 
   // ---------------------------------------------------------------- setup
@@ -110,6 +161,36 @@ export class ExploreScene extends Phaser.Scene {
 
   private get room() { return this.rooms[this.roomIdx]; }
 
+  private ext(i = this.roomIdx): Extras { return extrasFor(this.rooms[i]?.layout ?? 'lobby'); }
+
+  /** Vending machine, hidden door, secret glint and save star for the current room. */
+  private drawProps() {
+    this.props.forEach((o) => o.destroy());
+    this.props = [];
+    this.propTimers.forEach((t) => t.remove(false));
+    this.propTimers = [];
+    const e = this.ext(), i = this.roomIdx, key = spr('props');
+    const at = (sp: Spot, f: number) => {
+      const im = this.add.image(OX + sp.col * TILE, OY + sp.row * TILE, key, f).setOrigin(0).setDepth(cellY(sp.row) - 1);
+      this.props.push(im);
+      return im;
+    };
+    if (i > 0) at(e.vend, 0);
+    if (i === 0) at(e.door, R.doorOpen ? 6 : 5).setDepth(1);
+    if (!R.secretIds.has(this.room.layout)) {
+      const gl = at(e.secret.spot, 3).setDepth(900).setAlpha(0);
+      // A glint every few seconds: enough to make you wonder, easy to miss.
+      this.propTimers.push(this.time.addEvent({ delay: 2600, loop: true, callback: () => {
+        if (!gl.active) return;
+        gl.setFrame(3).setAlpha(1);
+        this.time.delayedCall(140, () => { if (gl.active) gl.setFrame(4); });
+        this.time.delayedCall(300, () => { if (gl.active) gl.setAlpha(0); });
+      } }));
+    }
+    const star = at(e.save, 1).setDepth(cellY(e.save.row) - 2);
+    this.propTimers.push(this.time.addEvent({ delay: 380, loop: true, callback: () => star.setFrame(String(star.frame.name) === '1' ? 2 : 1) }));
+  }
+
   private enterRoom(i: number, at: Spot) {
     this.roomIdx = i;
     const room = this.room;
@@ -135,7 +216,9 @@ export class ExploreScene extends Phaser.Scene {
       if (e.enc !== BOSS) s.setFlipX(true);
       this.actors.push({ kind: 'enc', id: e.enc, s, col: e.spot.col, row: e.spot.row, half: e.enc === BOSS ? 20 : 12 });
     }
+    this.drawProps();
     this.pos = { x: cellX(at.col), y: cellY(at.row) };
+    this.onSave = false;
     this.syncPlayer();
     this.refreshBoss();
     const def = K.theme.game.rooms[i];
@@ -164,7 +247,7 @@ export class ExploreScene extends Phaser.Scene {
 
   private syncPlayer() {
     this.player.setPosition(Math.round(this.pos.x), Math.round(this.pos.y - 5)).setDepth(this.pos.y + 1);
-    this.hud?.hp.setText(`HP ${Math.ceil(R.hp)}/${R.maxHp}`);
+    this.hud?.hp.setText(`${R.heat ? `HEAT ${R.heat}  ` : ''}HP ${Math.ceil(R.hp)}/${R.maxHp}  ${R.gold}G`);
   }
 
   // ---------------------------------------------------------------- collision
@@ -204,6 +287,7 @@ export class ExploreScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
   private onKey(e: KeyboardEvent) {
     if (e.repeat || this.busy || R.over) return;
+    if (this.shop) { this.shop.key(e.code); return; }
     const confirm = ['Enter', 'Space', 'KeyZ', 'NumpadEnter'].includes(e.code);
     if (this.dlg) { if (confirm) this.advance(); return; }
     if (confirm) this.interact();
@@ -220,15 +304,99 @@ export class ExploreScene extends Phaser.Scene {
       const facing = (dx * fx + dy * fy) / (d || 1);
       if (d < 26 && (facing > 0.3 || d < 14) && d < bd) { bd = d; best = a; }
     }
-    if (best) this.talk(best.id);
+    if (best) { this.talk(best.id); return; }
+    // Things you can inspect: the cell in front of you.
+    const c = colOf(this.pos.x + fx * 11), r = rowOf(this.pos.y + fy * 11);
+    const e = this.ext(), is = (sp: Spot) => sp.col === c && sp.row === r;
+    if (this.roomIdx > 0 && is(e.vend)) this.openShop();
+    else if (this.roomIdx === 0 && is(e.door)) this.knock();
+    else if (is(e.secret.spot)) this.inspect();
+  }
+
+  private openShop() {
+    hooks.state = 'shop';
+    K.play('select');
+    this.shop = new Shop(this, () => { this.shop = null; hooks.state = 'explore'; });
+  }
+
+  /** The secret in this room: flavour text plus gold or an item, once per run. */
+  private inspect() {
+    const layout = this.room.layout, sec = this.ext().secret;
+    if (R.secretIds.has(layout)) { this.say([{ text: 'Nothing else here. You already looked.' }], () => {}); return; }
+    R.secretIds.add(layout);
+    R.secretsFound = R.secretIds.size;
+    addSecret(layout);
+    K.play('product');
+    const pages = [{ text: sec.text }];
+    if (sec.gold) R.gold += sec.gold;
+    if (sec.item) {
+      if (R.items.length < MAX_ITEMS) R.items.push(sec.item);
+      else pages.push({ text: 'Your bag is full, so you leave it for the next hedgehog.' });
+    }
+    this.drawProps();
+    if (this.allSecrets()) { achieve('secrets'); pages.push({ text: 'That was the last hidden thing in this office. You feel very curious.' }); }
+    this.say(pages, () => {});
+  }
+
+  /** Every room's secret plus the hidden door's problem. */
+  private allSecrets() {
+    return this.rooms.every((r) => R.secretIds.has(r.layout)) && !!R.mini;
+  }
+
+  private knock() {
+    if (R.doorOpen) { this.say([{ text: 'Just an empty cupboard now. It smells of old sticky notes.' }], () => {}); return; }
+    this.say([{ text: 'This wall sounds hollow. You knock. Something knocks back.' }], () => {
+      R.doorOpen = true;
+      shake(this, 3, 300);
+      K.play('boss', 0.6);
+      this.drawProps();
+      this.busy = true; // nothing else may start a battle in the next 350 ms
+      this.time.delayedCall(350, () => { this.busy = false; this.encounter(MINI); });
+    });
   }
 
   private talk(i: number) {
     const npc = K.theme.game.npcs[i];
     if (!npc) return;
+    const first = !R.met.has(i);
     R.met.add(i);
     const speaker = `${npc.name}, ${npc.role}`;
-    this.say((npc.lines as string[]).map((t) => ({ speaker, text: t })), () => {});
+    let lines = (npc.lines as string[]).map((t) => ({ speaker, text: t }));
+    const memo = first ? this.remember(i) : '';
+    if (memo) lines.unshift({ speaker, text: memo });
+    // Talk again after a battle: a reaction to how you're handling things, then their last line.
+    const react = first ? '' : this.reaction();
+    if (react) lines = [{ speaker, text: react }, lines[lines.length - 1]];
+    this.say(lines, () => {});
+  }
+
+  /** What the team says about the run so far (fixed kit lines). */
+  private reaction(): string {
+    const done = R.spared + R.debugged;
+    if (!done) return '';
+    if (R.debugged === 0) return R.spared > 1 ? 'Everyone is so calm today. What did you DO?' : 'I heard you talked one of them down. Nice!';
+    if (R.spared === 0) return R.debugged > 1 ? 'It is getting very quiet around here. Too quiet.' : 'Did you... delete something? The logs look weird.';
+    return 'Some problems are gone, some are just... happier? Interesting approach.';
+  }
+
+  /** On later runs the first and last NPC remember you (fixed kit lines driven by the save). */
+  private remember(i: number): string {
+    const m = this.memory;
+    if (!m || m.visits < 1) return '';
+    const last = K.theme.game.npcs.length - 1;
+    if (i === 0) {
+      if (m.lastLost) return 'You again? Did it go better last time? Stay determined.';
+      if (m.lastEnding === 'pacifist') return 'Welcome back! Last time you were so kind to everyone. The problems still talk about it.';
+      if (m.lastEnding === 'bugfix') return 'Oh. It is you. The one who debugged everything the hard way. Please be gentle.';
+      if (m.lastEnding === 'neutral') return 'Welcome back! Some problems got spared last time. Some... did not.';
+      return 'You again? Did it go better last time?';
+    }
+    if (i === last && m.visits >= 2) {
+      if (m.secrets.length === 0) return 'Third visit? Have you ever looked behind the plants around here?';
+      if (m.endings.length < 3) return 'Back again? I hear this office has more than one ending.';
+      return 'You know this office better than we do by now.';
+    }
+    return '';
   }
 
   // ---------------------------------------------------------------- dialogue
@@ -294,12 +462,14 @@ export class ExploreScene extends Phaser.Scene {
       this.dlg.tw.step(dt);
       if (R.autopilot && this.dlg.tw.done) {
         this.dlg.wait += dt;
-        if (this.dlg.wait > 0.35) this.advance();
+        const page = this.dlg.pages[this.dlg.i]?.text ?? '';
+        if (this.dlg.wait > (R.humanize ? 0.8 + page.length / 25 : 0.35)) this.advance();
       }
       this.player.anims.stop();
       return;
     }
     if (this.busy) return;
+    if (this.shop) { this.player.anims.stop(); return; } // the vending machine menu has the arrow keys
     const k = this.keys;
     let dx = (k.RIGHT.isDown || k.D.isDown ? 1 : 0) - (k.LEFT.isDown || k.A.isDown ? 1 : 0);
     let dy = (k.DOWN.isDown || k.S.isDown ? 1 : 0) - (k.UP.isDown || k.W.isDown ? 1 : 0);
@@ -319,7 +489,22 @@ export class ExploreScene extends Phaser.Scene {
       this.player.setFrame(DIRS[this.dir]);
     }
     this.checkDoors();
+    this.checkSave();
     this.checkEncounters();
+  }
+
+  /** Stepping onto the save star records a checkpoint (and, on low heat, heals). */
+  private checkSave() {
+    const e = this.ext();
+    const on = colOf(this.pos.x) === e.save.col && rowOf(this.pos.y) === e.save.row;
+    if (on && !this.onSave) {
+      this.onSave = true;
+      const heal = R.heat === 0 && R.hp < R.maxHp;
+      if (heal) R.hp = R.maxHp;
+      R.checkpoint = { room: this.roomIdx, snap: snapshot() };
+      K.play('spare', 0.6);
+      this.say([{ text: `The smell of fresh coffee fills you with determination.${heal ? ' HP restored.' : ''} (Checkpoint saved.)` }], () => {});
+    } else if (!on) this.onSave = false;
   }
 
   private checkDoors() {
@@ -357,8 +542,18 @@ export class ExploreScene extends Phaser.Scene {
     const go = () => {
       hooks.state = 'battle';
       K.play('encounter');
-      this.cameras.main.flash(250, 255, 255, 255);
-      this.time.delayedCall(260, () => {
+      // Undertale-style: the soul pops out of the hedgehog and blinks, then stripes wipe the room away.
+      const heart = this.add.image(this.player.x, this.player.y - 2, spr('soul')).setDepth(3001);
+      this.tweens.add({ targets: heart, alpha: 0, duration: 70, yoyo: true, repeat: 2 });
+      const g = this.add.graphics().setDepth(3000);
+      this.tweens.addCounter({ from: 0, to: 1, delay: 220, duration: 300, ease: 'Quad.In', onUpdate: (tw) => {
+        const v = tw.getValue() ?? 1;
+        g.clear().fillStyle(0x000000, 1);
+        for (let i = 0; i < 10; i++) g.fillRect(i % 2 ? W - W * v : 0, i * 27, W * v, 27);
+      } });
+      this.time.delayedCall(560, () => {
+        heart.destroy();
+        g.destroy();
         this.scene.launch('Battle', { enc });
         this.scene.sleep();
       });
@@ -369,11 +564,34 @@ export class ExploreScene extends Phaser.Scene {
     } else go();
   }
 
-  private onWake(_sys: unknown, data: { enc: number; how: 'spared' | 'debugged' }) {
+  private onWake(_sys: unknown, data: { enc: number; how: 'spared' | 'debugged'; grazes?: number; continue?: boolean }) {
     this.busy = false;
     hooks.scene = 'Explore';
     hooks.state = 'explore';
     if (!data) return;
+    if (data.continue && R.checkpoint) {
+      // Lost a battle after a save star: back to the star, as things were.
+      restore(R.checkpoint.snap);
+      R.continues++;
+      stopBattleMusic(this, true); // the lost battle left the exploration track paused
+      this.enterRoom(R.checkpoint.room, this.ext(R.checkpoint.room).save);
+      this.onSave = true;
+      this.say([{ text: `You wake up by the save star. Stay determined. (${Math.max(0, MAX_CONTINUES - R.continues)} ${MAX_CONTINUES - R.continues === 1 ? 'retry' : 'retries'} left)` }], () => {});
+      return;
+    }
+    if (K.run.mode === 'rush') { this.rushNext(data.how, data.enc); return; }
+    const gold = (data.how === 'spared' ? 10 : 15) + Math.min(10, Math.floor((data.grazes ?? 0) / 3));
+    R.gold += gold;
+    if (data.enc === MINI) {
+      R.mini = data.how;
+      achieve('miniboss');
+      R.gold += 15;
+      const pages: Page[] = [{ text: data.how === 'spared' ? 'Tech Debt shrinks to a sticky note that says: refactor me later.' : 'Tech Debt is gone. For now.' },
+        { text: `You found ${gold + 15} G in the cupboard.` }];
+      if (this.allSecrets()) { achieve('secrets'); pages.push({ text: 'That was the last hidden thing in this office. You feel very curious.' }); }
+      this.say(pages, () => {});
+      return;
+    }
     R.cleared.add(data.enc);
     const a = this.actors.find((x) => x.kind === 'enc' && x.id === data.enc);
     if (a) {
@@ -384,12 +602,24 @@ export class ExploreScene extends Phaser.Scene {
     const def = encDef(data.enc);
     const pages: Page[] = [];
     if (data.enc === BOSS) {
-      pages.push(...(K.theme.game.ending as string[]).map((t) => ({ text: t })));
+      R.ending = endingFor(data.how);
+      addEnding(R.ending);
+      achieve(R.ending);
+      if (hq().endings.length >= 3) achieve('all_endings');
+      if (R.heat >= 3) achieve('heat3');
+      pages.push(...endingPages(R.ending).map((t) => ({ text: t })));
+      // The "true" last line, for players who looked behind every plant.
+      if (this.allSecrets()) pages.push({ text: 'And somewhere behind a plant, a very curious hedgehog smiles. You found everything.' });
       this.say(pages, () => this.finish(true));
       return;
     }
-    pages.push({ text: data.how === 'spared' ? `${def.name} wanders off, finally fixed.` : `${def.name} was debugged the hard way.` });
-    if (R.hp < R.maxHp) { R.hp = R.maxHp; pages.push({ text: 'You sip a PostHog coffee. HP fully restored.' }); }
+    pages.push({ text: `${data.how === 'spared' ? `${def.name} wanders off, finally fixed.` : `${def.name} was debugged the hard way.`} You got ${gold} G.` });
+    const heal = heat().heal;
+    if (R.hp < R.maxHp && heal >= 1) { R.hp = R.maxHp; pages.push({ text: 'You sip a PostHog coffee. HP fully restored.' }); }
+    else if (R.hp < R.maxHp && heal > 0) {
+      R.hp = Math.min(R.maxHp, R.hp + Math.ceil(R.maxHp * heal));
+      pages.push({ text: 'You sip half a PostHog coffee. Crunch time: no time for the rest.' });
+    }
     const bossNow = [0, 1, 2].every((i) => R.cleared.has(i)) && this.actors.some((x) => x.id === BOSS && x.kind === 'enc');
     if (bossNow) pages.push({ text: 'The floor rumbles. Something big just booted up...' });
     this.say(pages, () => { if (bossNow) this.refreshBoss(true); });
@@ -419,6 +649,12 @@ export class ExploreScene extends Phaser.Scene {
         }
         return [0, 0];
       }
+      if (b.goal === 'shop') {
+        b.goal = '';
+        this.dir = 'up';
+        this.botShop();
+        return [0, 0];
+      }
       if (b.goal === 'enc' || b.goal === 'door') { b.push = { x: 1, y: 0 }; return [1, 0]; }
       this.planBot();
       if (!b.path.length) return [0, 0];
@@ -442,6 +678,13 @@ export class ExploreScene extends Phaser.Scene {
       if (path) { b.path = path; b.goal = 'talk'; b.talkTo = npc.id; return; }
       R.met.add(npc.id); // unreachable: skip
     }
+    // Stock up on Cold Brew when there is gold and a machine in this room.
+    if (this.roomIdx > 0 && !b.shopped.has(this.roomIdx) && R.gold >= 12 && R.items.length < 3) {
+      const v = this.ext().vend;
+      const path = this.bfs(here, [{ col: v.col, row: v.row + 1 }]);
+      b.shopped.add(this.roomIdx);
+      if (path) { b.path = path; b.goal = 'shop'; return; }
+    }
     const enc = this.actors.find((a) => a.kind === 'enc' && a.s.visible && !R.cleared.has(a.id));
     if (enc) {
       const off = enc.half! > 12 ? 3 : 2;
@@ -452,6 +695,12 @@ export class ExploreScene extends Phaser.Scene {
       const path = this.bfs(here, [{ col: COLS - 2, row: DOOR_ROW }]);
       if (path) { b.path = path; b.goal = 'door'; }
     }
+  }
+
+  private botShop() {
+    let n = 0;
+    while (R.gold >= 12 && R.items.length < 3 && n < 3) { buyItem('coldbrew'); n++; }
+    this.say([{ text: n ? `The vending machine clunks ${n > 1 ? `${n} times` : 'once'}. You got ${n} Cold Brew.` : 'You window-shop.' }], () => {});
   }
 
   private bfs(from: Spot, targets: Spot[]): Spot[] | null {
@@ -485,11 +734,65 @@ export class ExploreScene extends Phaser.Scene {
     const game = this.game;
     hooks.debug = {
       autopilot: (on = true) => { R.autopilot = !!on; },
-      speed: (n: number) => { R.speed = Math.max(1, Math.min(8, Math.round(n))); },
+      speed: (n: number) => { R.speed = Math.max(1, Math.min(8, Math.round(n))); setJuiceSpeed(R.speed); },
       god: (on = true) => { R.god = !!on; },
+      // The autopilot reads like a person (~25 chars/s, a second per menu) and CHECKs each enemy:
+      // run it and read __game.elapsed for a first-run length estimate.
+      humanize: (on = true) => { R.humanize = !!on; },
+      // Set this run's heat (0-5) now: HP, density and heals follow it.
+      heat: (n: number) => {
+        R.heat = Math.max(0, Math.min(5, Math.floor(Number(n) || 0)));
+        K.run.heat = R.heat;
+        R.hp = R.maxHp = R.diff.hp - heat().hpLoss;
+        return R.heat;
+      },
       lose: () => { if (R.over) return; R.over = true; game.scene.stop('Battle'); game.scene.stop('Explore'); game.scene.start('End', endData(false)); },
       win: () => { if (R.over) return; R.over = true; [0, 1, 2, 3].forEach((i) => R.cleared.add(i)); R.spared = 4; game.scene.stop('Battle'); game.scene.stop('Explore'); game.scene.start('End', endData(true)); },
       room: (i: number) => { if (this.rooms[i]) this.enterRoom(i, this.rooms[i].spots.s); },
+      // Fight encounter i (0-2 enemies, 3 boss) right now.
+      battle: (i: number) => {
+        if (R.over || this.busy || !this.scene.isActive()) return;
+        this.closeDialogue();
+        this.encounter(Math.max(0, Math.min(MINI, Math.floor(Number(i) || 0))));
+      },
+      // Showcase turn with one named pattern (see patterns.ts), in the current or a new battle.
+      pattern: (name: string) => {
+        R.showPattern = String(name ?? '');
+        (hooks.debug.showcase as () => void)();
+      },
+      // Stand on a cell of the current room, facing a direction ('up' by default).
+      warp: (col: number, row: number, dir: Dir = 'up') => {
+        this.pos = { x: cellX(col), y: cellY(row) };
+        this.dir = DIRS[dir] !== undefined ? dir : 'up';
+        this.player.setFrame(DIRS[this.dir]);
+        this.syncPlayer();
+      },
+      interact: () => this.interact(),
+      gold: (n: number) => { R.gold = Math.max(0, Math.floor(Number(n) || 0)); this.syncPlayer(); return R.gold; },
+      give: (id: string) => { if (item(id) && R.items.length < MAX_ITEMS) R.items.push(id); return [...R.items]; },
+      shop: () => { if (!this.shop && !this.dlg) this.openShop(); },
+      // Secrets, hidden door, save stars and vending machines of every room (for tests and tools).
+      extras: () => this.rooms.map((r, i) => ({ room: i, layout: r.layout, ...this.ext(i) })),
+      // Find every room's secret now (the miniboss still has to be settled for the true line).
+      secrets: () => { this.rooms.forEach((r) => R.secretIds.add(r.layout)); R.secretsFound = R.secretIds.size; this.drawProps(); return [...R.secretIds]; },
+      // Load test: the busiest turn the game can produce (bullet-hell boss combo, long, dense).
+      flood: () => {
+        R.flood = true;
+        (hooks.debug.showcase as () => void)();
+      },
+      // Make the autopilot take a route: 'bugfix' fights everyone, 'pacifist' (default) spares them.
+      route: (r: string) => { R.forceRoute = r === 'bugfix' ? 'bugfix' : r === 'pacifist' ? 'pacifist' : ''; return R.forceRoute; },
+      // Mark enemies as already spared/debugged (e.g. route outcomes for the boss): debug.outcomes('ddd').
+      outcomes: (code: string) => {
+        String(code ?? '').slice(0, 3).split('').forEach((ch, i) => {
+          if (ch !== 's' && ch !== 'd') return;
+          R.outcomes[i] = ch === 's' ? 'spared' : 'debugged';
+          R.cleared.add(i);
+          if (ch === 's') R.spared++; else R.debugged++;
+        });
+        this.enterRoom(this.roomIdx, { col: colOf(this.pos.x), row: rowOf(this.pos.y) });
+        return { ...R.outcomes };
+      },
       // Jump to a representative, busy moment for the gameplay GIF: a battle with bullets flying.
       showcase: () => {
         if (R.over) return;

@@ -48,6 +48,14 @@
     "ending": [
       "The Monolith powers down, peacefully. The office goes quiet.",
       "Then someone opens a dashboard, and everyone can finally see what's going on."
+    ],
+    "ending_pacifist": [
+      "Every problem was spared. The Monolith retires to a nice server farm by the sea.",
+      "The team opens one dashboard, and for once, everyone agrees on what it says."
+    ],
+    "ending_bugfix": [
+      "Every problem was debugged the hard way. The office is very, very quiet.",
+      "The bugs are gone. So is the context. Someone opens a dashboard to find out what happened."
     ]
   }
 }
