@@ -81,7 +81,9 @@ async def one(browser, url, a, i):
             break
         last = st
         await page.wait_for_timeout(500)
-    end = await page.evaluate("({s: __game.state, score: __game.score, meta: {coins: __game.meta.coins}})")
+    end = await page.evaluate("({s: __game.state, score: __game.score, meta: {coins: __game.meta.coins}, scene: __game.scene, e: __game.elapsed, boss: __game.stats.boss, en: __game.stats.enemies})")
+    if end["s"] not in ("win", "lose"):
+        print("STUCK", i, end, flush=True)
     await page.close()
     s = last.get("stats", {}) or {}
     return {"i": i, "outcome": end["s"] if end["s"] in ("win", "lose") else "timeout", "real_s": round(time.time() - t0),

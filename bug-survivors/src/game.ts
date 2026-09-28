@@ -1466,6 +1466,7 @@ export class GameScene extends Phaser.Scene {
     const p = this.player;
     for (let i = this.projs.length - 1; i >= 0; i--) {
       const pr = this.projs[i];
+      if (!pr) continue;
       pr.life -= dt;
       if (pr.homing !== undefined) {
         if (!pr.homing || !pr.homing.alive) {
@@ -1725,11 +1726,8 @@ export class GameScene extends Phaser.Scene {
 
   private winNow() {
     this.won = true;
-    for (let i = this.projs.length - 1; i >= 0; i--) {
-      if (!this.projs[i].hostile) continue;
-      this.projs[i].s.destroy();
-      this.projs.splice(i, 1);
-    }
+    // Expire hostile shots (don't splice: this can run inside the projectile loop, when a shot kills the boss).
+    for (const pr of this.projs) if (pr.hostile) { pr.life = 0; pr.s.setVisible(false); }
     for (const e of [...this.enemies]) if (!e.boss) this.kill(e);
     this.time.delayedCall(1600, () => this.finish(true));
   }

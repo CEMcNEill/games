@@ -165,3 +165,15 @@ Smart bot, normal, no shop (n=6-8, lots of noise: run-to-run variance dominates 
 Crumbling boss also speeds up toward the hog's pace (x3.2 max), so kiting can't stall a fight (3-product novice runs
 had a 529 s outlier). Crumble cap x4 -> x8.
 3-product theme (Surveys/Flags/Analytics), novice, normal, n=8: 6/8 wins, 224-329 s.
+
+### ~01:25: crash caught by the sims
+After the review fixes, 7/24 sim runs "timed out" with game time frozen right after the boss. It was a page error:
+`winNow()` spliced hostile shots out of `projs` while `moveProjectiles` was iterating it (a player shot killed the
+boss). Gate 1 missed it because its single bot run happened not to hit it. Fix: expire the shots (life 0) instead of
+splicing, plus a guard in the loop. `tools/sim.py` now prints STUCK with the live state for any run that doesn't end.
+Re-measured, n=8 each, 0 page errors:
+| config | wins | game s |
+|---|---|---|
+| easy h0 novice | 8/8 | 222-282 |
+| normal h0 novice | 7/8 | 157 (L), 221-307 |
+| normal h0 smart | 8/8 | 216-256 |
