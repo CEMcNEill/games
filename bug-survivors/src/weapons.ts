@@ -82,7 +82,7 @@ const errorTracking: Fn = (g, w, dt) => {
 
 const sessionReplay: Fn = (g, w, dt) => {
   const s = g.st, p = g.player, L = w.level;
-  const n = (w.evo ? 6 : Math.min(5, 1 + L)) + s.amount;
+  const n = (w.evo ? 6 : Math.min(5, 2 + L)) + s.amount; // 3 orbs at level 1: a viable starting weapon
   const orbs = w.orbs;
   while (orbs.length < n) {
     const o = g.add.image(p.x, p.y, spr('orb')).setDepth(9);
@@ -91,7 +91,7 @@ const sessionReplay: Fn = (g, w, dt) => {
   }
   const rad = (w.evo ? 50 + 18 * Math.sin(g.elapsed * 2.2) : 26 + 4 * L) * s.area;
   const spin = g.elapsed * (w.evo ? 3.4 : 2.6 + 0.2 * L);
-  const dmg = w.evo ? 28 : 7 + 3 * L, hitCd = w.evo ? 0.22 : 0.35, kb = w.evo ? 140 : 90, hitR = w.evo ? 8 : 5;
+  const dmg = w.evo ? 28 : 7 + 3 * L, hitCd = w.evo ? 0.22 : 0.3, kb = w.evo ? 140 : 90, hitR = w.evo ? 8 : 5;
   orbs.forEach((o, i) => {
     const a = spin + (i / n) * Math.PI * 2;
     o.setPosition(p.x + Math.cos(a) * rad, p.y + Math.sin(a) * rad);

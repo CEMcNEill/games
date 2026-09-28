@@ -127,3 +127,15 @@ Some boss fights ran 100-260 s for weak builds. Added "IS CRUMBLING": from 70 s 
 | normal novice, before | 2/4 | 125 (lose), 128 (lose), 248, 385 |
 | normal novice, after both fixes | 5/6 | 186 (lose), 230, 226, 271, 302, 318 |
 | easy novice, after | 6/6 | 219-272 |
+
+### ~00:50: every starting weapon (default theme with starting_product swapped; novice bot, normal, n=4)
+| start | wins | game s |
+|---|---|---|
+| session_replay | 2/4 | 158 (L), 187 (L), 277, 393 |
+| feature_flags | 4/4 | 219-279 |
+| product_analytics | 4/4 | 225-263 |
+| surveys | 4/4 | 272-331 |
+| experiments | 4/4 | 353-409 (long boss fights) |
+Changes: Session Replay gets 2+L orbs (3 at level 1), hit every 0.3 s. Boss base HP 1100 -> 900; crumbling starts at 50 s.
+After: session_replay 3/4 (221-238 s wins). Experiments normal novice, n=8: 7/8 (219-295 s). Default easy novice, n=8:
+8/8 (222-303 s).

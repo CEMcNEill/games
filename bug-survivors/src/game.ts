@@ -1512,7 +1512,7 @@ export class GameScene extends Phaser.Scene {
       this.bossPhase = 2;
       this.banner(`${K.theme.game.boss.name.toUpperCase()} IS ANGRY!`, 'It is calling in more bugs');
     }
-    if (!b.hitAt.crumble && this.elapsed - this.bossAt > 70) {
+    if (!b.hitAt.crumble && this.elapsed - this.bossAt > 50) {
       b.hitAt.crumble = 1;
       this.banner(`${K.theme.game.boss.name.toUpperCase()} IS CRUMBLING!`, 'Your fixes are landing. Keep going!');
     }
@@ -1526,10 +1526,10 @@ export class GameScene extends Phaser.Scene {
     this.bossAttack(b);
   }
 
-  /** A long boss fight wears the boss down: from 70 s it takes more and more damage (max x4), so a weak first-run
+  /** A long boss fight wears the boss down: from 50 s it takes more and more damage (max x4), so a weak first-run
    * build still finishes in good time. */
   private bossVuln() {
-    const t = this.elapsed - this.bossAt - 70;
+    const t = this.elapsed - this.bossAt - 50;
     return t > 0 ? Math.min(4, 1 + t / 25) : 1;
   }
 
@@ -1615,7 +1615,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.add.sprite(x, y, spr('boss')).setDepth(6);
     s.play(anim('boss'));
     const n = this.bossKills;
-    const hp = 1100 * this.diff.boss * (1 + Math.min(this.level, 25) / 25) * (1 + this.heat * 0.12) * 2 ** n;
+    const hp = 900 * this.diff.boss * (1 + Math.min(this.level, 25) / 25) * (1 + this.heat * 0.12) * 2 ** n;
     const b: Enemy = { s, arch: 'tank', type: 3, hp, maxHp: hp, speed: 24 * (1 + 0.1 * n), dmg: 20 * this.diff.dmg * (1 + 0.15 * n), xp: 0, r: 22,
       kx: 0, ky: 0, flash: 0, slow: 1, hitAt: {}, alive: true, boss: true, elite: null, mode: 0, t: 0, vx: 0, vy: 0, acc: 0, accT: 0,
       accCrit: false, armour: 1, kb: 0, tint: null };
