@@ -33,13 +33,18 @@ existing theme (default, 3 examples, the real `ledgerly-hogtopia` prospect) load
 - **e45ccbf** threatened-city "!" badge, best grade, readable key hints, overnight screenshots.
 - **1a1431c** new sounds (warn, fanfare, veteran), End names the next map, rival style in the info
   panel, no second rival on the small map, perks line capped to one line, report.
-- **Archipelago map** (the brief's "if boats are feasible"): islands, everyone starts with Sailing, the
+- **f610fdb Archipelago map** (the brief's "if boats are feasible"): islands, everyone starts with Sailing, the
   capitals on different islands (home island >= 12 tiles); boats drawn under units. Rivals get +4 income
   there because the AI is clumsier at sea; it still favours the player a little (normal ~73%).
   Hard growth nudged 0.55 -> 0.62 to keep the rotation average in range.
+- **e95a2bd** E ends the turn from the research/train menus too (found in a scripted human session).
+- **bc9cb8a** second review fixes: archipelago capitals could start on a one-tile island (19% of maps;
+  home islands are now >= 12 tiles), autopilot switched on mid-animation now resumes, E in the reward/
+  truce popups takes the highlighted choice and ends the turn, firstGame stat; a Giant in the GIF showcase.
+- Final commit: report and notes.
 
-## Review fixes (5f7d508)
-An independent review of the diff found: losing a *non-home* capital (heat 4+, a rival retaking a capital
+## Review fixes (5f7d508, bc9cb8a)
+Two independent code reviews ran during the night. The first of the diff found: losing a *non-home* capital (heat 4+, a rival retaking a capital
 you took) ended the game as a loss; your own attack could resolve during the rival turn if you pressed E
 during the lunge; the AI's target cost counted its *own* units instead of defenders; a Giant/Explorer
 could vanish with no free tile; Session Replay undo could stack two units; monuments were only checked
@@ -83,6 +88,10 @@ See `hogtopia/SHARED-REQUESTS.md`: `debug.goto` on the active scene, PixelText c
 position vs a kit HUD, End screen room for achievements, validated `meta.kitData`.
 
 ## Gates
-Gate 1 (`tests/accept.py hogtopia`) passed at every commit (bot wins on easy in ~5 s of game time; fuzz
-20/20; load test 60 fps). Gate 2 (`game_check.py` on the re-assembled `ledgerly-hogtopia`) passed; see
-the final section below for the last run.
+Gate 1 (`tests/accept.py hogtopia`) passed before every commit: 4 themes, bot wins on easy in ~5 s of
+game time, fuzz 20/20, and a real load test now (`debug.flood`, ~80 units, 60 fps; before tonight the
+kit had no load test). Gate 2 (`~/games/tools/game_check.py` on `ledgerly-hogtopia` re-assembled with
+the new build) passed at the final build: bot win, no errors, no fallbacks, no text warnings, 39-frame
+GIF showing captures, level-ups and rival lines. Also: `tools/keyfuzz.py` (random real-key play, 10+
+sessions across all map types) found no errors or stuck states; classic maps match the original
+generator on 1200 seeds x 4 biomes.
