@@ -60,7 +60,8 @@ without re-rendering.
 - Title rows: `RUN  DAILY  ENDLESS  SHOP` and `HEAT 0-5`. Enter = RUN heat 0. ENDLESS unlocks after the first win.
   Heat n unlocks by winning heat n-1 (shared meta).
 - **Heat (stacking):** 1 more bugs, 2 faster bugs, 3 elites early (4 lone elites), 4 no regen + half food,
-  5 boss rage phase + 45 s overtime after the boss. Each level also adds +8% bug HP, +6% damage, +6% spawns.
+  5 boss rage phase + 45 s overtime after the boss. Each level also adds pressure that ramps in over 2:30: up to
+  +15% bug HP and +10% spawns per level, plus a flat +8% damage. The elite pack stays the 3:00 event.
   Gold x(1 + 0.1 heat), score x(1 + 0.2 heat).
 - **SHOP** (title choice): UPGRADES (might, max HP, speed, magnet, luck, reroll, skip+banish, rollback), HEROES,
   RECORDS (achievements, evolution codex, lifetime totals). Gold per run is roughly 60-110 at heat 0 and ~110 at heat 3; the full shop costs ~2900, so about 15-25 runs.

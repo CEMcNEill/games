@@ -144,7 +144,7 @@ export class GameScene extends Phaser.Scene {
   warnG!: Phaser.GameObjects.Graphics;
   popCols: number[][] = [];
   hud!: { xp: ReturnType<typeof bar>; hpBar: Phaser.GameObjects.Graphics; time: PixelText; lv: PixelText; kills: PixelText; gold: PixelText;
-    icons: Phaser.GameObjects.Container; bossBar: ReturnType<typeof bar> | null; bossName: PixelText | null; arrow: Phaser.GameObjects.Image };
+    icons: Phaser.GameObjects.Container; bossBar: ReturnType<typeof bar> | null; bossName: PixelText | null; arrow: Phaser.GameObjects.Image; chestArrow: Phaser.GameObjects.Image };
   banners: { title: string; body: string }[] = [];
   bannerBusy = false;
   bannerObjs: Phaser.GameObjects.GameObject[] = [];
@@ -367,7 +367,8 @@ export class GameScene extends Phaser.Scene {
     if (tags.length) text(this, 4, 20, tags.join(' '), { color: 0xf87858, fixed: true, depth: UI + 90 });
     const icons = this.add.container(4, H - 20).setScrollFactor(0).setDepth(UI + 90);
     const arrow = this.add.image(0, 0, spr('boss_shot')).setScrollFactor(0).setDepth(UI + 95).setVisible(false).setScale(2);
-    this.hud = { xp, hpBar, time, lv, kills, gold, icons, bossBar: null, bossName: null, arrow };
+    const chestArrow = this.add.image(0, 0, spr('chest')).setScrollFactor(0).setDepth(UI + 95).setVisible(false);
+    this.hud = { xp, hpBar, time, lv, kills, gold, icons, bossBar: null, bossName: null, arrow, chestArrow };
   }
 
   refreshIcons() {
@@ -411,6 +412,23 @@ export class GameScene extends Phaser.Scene {
       if (off) this.hud.arrow.setPosition(Phaser.Math.Clamp(bx, 10, W - 10), Phaser.Math.Clamp(by, 34, H - 30));
     } else {
       this.hud.arrow.setVisible(false);
+    }
+    // Off-screen chest: a blinking chest icon on the screen edge, toward the nearest one.
+    const cam = this.cameras.main, p = this.player;
+    let best: Item | null = null, bd = 1e12;
+    for (const it of this.items) {
+      if (it.kind !== 'chest') continue;
+      const d = (it.s.x - p.x) ** 2 + (it.s.y - p.y) ** 2;
+      if (d < bd) { bd = d; best = it; }
+    }
+    const ca = this.hud.chestArrow;
+    if (best) {
+      const cx = best.s.x - cam.scrollX, cy = best.s.y - cam.scrollY;
+      const off = cx < 0 || cx > W || cy < 0 || cy > H;
+      ca.setVisible(off && Math.floor(this.time.now / 300) % 2 === 0);
+      if (off) ca.setPosition(Phaser.Math.Clamp(cx, 12, W - 12), Phaser.Math.Clamp(cy, 40, H - 32));
+    } else {
+      ca.setVisible(false);
     }
   }
 
@@ -1282,6 +1300,17 @@ export class GameScene extends Phaser.Scene {
     }
     this.recalc();
     this.refreshIcons();
+    this.checkReady();
+  }
+
+  /** One banner the moment a weapon can evolve, so players know to go hunting for a chest. */
+  private checkReady() {
+    for (const w of this.weapons.values()) {
+      const pid = WEAPONS[w.id].evo.passive;
+      if (w.evo || w.level < MAX_LEVEL || !this.passives.has(pid) || this.seen.has(`ready:${w.id}`)) continue;
+      this.seen.add(`ready:${w.id}`);
+      this.banner('EVOLUTION READY!', `${productName(w.id)}: open a chest from an elite`);
+    }
   }
 
   private closeModal() {
