@@ -54,8 +54,8 @@ def main():
         key("Enter"); wait(1500); shot("day1-desk")
         ev("__game.debug.day(5)"); wait(3000); shot("day5-intro")
         key("Enter"); wait(2600); shot("day5-request")
-        key("KeyD"); wait(1800); shot("day5-reply")
-        key("Enter"); wait(1200); shot("day5-rules")
+        key("KeyD"); wait(1800); shot("day5-answered")
+        wait(600); shot("day5-rules")
         for _ in range(4):
             key("Tab"); wait(250); shot("day5-" + ev("__game.stats.tab"))
         key("KeyR"); wait(200)

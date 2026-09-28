@@ -18,7 +18,7 @@ import {
 } from './story';
 
 type ToolId = 'session_replay' | 'product_analytics' | 'feature_flags' | 'error_tracking' | 'surveys' | 'experiments';
-type Mode = 'intro' | 'request' | 'reply' | 'playing' | 'reason' | 'summary' | 'finalintro' | 'final' | 'done';
+type Mode = 'intro' | 'request' | 'playing' | 'reason' | 'summary' | 'finalintro' | 'final' | 'done';
 type RunMode = 'week' | 'endless' | 'daily';
 
 export const TOOLS: Record<ToolId, { name: string; effect: string }> = {
@@ -154,7 +154,7 @@ export class GameScene extends Phaser.Scene {
       choices: {}, corners: 0, integrity: 0, stress: 0, junk: 0, todayExempt: [], quotasMet: 0, finalCaught: false,
       upgraded: new Set(), charges: new Map(), patternSeen: new Set(), patternNoted: 0, pickerSeen: false,
     });
-    this.patternEvent = r.pick(this.world.events).name;
+    this.patternEvent = r.pick(this.world.events)?.name ?? '';
     hooks.scene = 'Game';
     hooks.elapsed = 0;
     hooks.score = 0;
@@ -333,15 +333,13 @@ export class GameScene extends Phaser.Scene {
     if (yes && q.id === 'overtime') this.addPending(OVERTIME_BONUS, 'Overtime: +10s and +1 tool use today.');
     capture('request_answered', { request: q.id, yes, day: this.day + 1 });
     K.play(yes ? 'correct' : 'select');
-    this.mode = 'reply';
-    hooks.state = 'reply';
-    this.panel(q.title);
-    this.managerSays(fill(o.reply, this.names()), 58);
-    const fx = this.effectText(o.effect);
-    if (fx) this.add_(text(this, 118, 120, fx, { color: GOLD, depth: 102, maxWidth: W - 150, maxLines: 2 }));
-    this.prompt('ENTER: START SHIFT');
+    // No extra screen: the shift starts, the manager's reply is the first line and the effect a toast.
     this.refreshDocs();
-    this.refreshHud();
+    this.startShift();
+    this.say(`${K.theme.game.manager.name}: ${fill(o.reply, this.names())}`, K.ui.accentInt);
+    this.desk.boss_(yes ? 'good' : 'talk');
+    const fx = this.effectText(o.effect);
+    if (fx) toast(this, fx.toUpperCase(), false);
   }
 
   private effectText(e: Effect) {
@@ -352,7 +350,7 @@ export class GameScene extends Phaser.Scene {
     if (e.score) out.push(`+${e.score} score`);
     if (e.exemptToday) out.push(`${e.exemptToday} events: approve them today`);
     if (e.exemptWeek) out.push(`${e.exemptWeek} events: approve them all week`);
-    return out.join('   ');
+    return out.join(' / ');
   }
 
   private apply(e: Effect) {
@@ -799,7 +797,6 @@ export class GameScene extends Phaser.Scene {
     switch (this.mode) {
       case 'intro': if (go && armed) { K.play('select'); this.afterIntro(); } break;
       case 'request': if ((left || right) && armed) this.answerRequest(left); break;
-      case 'reply': if (go && armed) { K.play('select'); this.startShift(); } break;
       case 'summary':
         if (digit >= 0 && armed) this.toggleBill(digit);
         else if (go && armed) { K.play('select'); this.payBills(); }
@@ -873,10 +870,9 @@ export class GameScene extends Phaser.Scene {
 
   private bot(dt: number) {
     this.botT += dt;
-    if (['intro', 'request', 'reply', 'summary', 'finalintro'].includes(this.mode) && this.overlayT > 0.6) {
+    if (['intro', 'request', 'summary', 'finalintro'].includes(this.mode) && this.overlayT > 0.6) {
       if (this.mode === 'intro') this.afterIntro();
       else if (this.mode === 'request') this.answerRequest(this.plan.requests === 'yes'); // by default the bot plays it straight
-      else if (this.mode === 'reply') this.startShift();
       else if (this.mode === 'summary') {
         if (this.quality <= 0) return;
         if (this.day + 1 < DAYS) {
