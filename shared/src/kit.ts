@@ -163,7 +163,7 @@ export async function startKit(kit: KitDef) {
     pixelArt: true,
     roundPixels: true,
     backgroundColor: K.ui.bg,
-    scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER }, // #game flexbox centres the canvas; CENTER_BOTH would double the offset
     physics: { default: 'arcade', arcade: { debug: false } },
     input: { keyboard: true, gamepad: false },
     audio: { disableWebAudio: false },
