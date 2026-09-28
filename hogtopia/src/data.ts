@@ -100,8 +100,8 @@ export const AUTOPILOT: Personality = { id: 'auto', name: 'Autopilot', aggroTurn
 export interface Diff { rivalStars: number; rivalIncome: number; growth: number; rivalUnlock: number; aggro: number; mass: number; risk: number; extraUnit: boolean }
 export const DIFF: Record<string, Diff> = {
   easy: { rivalStars: 3, rivalIncome: 0, growth: 0, rivalUnlock: 3, aggro: 5, mass: 1, risk: 2, extraUnit: false },
-  normal: { rivalStars: 6, rivalIncome: 5, growth: 0.4, rivalUnlock: 0, aggro: 0, mass: 0, risk: 0, extraUnit: false },
-  hard: { rivalStars: 10, rivalIncome: 8, growth: 0.8, rivalUnlock: -2, aggro: -2, mass: 0, risk: -1, extraUnit: true },
+  normal: { rivalStars: 6, rivalIncome: 7, growth: 0.35, rivalUnlock: 0, aggro: 0, mass: 0, risk: 0, extraUnit: false },
+  hard: { rivalStars: 10, rivalIncome: 6, growth: 0.55, rivalUnlock: -2, aggro: -2, mass: 0, risk: -1, extraUnit: true },
 };
 /** HEAT n: rival bonus stars, earlier units, sharper AI, a second rival at 4+, fewer ruins. */
 export const HEAT = [

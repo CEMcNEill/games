@@ -216,6 +216,8 @@ export function* aiTurn(w: World, o: Owner): Generator<Action, void, void> {
       const c = t.city >= 0 ? w.cities[t.city] : null;
       const def = c && c.owner === o ? 2 : t.t === 'forest' ? 1.25 : t.t === 'mountain' ? 1.5 : t.t === 'water' ? 0.6 : 1;
       s += (def - 1) * 8 * P.terrain;
+      // Don't squat on our own cities when there is money to train there (the garrison excepted).
+      if (c && c.owner === o && u !== garrisonUnit && f.stars >= 3 && danger[i] < u.hp) s -= 10 + 8 * P.terrain;
       const exp = danger[i] / Math.max(1, S.def * def);
       s -= exp * caution * (exp >= u.hp ? 3 : 1);
       // Can hit something from there next?
@@ -245,7 +247,7 @@ export function* aiTurn(w: World, o: Owner): Generator<Action, void, void> {
   for (const c of w.myCities(o).sort((a, b) => Number(b.capital) - Number(a.capital))) {
     const threat = threatAt(w, o, c) > 0;
     // Big spenders on growth keep money for their cities when nothing is on fire.
-    if (!threat && P.invest > 1.1 && mine().length >= w.myCities(o).length * 2 + 2 && w.turn > 4) continue;
+    if (!threat && P.invest > 1.1 && mine().length >= w.myCities(o).length * 3 + 2 && w.turn > 4) continue;
     const reachableVillages = neutral.length;
     const prefs: UnitType[] = threat ? ['defender', 'archer', 'warrior']
       : count('scout') < Math.min(2, reachableVillages) && w.turn < 14 && (count('scout') < 1 || P.expand > 1.4) ? ['scout', 'warrior']
