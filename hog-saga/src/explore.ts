@@ -14,7 +14,7 @@ import { ShopMenu } from './shop';
 import { SECRETS, SECRET_TEXT, SecretId, QUEST, WYRM_LINES, chestContents, rollEvents, RunEvents, MERCHANT, MIMIC as MIMIC_DEF } from './world';
 import { rng } from '@shared/meta';
 import { autoEquip, gearDef, gearLine, SHOP, price, RARE_POOL } from './gear';
-import { checkFinds, fmtTime, onWin } from './progress';
+import { checkFinds, fmtTime, onWin, tip } from './progress';
 import { ICON, HEAT as HEAT_T, STATUS, StatusId } from './rules';
 import { toast } from '@shared/juice';
 import { beginRun } from '@shared/kit';
@@ -481,7 +481,7 @@ export class ExploreScene extends Phaser.Scene {
   private giveGear(id: string): string {
     const g = gearDef(id)!;
     const m = autoEquip(R.party, id);
-    if (m) return `${m.name} equips the ${g.name}! (${gearLine(id)})`;
+    if (m) { tip('gear'); return `${m.name} equips the ${g.name}! (${gearLine(id)})`; }
     const cash = Math.round(g.price / 2);
     R.gold += cash;
     return `Found the ${g.name}, but nobody needs it. Sold for ${cash} gold.`;

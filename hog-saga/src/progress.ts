@@ -4,7 +4,8 @@ import type { AchievementDef } from '@shared/meta';
 import { hooks } from '@shared/hooks';
 import { R, BOSS, levelUp, freshParty, scoreMult } from './state';
 import { autoEquip } from './gear';
-import { saga, saveWin, addBreaks, markWyrm, ngReady } from './save';
+import { saga, saveWin, addBreaks, markWyrm, ngReady, markTip } from './save';
+import { toast } from '@shared/juice';
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first_win', name: 'Shipped It', desc: 'Beat the boss' },
@@ -93,4 +94,18 @@ export function kitUnlockAll(shared?: () => unknown) {
   for (const id of ['merge_hammer', 'query_wand', 'tea_kettle', 'standup_vest', 'standup_vest', 'standup_vest', 'lucky_duck', 'coffee_mug']) autoEquip(p, id);
   saveWin(p, 0, 0, false);
   return { meta: meta.data, saga: saga() };
+}
+
+/** First-time tips, shown once per browser as a toast (never while the autopilot plays). */
+const TIPS: Record<string, string> = {
+  weak: 'WEAK SPOT! Hits of the right kind knock its shield down.',
+  break: 'BREAK! It skips its next turn and takes extra damage.',
+  meter: 'SHIP IT is ready: pick it at the top of the menu!',
+  warn: 'A red ! means a big attack next turn. DEFEND!',
+  gear: 'New gear equips itself. ESC shows your party.',
+};
+
+export function tip(id: keyof typeof TIPS, show?: (text: string) => void) {
+  if (R.autopilot || !TIPS[id]) return;
+  if (markTip(id)) (show ?? ((t: string) => toast(null, t, false)))(TIPS[id]);
 }

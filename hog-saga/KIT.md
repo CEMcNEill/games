@@ -74,6 +74,8 @@ secrets and a superboss.
   desert lake (first touch warns, the second fights). The footer shows gold, chests x/7, secrets x/4.
 - **Overworld events** (seeded per run from 6 fixed spots): a travelling Merchant (rare gear at 80%)
   and two stray chests, each either supplies or a Mimic Chest fight (loot + gold).
+- **First-time tips**: the first WEAK hit, BREAK, full meter, red "!" and new gear each show a one-line
+  hint once per browser (a banner under the battle message, or a toast on the map; never for the bot).
 - **Formation**: back row takes and deals x0.7 physical damage (magic and heals unaffected). Everyone
   starts in the front row; the autopilot puts the analyst and support in the back.
 

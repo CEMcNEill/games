@@ -116,6 +116,18 @@ export function cutIn(scene: Phaser.Scene, sprites: string[], title: string, col
   });
 }
 
+/** A one-line hint banner under the battle's message box (first-time tips); fades after a few seconds. */
+export function banner(scene: Phaser.Scene, str: string) {
+  const t = text(scene, W / 2, 46, str, { align: 'center', color: 0xfcfcfc, depth: 500, maxWidth: W - 40, maxLines: 1 });
+  const w = Math.min(W - 20, t.textWidth + 14);
+  const g = scene.add.graphics().setDepth(499);
+  g.fillStyle(0x000000, 0.85).fillRect(Math.round(W / 2 - w / 2), 42, Math.round(w), 15);
+  g.fillStyle(0xf8b800, 1).fillRect(Math.round(W / 2 - w / 2), 56, Math.round(w), 1);
+  scene.time.delayedCall(3200, () => {
+    scene.tweens.add({ targets: [t, g], alpha: 0, duration: 300, onComplete: () => { t.destroy(); g.destroy(); } });
+  });
+}
+
 // ---------------------------------------------------------------- jingles + music
 
 /** Play ZzFX note presets in a row (victory jingle, level-up fanfare). */

@@ -16,9 +16,10 @@ interface SagaSave {
   bestTimeS: number;     // fastest speedrun win, 0 = none
   totalBreaks: number;
   wyrm: boolean;         // superboss beaten at least once
+  tips: string[];        // first-time tips already shown
 }
 
-const DEFAULTS: SagaSave = { ngParty: null, ngCycle: 0, bestTimeS: 0, totalBreaks: 0, wyrm: false };
+const DEFAULTS: SagaSave = { ngParty: null, ngCycle: 0, bestTimeS: 0, totalBreaks: 0, wyrm: false, tips: [] };
 
 const num = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.floor(v))) : null);
 
@@ -50,6 +51,7 @@ export function saga(): SagaSave {
       bestTimeS: num(d.bestTimeS, 0, 1e6) ?? 0,
       totalBreaks: num(d.totalBreaks, 0, 1e7) ?? 0,
       wyrm: d.wyrm === true,
+      tips: Array.isArray(d.tips) ? d.tips.filter((t): t is string => typeof t === 'string').slice(0, 50) : [],
     };
   } catch {
     return { ...DEFAULTS };
@@ -88,3 +90,11 @@ export function saveWin(party: Member[], cycle: number, timeS: number, speedrun:
 
 export function addBreaks(n: number) { if (n > 0) patch({ totalBreaks: saga().totalBreaks + n }); }
 export function markWyrm() { patch({ wyrm: true }); }
+
+/** Remember a first-time tip; true if it hadn't been shown before. */
+export function markTip(id: string): boolean {
+  const s = saga();
+  if (s.tips.includes(id)) return false;
+  patch({ tips: [...s.tips, id] });
+  return true;
+}

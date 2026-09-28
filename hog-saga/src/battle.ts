@@ -18,10 +18,10 @@ import {
 } from './rules';
 import { foeMove, partyMove, randomVictim, BattleView, FoeMove } from './ai';
 import { FOE_MOVES, SELF_MOVES } from './foemoves';
-import { onWin, onBattleEnd } from './progress';
+import { onWin, onBattleEnd, tip } from './progress';
 import { hasFx } from './gear';
 import { MIMIC as MIMIC_DEF } from './world';
-import { slash, sparkle, pop, cutIn, jingle, VICTORY, FANFARE, reveal, battleMusic } from './fx';
+import { slash, sparkle, pop, cutIn, jingle, VICTORY, FANFARE, reveal, battleMusic, banner } from './fx';
 
 export interface Foe {
   name: string; pain: string; arch: Arch | 'boss' | 'wyrm'; key: FoeKey; sprite: string;
@@ -303,6 +303,7 @@ export class BattleScene extends Phaser.Scene {
     const x0 = Math.round(f.x - 26) - 2;
     plate.fillStyle(0x000000, 0.55).fillRect(x0, iy - 5, ix - x0, 10);
     const warn = f.windup || f.telegraph;
+    if (warn) tip('warn', (t) => banner(this, t));
     if (warn && !f.alert) f.alert = this.add.image(this.alertX(f), this.alertY(f), spr('saga_icons'), ICON.alert).setScale(2).setDepth(13);
     if (!warn && f.alert) { f.alert.destroy(); f.alert = null; }
   }
@@ -348,6 +349,7 @@ export class BattleScene extends Phaser.Scene {
     R.meter = Math.min(METER.max, R.meter + n);
     if (was < METER.max && R.meter >= METER.max) {
       K.play('ready', 0.6);
+      tip('meter', (t) => banner(this, t));
       burst(this, W - 44, 32, 0xf8b800, 16, { colours: [0xfcfcfc], speed: 80 });
     }
     this.drawMeter();
@@ -758,6 +760,7 @@ export class BattleScene extends Phaser.Scene {
       this.time.delayedCall(60, () => pop(this, f.x, cy - 16, tag, tag === 'WEAK!' ? 0x58d854 : 0xbcbcbc));
       K.play(tag === 'WEAK!' ? 'weak' : 'resist', 0.5, 60);
       if (tag === 'WEAK!' && !knewWeak) R.known.add(`${f.key}:weak`);
+      if (tag === 'WEAK!') tip('weak', (t) => banner(this, t));
     }
     if (kind === 'strike') slash(this, f.x, cy, opts.crit ? 0xf8b800 : 0xfcfcfc);
     else sparkle(this, f.x, cy, KIND_COLOUR[kind]);
@@ -785,6 +788,7 @@ export class BattleScene extends Phaser.Scene {
 
   private breakFoe(f: Foe) {
     this.breaks++;
+    tip('break', (t) => banner(this, t));
     f.broken = 1;
     f.windup = false;
     f.telegraph = false;
