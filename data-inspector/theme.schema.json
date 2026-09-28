@@ -355,7 +355,12 @@
                         "future_timestamp",
                         "duplicate_id",
                         "blocked_source",
-                        "internal_user"
+                        "internal_user",
+                        "email_mismatch",
+                        "source_outage",
+                        "flag_before_release",
+                        "pii_in_text",
+                        "currency_mismatch"
                       ]
                     },
                     "text": {
@@ -367,12 +372,12 @@
                     "property": {
                       "type": "string",
                       "maxLength": 16,
-                      "description": "required_property, property_in_set, value_in_range, property_equals: a property from events"
+                      "description": "required_property, property_in_set, value_in_range, property_equals: a property from events; pii_in_text: a free-text property (optional); currency_mismatch: the numeric money property (optional)"
                     },
                     "value": {
                       "type": "string",
                       "maxLength": 16,
-                      "description": "property_equals: the forbidden value"
+                      "description": "property_equals: the forbidden value; currency_mismatch: the 3-letter currency code (optional, default from the property name or USD)"
                     },
                     "values": {
                       "type": "array",
