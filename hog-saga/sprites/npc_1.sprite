@@ -1,0 +1,47 @@
+size 16x16
+concept Ninja Adventure OldMan -> old developer: grey beard, brand mug
+legend
+  a #141b1b
+  b #4e484a
+  c @1 brand (was #c0392b)
+  d #965340
+  e #5f7160
+  f #548789
+  g #8d977f
+  h #ef914f
+  i #f2ad7d
+  j #f0e5d1
+frame
+................
+................
+....aaaaaaaa....
+...aeeeeeeeea...
+..aegggggeeeba..
+.abegggggeeebba.
+.abbeeheeeebbba.
+.abbhhhhhhhbbba.
+.ahbiiiiiiiibha.
+.ahbhaaiiaahbha.
+.ahhjjjiijjjhha.
+..ahjjjjjjjgha..
+..affjjggjjfja..
+.ahfffjjjjffcca.
+.aiiddddddddcca.
+..aadddaadddaa..
+frame
+................
+................
+................
+....aaaaaaaa....
+...aeeeeeeeea...
+..aegggggeeeba..
+.abegggggeeebba.
+.abbeeheeeebbba.
+.abbhhhhhhhbbba.
+.ahbiiiiiiiibha.
+.ahbhaaiiaahbha.
+.ahhjjjiijjjhha.
+..ahjjjjjjjgha..
+.aaffjjggjjfjaa.
+.aiiddddddddcca.
+..aadddaadddaa..

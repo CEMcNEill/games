@@ -1,0 +1,47 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/OldWoman/SpriteSheet.png
+concept friendly senior receptionist with lilac hair; cardigan in brand secondary
+legend
+  a #141b1b
+  b #4e484a
+  d #d14b34
+  e #a5608b
+  g #ef914f
+  h #d3a2c0
+  i #f2eaf1
+  j @2d clothes (brand)
+  k @2 clothes (brand)
+frame
+................
+.....aaaaaaaa...
+...aahhhhhhhha..
+..ahhhhhhhhhhha.
+.ahhihihhhhhhhea
+.ahhihihhhhdheea
+.aehhhhhhhdddeea
+.aeeehhhhdgggdea
+.aeeeddddgggggea
+.aeeedaagggaagea
+.aeeedggggggggea
+.aeeeedgaaagdaaa
+.aeeeeedddddadda
+.aaeeebjjjbkadda
+.abbbbjkkkkkkaga
+..abjjkkkkkkkag.
+frame
+................
+................
+.....aaaaaaaa...
+...aahhhhhhhha..
+..ahhhhhhhhhhha.
+.ahhihihhhhhhhea
+.ahhihihhhhdheea
+.aehhhhhhhdddeea
+.aeeehhhhdgggdea
+.aeeeddddgggggea
+.aeeedaagggaagea
+.aeeedggggggggea
+.aeeeedgaaagdaaa
+.aeeeeedddddadda
+..aeeebkkkkkadda
+..abbbjkkkkkkag.

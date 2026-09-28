@@ -1,0 +1,45 @@
+size 32x32
+base ninja-adventure Actor/Character/OldWoman/Faceset.png crop 3,5,32,32
+concept Finance lead: older woman, silver hair, smiling, brand cardigan
+legend
+  a #141b1b
+  b @4 cardigan shade
+  c #d14b34
+  d #8f8aa6 silver hair shade
+  e @1d cardigan (brand primary, deepened to part from the warm skin)
+  f #ef914f
+  g #cfcbe0 silver hair
+  h #f2eaf1
+frame
+.....aaaaaaaaaaaaaaaaaaa........
+....addgggggggggggggggggaa......
+...adgggggggggggggggggggggaa....
+..adgggggggggggggggggggggggga...
+.addgggddddggggggggggghhhgggda..
+addggdddddddgggggggggghhhggggda.
+adddddcccccdddgggggggghhhggggdda
+addddcccffcccddggggggggggggggdda
+adddccfffffcccddggggggggggggddda
+adddcfffffffccdddgggggggggggddda
+addcfdddddfffccdddddggggggddddda
+addcfdddddfffcccddddddddddddddda
+addcffffffffffcccccccdddddddddda
+addcffaaaaffffaaaaacccddddddddda
+addcffffffffffffffcccccdddddddda
+addcffccccccffcccccccccdddddddda
+addcffffcffffffffffccccdddddddda
+adddcffffcccffffffffcccdddddddda
+adddcffcffffffffcfffcccdddddddda
+adddcffcfaffffafcfffccddddddddda
+addddcfcffaaaaffcffcccddddddddda
+adddddcffffffffffffccaddddddddda
+addddddafffffffffccaadddddddddda
+addddddaaafffffccaaaadddddddddda
+addddddaaaaaacccccaaadddddddddda
+adddddbbbaaaccccccaaabddddddddda
+addbbbbbbbbacccccbbbbbddddddddda
+adbeeeeeeeeeeeeeeeeeeeeddddddbaa
+aeeeeeeeeeeeeeeeeeeeeeeebbbbbbba
+aeeeeeeeefffffceeeeeeeeeebbbbbba
+aeebbeeccccccffcebbeeeeeeeeebbba
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

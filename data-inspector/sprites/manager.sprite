@@ -1,0 +1,81 @@
+size 32x32
+base ninja-adventure Actor/Character/OldMan/Faceset.png crop 3,5,32,32
+concept Head of Data: friendly manager, brand jacket, accent tie; frame 2 talking
+legend
+  a #141b1b
+  b #2a1d1a hair shadow
+  c #4a3226 hair
+  d #6e4a34 hair highlight
+  e @1 jacket (brand primary)
+  f #ef914f
+  g #f2ad7d
+  h #f2eaf1
+  T @3 tie (brand accent)
+  t @3d tie shade
+  m #8f3e56 open mouth
+frame
+..........aaaaaaaaaaaaaaaaa.....
+........aacccccccccccccccccaa...
+.......accccccccccccccccccccca..
+......accccccccccccccccccccccba.
+.....addddcccccfcccccccccccccbba
+....acddddccccffffcccccccccccbba
+...accdddccccffffffccccccccbbbba
+..aaccccccfffffffgffcfffffbbbbba
+.abbcccccfffffffgggffffffffbbbba
+abbbcccccfffgggggggccccggffbbbba
+.abbbcccccccggggggccccccggfbbbba
+..abbbcccccccgggggccffccgggfbbba
+...abbcccfffcggggggfffffgggfbbba
+...abbcgffffffgggggaaaaagfffbbba
+...abbbfggaaafffffgggggggggfbbfa
+...afbbgggggggffffgggggggffffffa
+...affbffggggfgggfgggggggggffafa
+..afaffggggggggggggggggggggffafa
+..afaffggggggggggggggfgggggffffa
+..affffgggggfgggggggggfggggfffa.
+...afffgggggfgggggggagfgggffaa..
+....aaffggggfgaaaaaaggfggfffa...
+.....affffggggggggggggggfffa....
+......afffffgggggggggggfffa.....
+.......afffffffffffffffffa......
+........aaffffffffffffffa.......
+..........aaaffffffffaaa........
+.........ahhaffffffffahha.......
+.......aeeehhhhaTTahhhheeea.....
+.....aeeeeehhhaTTTTahhheeeeea...
+....aeeeeeeehhaTTTtahheeeeeeea..
+...aaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+frame
+..........aaaaaaaaaaaaaaaaa.....
+........aacccccccccccccccccaa...
+.......accccccccccccccccccccca..
+......accccccccccccccccccccccba.
+.....addddcccccfcccccccccccccbba
+....acddddccccffffcccccccccccbba
+...accdddccccffffffccccccccbbbba
+..aaccccccfffffffgffcfffffbbbbba
+.abbcccccfffffffgggffffffffbbbba
+abbbcccccfffgggggggccccggffbbbba
+.abbbcccccccggggggccccccggfbbbba
+..abbbcccccccgggggccffccgggfbbba
+...abbcccfffcggggggfffffgggfbbba
+...abbcgffffffgggggaaaaagfffbbba
+...abbbfggaaafffffgggggggggfbbfa
+...afbbgggggggffffgggggggffffffa
+...affbffggggfgggfgggggggggffafa
+..afaffggggggggggggggggggggffafa
+..afaffggggggggggggggfgggggffffa
+..affffgggggfgggggggggfggggfffa.
+...afffgggggfgggggggagfgggffaa..
+....aaffggggfgaaaaaaggfggfffa...
+.....affffgggggmmmmgggggfffa....
+......afffffgggaaaaggggfffa.....
+.......afffffffffffffffffa......
+........aaffffffffffffffa.......
+..........aaaffffffffaaa........
+.........ahhaffffffffahha.......
+.......aeeehhhhaTTahhhheeea.....
+.....aeeeeehhhaTTTTahhheeeeea...
+....aeeeeeeehhaTTTtahheeeeeeea..
+...aaaaaaaaaaaaaaaaaaaaaaaaaaaa.

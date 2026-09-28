@@ -1,0 +1,47 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/Noble/SpriteSheet.png
+concept exec in a fedora and a brand-primary suit
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #965340
+  e #ef914f
+  f #f2ad7d
+  g #f2eaf1
+  h @1d clothes (brand)
+  i @1 clothes (brand)
+frame
+................
+....aaaaaaaa....
+...acccccccca...
+...acccccccca...
+..abbccccccbba..
+.aaabbbbbbbbaaa.
+acccaaaaaaaaccca
+aaccccccccccccaa
+.aaaaaaaaaaaaaa.
+.aeaeeeeeeeeaea.
+.aeeffaaaaffeea.
+..aeeffffffeea..
+..aheeeeeeeeha..
+.aihhhhhhhhhhia.
+aeedddhgghdddeea
+affhaaaaaaaahffa
+frame
+................
+................
+....aaaaaaaa....
+...acccccccca...
+...acccccccca...
+..abbccccccbba..
+.aaabbbbbbbbaaa.
+acccaaaaaaaaccca
+aaccccccccccccaa
+.aaaaaaaaaaaaaa.
+.aeaeeeeeeeeaea.
+aaeeffaaaaffeea.
+aeaeeffffffeea..
+aahheeeeeeeeha..
+..adddhggaffha..
+...aaaaaaaffa...

@@ -1,0 +1,46 @@
+size 16x16
+concept Ninja Adventure Princess -> analyst: glasses, purple hoodie
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #54408a
+  e #965340
+  f #7b5bb5
+  g #a3754e
+  h #a58ad8
+  i #dff3f5
+frame
+................
+....aaaaaaaaa...
+...accccccccca..
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.accbcbccbcbcca.
+.acebbbbbbbbeca.
+.aceiaaggaaieca.
+.acegaggggageca.
+accegggeegggecca
+accaeggggggeacca
+acahheeeeeehhaca
+.ahhfffddfffhha.
+.ahhhfaaaafhhha.
+..aadddaadddaa..
+frame
+................
+................
+....aaaaaaaaa...
+...accccccccca..
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.accbcbccbcbcca.
+.acebbbbbbbbeca.
+.aceiaaggaaieca.
+.acegaggggageca.
+accegggeegggecca
+accaeggggggeacca
+acahheeeeeehhaca
+.ahhhfaaaafhhha.
+..aadddaadddaa..

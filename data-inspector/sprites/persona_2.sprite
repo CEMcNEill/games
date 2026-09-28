@@ -1,0 +1,48 @@
+size 32x32
+base ninja-adventure Actor/Character/Princess/Faceset.png crop 3,5,32,32
+concept Power user: long dark hair with a flower, accent-coloured top
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #8f3e56
+  e #e0394c
+  f #965340
+  g #a3754e
+  h #8d977f
+  i @3d top shade
+  j @3 top (brand accent)
+  k #ffffff
+frame
+........aaaaaaaaaaaaaaaaaaaaaa..
+.......abbcccccccceddjijjjddea..
+......abccccccccccdeejjjijeeda..
+.....abccccccccccceeeejjjeeeea..
+....abccccccccccccceedeedeeeba..
+....abccccccccccccccdeeeedebba..
+...abccccccccccccccccceeebbbbba.
+...abccccccbcccbcccbccccbbbbbba.
+...abcccccbcccbcccbcccccccbbbba.
+...abcccbcbcccbcccbcccbccccbbbba
+...abcccbcbcccbcccbcbbbcccccbbba
+...abccccbbbccbcccbbbffbccccbbba
+...abccccfbbbbbbbbbbfffbccccbbba
+...abccccffffffffffffffbbccbbbba
+...abccccfggffffffffggfbbbbbbbba
+...abccccfaggaggggaggafbbbbbbbba
+..abbccccfgaaggggggaagfbbbbbbbba
+.abbbbccbfggggggggggggfbbbbbbbba
+abbbbbbbbfggggggggggggfbbbbbbbba
+abbbbbbbbbggggggggggggfbbbbbbbba
+abbbbbbbbbggggffffgggffbbbbbbbba
+abbabbbbbbbgggggggggffbbbbbbbaba
+.ababbbbbiihaaggggggaahbbbbbbaba
+..abbbaaiiihhhaaaaaahhhibbbbbbaa
+..abbaiiiiiihhhhkhhhhhiibbbbbbaa
+...aaiiiiiiiiihhhkhhiiiiiabbbaaa
+.aaaaaiiiiiiiiahhhkaiiiiiiaaaiia
+ajjjjjjjjjjiiiiahaaiiiiiiiiiiiia
+ajjjjjjjjjijjjjiajjjjjijjjjjjjia
+ajjjjjjjjijjjjjajjjjjijjjjjjjjja
+ajjjjjjjjijjjjjajjjjjijjjjjjjjja
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

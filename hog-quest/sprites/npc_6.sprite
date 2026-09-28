@@ -1,0 +1,46 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/Villager2/SpriteSheet.png
+concept designer with big dark hair; shirt in brand accent
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #8f3e56
+  e #4a5270
+  f #d14b34
+  h @3d clothes (brand)
+  i @3 clothes (brand)
+frame
+................
+.....aa..aa.....
+..aaaccaaccaaa..
+.accabccccbacca.
+..abccbccbccba..
+.abbbcbccbcbbba.
+.acbbbbbbbbbbca.
+abbcbddbbddbcbba
+abbbdaaddaadbbba
+abbbdffddffdbbba
+.abdbffffffbdba.
+..adffddddffda..
+.aahhffffffhhaa.
+ahhihhhhhhhhihha
+affeeeeeeeeeeffa
+.aaaiiiaaiiiaaa.
+frame
+................
+................
+.....aa..aa.....
+..aaaccaaccaaa..
+.accabccccbacca.
+..abccbccbccba..
+.abbbcbccbcbbba.
+.acbbbbbbbbbbca.
+abbcbddbbddbcbba
+abbbdaaddaadbbba
+abbbdffddffdbbba
+aabdbffffffbdba.
+adadffddddffda..
+aeehhfffffaaia..
+.aeehhhhhaffia..
+..aiiieeeaffa...

@@ -1,0 +1,47 @@
+size 16x16
+concept 0x72 DungeonTileset II chest (closed, open)
+legend
+  a #222222
+  b #62232f
+  c #8f4029
+  d #c56025
+  e #ee8e2e
+  f #ffad3b
+  g #72d6ce
+  h #97da3f
+  i #facb3e
+  j #fdf7ed
+frame
+................
+................
+..aa........aa..
+aaibaaaaaaaabiaa
+aeeceeeeeeeeceea
+adibddddddddbida
+adecddddddddceda
+adibddddddddbida
+adecddcbbcddceda
+aiibiibiibiibiia
+aaecaabeibaaceaa
+abaabbaaaabbaaba
+acbbccbbbbccbbca
+abccccccccccccba
+abbbbbbbbbbbbbba
+aaaaaaaaaaaaaaaa
+frame
+..aa........aa..
+aaebaaaaaaaabeaa
+aeiceeeeeeeeciea
+adecddcbbcddceda
+aiibiibiibiibiia
+aaecaabeibaaceaa
+adaaaaabbaaaaada
+adaahjffiijjaada
+adajhhijjfgjfada
+adjiiffbbjggijda
+adddddddddddddda
+abbbbbbbbbbbbbba
+acccccccccccccca
+abccccccccccccba
+abbbbbbbbbbbbbba
+aaaaaaaaaaaaaaaa

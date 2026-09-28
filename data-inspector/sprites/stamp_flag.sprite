@@ -1,0 +1,26 @@
+size 16x16
+base data-inspector/art.py stamp_flag
+concept FLAG ink stamp: red, cross, lit from the top-left
+legend
+  k #141b1b outline
+  D #8a2432 ink shade
+  B #d6453d ink
+  L #ff8f7c ink highlight
+  W #f7f3fb symbol
+frame
+................
+.....kkkkkk.....
+...kkLLLLLLkk...
+..kLLBBBBBBLBk..
+..kLWWBBBBWWBk..
+.kLBWWWBBWWWBBk.
+.kLBBWWWWWWBBBk.
+.kLBBBWWWWBBBBk.
+.kLBBBWWWWBBBBk.
+.kLBBWWWWWWBBBk.
+.kLBWWWBBWWWBBk.
+..kLWWBBBBWWBk..
+..kDBBBBBBBBDk..
+...kkDDDDDDkk...
+.....kkkkkk.....
+................

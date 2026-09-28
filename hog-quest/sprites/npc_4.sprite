@@ -1,0 +1,47 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/Villager3/SpriteSheet.png
+concept data person, curly dark hair; shirt in brand primary
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #965340
+  f #a3754e
+  g #8d977f
+  i #abc2bc
+  j @1d clothes (brand)
+  k @1 clothes (brand)
+frame
+................
+....aaaaaaaa....
+...acccccccca...
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.acbbbbbbbbbbca.
+.acbddddddddbca.
+.acdfaffffafdca.
+.acdfaffffafdca.
+..adfffddfffda..
+...adffffffda...
+..akkddddddkka..
+.akkjjjkkjjjkka.
+addkkjjjjjjkkdda
+affiggggggggiffa
+frame
+................
+................
+....aaaaaaaa....
+...acccccccca...
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.acbbbbbbbbbbca.
+.acbddddddddbca.
+.acdfaffffafdca.
+.acdfaffffafdca.
+.aadfffddfffda..
+.adadffffffdaa..
+.aaajdddddjjka..
+...akjjjjjffka..
+....aigggaffa...

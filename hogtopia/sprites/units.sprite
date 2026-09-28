@@ -1,0 +1,203 @@
+size 16x16
+concept Units: yours = Ninja Adventure people in brand colours (scout cap, builder, analyst, knight, frog-mask catcher); rival = steel bots with red eyes
+legend
+  a #141b1b
+  b #965340
+  c #d14b34
+  d #548789
+  e #ef914f
+  f #d3a2c0
+  g #e3f1f5
+  h @1d
+  i @1
+  j #3b3643
+  k #8f3e56
+  l #e0394c
+  m #8d977f
+  n #d78b4a
+  o #abc2bc
+  p #f1c471
+  q @1l
+  r #91522c
+  s #a3754e
+  t #f2eaf1
+  u #4e484a
+  v #5f7160
+  w #c7d0d8
+  x #f2f6fa
+  y #8a96a3
+  z #56864c
+  A #a8a129
+  B #79b8ce
+  C #345a52
+  D #fce2ca
+frame
+................
+....aaaa.aaa....
+...ahhhaaiiiaaaa
+..aiiiiiiiiiiiia
+.ahhiiiiiiiiiia.
+.ahhhiiiiiiihhha
+.ahhhhhhhhhhhhha
+.aahiiiihhiiihha
+.aihgaaeeaageha.
+.aiheeeeeeeeeha.
+.aiieeeeaaeeeha.
+..aiieeeeeeeia..
+..agggiiiiigga..
+.agggggfggggga..
+.aiijjjjajjjiia.
+.aiijjjajjjjiia.
+frame
+................
+....aaaaaaaa....
+...appppppppa...
+..appppppppppa..
+.appppppppppppa.
+.appnpnppnpnppa.
+.annnnnnnnnnnna.
+.apnccccccccnpa.
+.apceaeeeeaecpa.
+.apceaeeeeaecpa.
+..aceeecceeeca..
+...aceeeeeeca...
+..aiiqqqqqqiia..
+.aiihhhiihhhiia.
+aqqiihhhhhhiiqqa
+aeeommmmmmmmoeea
+frame
+................
+....aaa..aaa....
+...atttaattta...
+...aottttttoa...
+..aiooooooooia..
+.aaiiiiiiiiiiaa.
+atttssssssssttta
+aottttttttttttoa
+.aooooooooooooa.
+.acjjjjjjjjjjca.
+.accjjjeejjjcca.
+..acceeaaeecca..
+..ahiiiiiiiiha..
+.aqqhhhjjhhhqqa.
+aiihqqqjjqqqhiia
+aeehhhhaahhhheea
+frame
+................
+.......qq.......
+....aaaiiaaa....
+...awxxiiawwa...
+..aywxxiiawwya..
+..aywwywwawwua..
+..aywwwyywwwua..
+..auwaaaaaawua..
+..auwaaaaaawua..
+..auywwaawwyua..
+..auyywaawyyua..
+...auywaawyua...
+..auiiiiiiiiua..
+.accwwyiiywwcca.
+.aeeuhhhhhhueea.
+..aayyhaahyyaa..
+frame
+................
+................
+................
+....aa...aa.....
+...aAAaaaAAa....
+..aAAAAjAAAAa...
+..aAAAAAAAAAa...
+.aAAaAAAAAaAAa..
+.aAAAAaAaAAAAa..
+.aAllAaaaAllAaa.
+.azAAAAAAAAAAaka
+..azAAAAAAAzakka
+.aiizzzzzzziiaa.
+.aqiiqqqqqiiqa..
+aeeqqiiiiiqqeea.
+aeehhhaaahhheea.
+frame
+................
+............aaa.
+....aaaaaaaavva.
+...amvmmmmvmvvaa
+..ammvmmmmvmvava
+.avmmmvvvvmmmvva
+.avmmmmmmmmmmaaa
+.avvmmmmmmmmvva.
+.avuallaallauva.
+.avuallaallauva.
+.avvmmmmmmmmvva.
+..avvvuvvuvvva..
+..aauuuuuuuuaa..
+.avvvuvvvvuvvva.
+.ammuuuaauuumma.
+..aauuuaauuuaa..
+frame
+................
+....aaaaaaaa....
+...ammvmmvmma...
+..amtmvmmvmmma..
+.atmmmvmmvmmmta.
+.attmmvmmvmmtta.
+.atttttttttttta.
+.amttttttttttma.
+.ammvllllllvmma.
+.avmmmlttlmmmma.
+.aavmmmmmmmmmaa.
+attmmmvmmvmmttta
+avvvvmvmmvmvvvva
+ammvvvvvvvvvvmma
+avvvvmmmmmvvvvva
+.aaavvvaavvvaaa.
+frame
+................
+.....aaaaaa.....
+...aallllllaa...
+..alvllllllvla..
+.alllvvvvvvllla.
+alllllllllllllla
+avllllllllllllva
+.avvvllllllvvva.
+..aaavvvvvvaaa..
+..avvalaalavva..
+.avvvvaaaavvvva.
+.avvvvvvvvvvvva.
+..avvvvvvvvvva..
+.avvvvvvvvvvvva.
+.avvvvaaaavvvva.
+..aavvvaavvvaa..
+frame
+................
+....aaaaaaaa....
+...avvvvvvvva...
+..avvvulluvvva..
+..avvulaaluvva..
+..avvvulluvvva..
+..avvaauuaavva..
+.avualluullauva.
+avvvvaavvaavvvva
+avuvvvvuuvvvvuva
+.aavvvvvvvvvvaa.
+..auvvvvvvvvua..
+.avuuuuuuuuuuva.
+.avvuuuuuuuuvva.
+auuavvuuuuvvauua
+avvauuuaauuuavva
+frame
+................
+....aaaaaaaa....
+...ammvmmvmma...
+..amomvmmvmmma..
+.aommmvmmvmmmoa.
+.aoommvmmvmmooa.
+.aooooooooooooa.
+.amooooooooooma.
+.ammcaccccacmma.
+.avmmmlmmlmmmma.
+.aavmmmmmmmmmaa.
+aoommmvmmvmmoooa
+avvvvmvmmvmvvvva
+ammvvvvvvvvvvmma
+acccvmmmmmvvccca
+.aaavvvaavvvaaa.

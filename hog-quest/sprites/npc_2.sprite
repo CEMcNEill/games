@@ -1,0 +1,48 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/Princess/SpriteSheet.png
+concept product manager with a bun; hair pin and dress in brand secondary
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #e0394c
+  e #965340
+  f #a3754e
+  g #8d977f
+  i #abc2bc
+  k @2d clothes (brand)
+  l @2 clothes (brand)
+frame
+..........aaa...
+....aaaaaaddda..
+...acccccdlllda.
+..acccccccddda..
+.acccccccccccca.
+.accbcbccbcbcca.
+.accbcbccbcbcca.
+.acebbbbbbbbeca.
+.aceaaffffaaeca.
+.acefaffffafeca.
+accefffeefffecca
+accaeffffffeacca
+acalleeeeeellaca
+.allkkkggkkklla.
+.alllkaaaakllla.
+..aagggaagggaa..
+frame
+................
+..........aaa...
+....aaaaaaddda..
+...acccccdlllda.
+..acccccccddda..
+.acccccccccccca.
+.accbcbccbcbcca.
+.accbcbccbcbcca.
+.acebbbbbbbbeca.
+.aceaaffffaaeca.
+accefaffffafecca
+acaefffeefffeaca
+aakaeffffffeaaca
+.aaakeeeeekklaa.
+...alkggkkllla..
+....aigggalla...

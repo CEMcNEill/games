@@ -1,0 +1,435 @@
+size 16x16
+concept map tiles: CC0 Ninja Adventure tiles + edits; roofs/lair take brand
+legend
+  a #141b1b
+  b #7a3f33
+  c #5b4a45
+  d #e0394c
+  e #56634d
+  f #965340
+  g #816855
+  h #5f7160
+  i #90775e
+  j #8e7c73
+  k #ff5a8a
+  l #e66a3a
+  m #bd7959
+  n #74a334
+  o #b3957f
+  p #c8966b
+  q #e0a23a
+  r #a0b3b8
+  s #adbc3a
+  t #c9ab96
+  u #d2b37d
+  v #e9ab8c
+  w #ffad5d
+  x #71ddee
+  y #d1c9b7
+  z #eecf9b
+  A #ffcba9
+  B #ffd35b
+  C #a4e4fc
+  D #c7f5f9
+  E #f2eaf1
+  F #fff1c9
+  G #fff0e2
+  H #fbf5ef
+  I #ffffff
+  J @1l brand
+  K @1 brand
+  L @1d brand
+  M @3 brand
+  N @3d brand
+  O @4 brand
+frame
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssnsssssssssss
+sssnsnssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssnsss
+sssssssssssnsnss
+ssssssssssssssss
+ssssssssssssssss
+ssssssssssssssss
+frame
+ssssssssssssssss
+ssssssssssssssss
+ssssksssssssssss
+ssskBkssssssssss
+ssssksssssssssss
+sssnnnsssssHssss
+ssssssssssHBHsss
+sssssssssssHssss
+sssssssssssnssss
+ssssssssssssssss
+ssssssssssssssss
+ssssssskssssnsss
+sssssskBkssnsHss
+ssssssskssssHBHs
+sssssssnsssssHss
+sssssssssssssnss
+frame
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAGAAAAAAA
+AAAvvAAAAAAAGAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAvAAAAA
+AAGAAAAAAAAvAAAA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+AAAAAvAAAAAAAAAA
+AAAAAAAAAAAAAvvA
+AAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAA
+frame
+ssassssssssssass
+sassssssssssssas
+sasnssssssssnsas
+asnssssssssssnsa
+asnssnssssnssnsa
+annsnssssssnsnna
+asnnnssnnssnnnsa
+anssnnnnnnnnssna
+snssnssnnssnssns
+ssnnsssnnsssnnss
+sssnsssnnsssnsss
+sssssnnnnnnsnsss
+ssssssamfasnsnss
+ssssssaffassssss
+ssssssaffassssss
+ssssssaffassssss
+frame
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxDDDxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxDDDxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxDDDxxxxxxxxx
+xxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxx
+frame
+xxxxxxxxxxxxxxxx
+ffffffffffffffff
+................
+................
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+uuuuuuuuuuuuuuuu
+pppppppppppppppp
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+uuuuuuuuuuuuuuuu
+pppppppppppppppp
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+ffffffffffffffff
+xxxxxxxxxxxxxxxx
+frame
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhheehhhhhehhh
+hehhhhehhhhhehhh
+hehheeehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+hehhhhehhhhhehhh
+frame
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+zzzzzzFzzzzzzzzz
+zzuuzzzzzzzzzzzz
+zzzzzzzzzzzzzzFz
+zzzzzzzzzzzzzzzz
+zzzzzzzzzuzzzzzz
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+zzzzzzzzzzzzzzzz
+zzFzzzzzzzzzzzzz
+zzzzzzzzzzzzuuzz
+zzzzzzzzzzzzzzzz
+zzzzzuzzzzzzzzzz
+zzzzzzzzzzFzzzzz
+zzzzzzzzzzzzzzzz
+frame
+zzzzzzzzzzzzzzzz
+zzzzaaaaaazzzzzz
+zzaayyyyyyaazzzz
+zayyyyyyyyyrazzz
+zayyIIyyyyyyraFz
+aryyIIyyyyyyrazz
+aryyyyyyyyyyraEz
+aryyyyyyyyyyraEE
+aryyyyyyyyyrrrEE
+aryyyyyyyyrrrrEE
+zrryyyyyyrrrrrEE
+zrrrrrrrrrrrrEEE
+zzrrrrrrrrrrEEEz
+zzzzrrrrrrEEEEzz
+zzzzzzzzzzFzzzzz
+zzzzzzzzzzzzzzzz
+frame
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oooooooootoooooo
+ooojjooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+oooooooooooooooo
+ooooooooooojoooo
+oooooooooooooooo
+ootooooooooooooo
+oooooooooooooooo
+oooooojjoooooooo
+oooooooooooootoo
+oooooooooooooooo
+frame
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmffmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmfffmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+mfmmmmfmmmmmfmmm
+frame
+aJJJJJJKKKKKKKKK
+aJJKJJJKKKKKKKKK
+aJJJKJKKKKKKKKKK
+aJJJJKKKKKKKKKKK
+aJJJJJKKKKKKKKKK
+aJJJJJJKKKKKKKKK
+aJJJKJJJKKKKKKKK
+aJJJKKKKKKKKKKKK
+aKJJKKKKKKKKKKKK
+aJJJJKKKKKKKKKKK
+aKJJJJKKKKKKKKKK
+aKJJKKKKKKKKKKKK
+.aKJJKKKKKKKKKKK
+.aaKKKKKKKKKKKKK
+.aLLLLKKKKKKKKKK
+.aLLLaLLLLLLLLLL
+frame
+KKKKKKKKKJJJJJJa
+KKKKKKKKKJJJKJJa
+KKKKKKKKKKJKJJJa
+KKKKKKKKKKKJJJJa
+KKKKKKKKKKJJJJJa
+KKKKKKKKKJJJJJJa
+KKKKKKKKJJJKJJJa
+KKKKKKKKKKKKJJJa
+KKKKKKKKKKKKJJKa
+KKKKKKKKKKKJJJJa
+KKKKKKKKKKJJJJKa
+KKKKKKKKKKKKJJKa
+KKKKKKKKKKKJJKa.
+KKKKKKKKKKKKKaa.
+KKKKKKKKKKLLLLa.
+LLLLLLLLLLaLLLa.
+frame
+.auffammmmmmmaff
+.auumfmmmmmmmaff
+.auumfmmmuuuufmm
+.auumfmmuuuuufmm
+.auumaaaaaaaufmm
+.auumaHCaHCaufmm
+.auumaCCaCCaufmm
+.auumaaaaaaaufmm
+.auumaCCaCCaufmm
+.auumaCCaCCaufmm
+.amumaaaaaaaufmm
+..aummffffffffmm
+..ammmzzzzzzzzmm
+...ammmmmmmmmmmm
+....ffmmmmmmmmmm
+......ffffffffff
+frame
+ffammmmmmmaffua.
+ffammmmmmmfmuua.
+mmfmuuummmfmuua.
+mmfmuuuummfmuua.
+mmfmaaaaaaamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbBfamuua.
+mmfmaffbffamuma.
+mmffaffbffamua..
+mmzzaffbffamma..
+mmmmaffbffama...
+mmmmmmmmmmff....
+ffffffffff......
+frame
+aJJJJJJKKKKKKKKK
+aJJKJJJKKKKKKKKK
+aJJJKJKKKKKKKKKK
+aJJJJKKKKKKKKKKK
+aJJJJJKKKKKKKKKK
+aJJJJJJKKKKKKKKK
+aJJJKJJJKKKKKKKK
+aJJJKKKKKKKKKKKK
+aKJJKKKKKKKKKKKK
+aJJJJKKKKKKKKKKK
+aKJJJJKKKKKKKKKK
+aaaaaaaaaaaaaaaa
+aMMMMMMMMMMMMMMM
+aMMMMMMMMMMMMMMM
+aMMMMMMMMMMMMMMM
+aNNNNNNNNNNNNNNN
+frame
+KKKKKKKKKJJJJJJa
+KKKKKKKKKJJJKJJa
+KKKKKKKKKKJKJJJa
+KKKKKKKKKKKJJJJa
+KKKKKKKKKKJJJJJa
+KKKKKKKKKJJJJJJa
+KKKKKKKKJJJKJJJa
+KKKKKKKKKKKKJJJa
+KKKKKKKKKKKKJJKa
+KKKKKKKKKKKJJJJa
+KKKKKKKKKKJJJJKa
+aaaaaaaaaaaaaaaa
+MMMMMMMMMMMMMMMa
+MMMMMMMMMMMMMMMa
+MMMMMMMMMMMMMMMa
+NNNNNNNNNNNNNNNa
+frame
+.auffammmmmmmaff
+.auumfmmmmmmmaff
+.auumfmmmuuuufmm
+.aaaaaaaaaaaaamm
+.aaMMMMMMMMMMamm
+.aaMaMMaaaMaaamm
+.aaMaMMaaaMaaamm
+.aaMaMMaMaMaaamm
+.aaMaMMaMaMaaamm
+.aaMMMMMMMMMMamm
+.aaaaaaaaaaaaamm
+..aummffffffffmm
+..ammmzzzzzzzzmm
+...ammmmmmmmmmmm
+....ffmmmmmmmmmm
+......ffffffffff
+frame
+ffammmmmmmaffua.
+ffammmmmmmfmuua.
+mmfmuuummmfmuua.
+mmfmuuuummfmuua.
+mmfmaaaaaaamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbffamuua.
+mmfmaffbBfamuua.
+mmfmaffbffamuma.
+mmffaffbffamua..
+mmzzaffbffamma..
+mmmmaffbffama...
+mmmmmmmmmmff....
+ffffffffff......
+frame
+LLLOLLLOLLOOLLLO
+LLOLLLOOOLOLLLOL
+OOOLLOOOOOOLLOOO
+OOOLOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOOOOOOOOOOOOOOO
+OOLOOOOOLOOOOOOO
+OOLLOLOOLLOOOOLL
+LOLLOLLOLLLOOLLL
+frame
+................
+................
+aaaaaaaaaaaaaaaa
+aKKKKKKKKKKKKKKa
+aKaaaaaaaaaaaKKa
+aKaLLLLLLLLLLLKa
+aKaLKKKKKKKKKLJa
+aKaLKKKKKKKKKLJa
+aKaLKKKKKKKKKLJa
+aKaLKKKKKKKKKLJa
+aKaLKKKKKKKKKaJa
+aKaLKKKKKKKKKaJa
+aJaLKKKKKKKKKaJa
+aJKLLLLLLLLLLJJa
+aJJJJJJJJJJJJJJa
+aLLLLLLLLLLLLLLL
+frame
+BBBBBBBBBBBBBBBB
+BlddldlddldlddlB
+BddddddddddddddB
+BldlllldlllldllB
+BldlllldlllldllB
+BldlddldlddldldB
+BddddddddddddddB
+BlllldlllldllllB
+BlllldlllldllllB
+BlddldlddldlddlB
+BddddddddddddddB
+BddlllldlllldllB
+BddlllldlllldllB
+BddlddldlddldldB
+BddddddddddddddB
+BBBBBBBBBBBBBBBB
+frame
+ssssssssssssssss
+sssssHssHsssssss
+ssssssHssHssssss
+ssssaaaaaaaassss
+ssssajjjjjjaasss
+sssnaKKKKKjaasss
+ssssajjjjjjassss
+ssssajaaaajassss
+ssssajaHHajassss
+ssssajaHHajassss
+ssssajjjjjjassss
+sssaaaaaaaaaasss
+sssaccccccccanss
+ssssaaaaaaaassss
+ssssssssssssssss
+ssssssssssssssss

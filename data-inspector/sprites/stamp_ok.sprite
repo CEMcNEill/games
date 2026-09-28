@@ -1,0 +1,26 @@
+size 16x16
+base data-inspector/art.py stamp_ok
+concept APPROVED ink stamp: green, check mark, lit from the top-left
+legend
+  k #141b1b outline
+  D #1f6a3a ink shade
+  B #3fa34d ink
+  L #8ad86b ink highlight
+  W #f7f3fb symbol
+frame
+................
+.....kkkkkk.....
+...kkLLLLLLkk...
+..kLLBBBBBBLBk..
+..kLBBBBBBBWWk..
+.kLBBBBBBBWWWBk.
+.kLBBBBBBWWWBBk.
+.kLBWWBBWWWBBBk.
+.kLBWWWWWWBBBBk.
+.kLBBWWWWBBBBBk.
+.kLBBBWWBBBBBBk.
+..kLBBBBBBBBBk..
+..kDBBBBBBBBDk..
+...kkDDDDDDkk...
+.....kkkkkk.....
+................

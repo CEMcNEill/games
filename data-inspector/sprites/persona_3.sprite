@@ -1,0 +1,46 @@
+size 32x32
+base ninja-adventure Actor/Character/Villager3/Faceset.png crop 3,5,32,32
+concept Developer: curly dark hair, glasses, secondary shirt, accent scarf
+legend
+  a #141b1b
+  b #4d4456 hair shade
+  c #6a5f6e hair
+  d #965340
+  e @2l shirt (brand secondary, lifted)
+  f #a3754e
+  g @3 scarf (brand accent)
+  h #ffffff
+  G #2d2433 glasses frame
+frame
+.......aaaaaaaaaaaaaaaaaaa......
+......abccccccccccccccccbba.....
+.....abcccccccccccccccccccba....
+....abcccccccccccccccccccccba...
+...abccbcccbccccbcccccccccccba..
+..abccbcccbccccbccccccccccccca..
+..abccbcccbccccbccccbccccccccba.
+.abbccbbbbbbbbbbbbbcbccccccccbba
+.abbbbbbbddddddbbbbbbbbccccccbba
+.abbbbddddddddddddddbbbbbccbbbba
+.abbbbGGGGGGffGGGGGGfbbbbbbbbbba
+.abbbdGhaaaGffGaaahGfdbbbbbbbbba
+.abbbdGhaahGGGGhaahGfdbbbbbbbbba
+.abbbdGhaahGffGhaahGfdbbbbbbbbba
+.abdbfGhaahGffGhaahGfdbbbbbbbbba
+.abdbfGGGGGGffGGGGGGfbbbdddbbba.
+..adfffffffffffffffffbbddddbbba.
+...afffffdddddfffffffffdddbbba..
+...afffffffffffffffffffddbbba...
+....afffffffffffffffffdbbbba....
+.....afffffffffffffffbbbbba.....
+......afffffffffffffdbbaaa......
+....aa.adffffffffdaaaaa.........
+...aggaaaaaadddddaaaaaaaaaaaa...
+...aggggggaaaaaaggggggeeeeeeea..
+..aeaggggggggggggggggaaaaeeeeea.
+.aeeeaaggggggggggggggggggeeeeeea
+aeeeeggaaeggggggeegggggggeeaaaaa
+aeeaeegggeeeeeeeeggggeeeeaaeeeea
+aeeaeeegggeeeegggggeeeeeaeeeeeea
+aeeeaeeeeeeeeeeeeeeeeaaaeeeeeeea
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

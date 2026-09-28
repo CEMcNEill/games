@@ -1,0 +1,46 @@
+size 16x16
+concept Ninja Adventure Villager3 -> support lead: headset, green shirt
+legend
+  a #141b1b
+  b #3b3643
+  c #4e484a
+  d #965340
+  e #2e8a4a
+  f #a3754e
+  g #3fae5a
+  h #8d977f
+  i #abc2bc
+frame
+................
+....aaaaaaaa....
+...acccccccca...
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.acbbbbbbbbbbca.
+.bibddddddddbib.
+.bbdfaffffafdbb.
+.acdfaffffafdca.
+..abfffddfffda..
+...aiffffffda...
+..aeeddddddeea..
+.aeegggeegggeea.
+addeeggggggeedda
+affihhhhhhhhiffa
+frame
+................
+................
+....aaaaaaaa....
+...acccccccca...
+..acccccccccca..
+.acccccccccccca.
+.accbcbccbcbcca.
+.acbbbbbbbbbbca.
+.bibddddddddbib.
+.bbdfaffffafdbb.
+.acdfaffffafdca.
+..abfffddfffda..
+...aiffffffda...
+.aaeeddddddeeaa.
+addeeggggggeedda
+affihhhhhhhhiffa

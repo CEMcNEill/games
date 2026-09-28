@@ -1,0 +1,47 @@
+size 16x16
+base ninja-adventure/Ninja Adventure - Asset Pack/Actor/Character/Boy/SpriteSheet.png
+concept engineer with red hair and a white collar; hoodie in brand primary
+legend
+  a #141b1b
+  b #965340
+  c #d14b34
+  d #548789
+  e #ef914f
+  f #d3a2c0
+  g #e3f1f5
+  h @1 clothes (brand)
+  i @1d clothes (brand)
+frame
+................
+....aaaa.aaa....
+...abbbaacccaaaa
+..acccccccccccca
+.abbcccccccccca.
+.abbbcccccccbbba
+.abbbbbbbbbbbbba
+.aabccccbbcccbba
+.acbgaaeeaageba.
+.acbeeeeeeeeeba.
+.acceeeeaaeeeba.
+..acceeeeeeeca..
+..agggcccccgga..
+.agggggfggggga..
+.aiihhhhahhhiia.
+.aiihhhahhhhiia.
+frame
+................
+................
+....aaaa.aaa....
+...abbbaacccaaaa
+..acccccccccccca
+.abbcccccccccca.
+.abbbcccccccbbba
+.abbbbbbbbbbbbba
+.aabccccbbcccbba
+.acbgaaeeaageba.
+.acbeeeeeeeeeba.
+.aaceeeeaaeeeba.
+.abgceeeeeeeca..
+.aagggcccccgga..
+...adddaadeega..
+....ahhhhaeea...

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Render kit default sprites from text grids, recoloured with a theme palette.
 
-Kits describe their default art in <kit>/art.py as SPRITES = {slot_id: [frame_rows, ...]} (each
+A kit slot's default art is <kit>/sprites/<slot>.sprite when that file exists (see pixel.py; '@' legend
+tokens take the theme's brand colours), else <kit>/art.py.
+Kits describe their older default art in <kit>/art.py as SPRITES = {slot_id: [frame_rows, ...]} (each
 frame a list of equal-length strings) plus optional PROCEDURAL = {slot_id: fn(pal) -> [Image]}.
 Letters map to fixed master-palette colours (LEGEND); the digits 1-5 are brand colours from the
 theme, so fallback art still carries the prospect's colours.
@@ -115,7 +117,11 @@ def build(kit_dir, out_dir, theme=None, only=None):
     for sid, slot in slots.items():
         if only and sid not in only:
             continue
-        if sid in getattr(art, "SPRITES", {}):
+        sprite_file = os.path.join(kit_dir, "sprites", f"{sid}.sprite")
+        if os.path.exists(sprite_file):  # Claude-drawn art (CC0 base + edits) wins over art.py
+            import pixel
+            frames = pixel.to_images(pixel.load(sprite_file), pixel.brand_palette(theme))
+        elif sid in getattr(art, "SPRITES", {}):
             frames = [render(f, pal) for f in art.SPRITES[sid]]
         elif sid in getattr(art, "PROCEDURAL", {}):
             frames = art.PROCEDURAL[sid](pal)

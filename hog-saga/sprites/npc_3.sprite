@@ -1,0 +1,47 @@
+size 16x16
+concept Ninja Adventure Child -> intern: brand cap, backpack straps
+legend
+  a #141b1b
+  b #2b212a
+  c #4e484a
+  d #965340
+  e #d14b34
+  f @1 brand (was #5f7160)
+  g #ef914f
+  h #f1c471
+  i #f2eaf1
+  j #ffffff
+frame
+................
+....aaaaaaaa....
+...affffffffa...
+.aaffffffffffaa.
+acacffffffffcaca
+accccccciiicccca
+abcccccciiicccba
+abbbbbbbbbbbbba.
+abbbheeeeeeeeeaa
+aehhggggggggggga
+aeehggajjajjagga
+.aaegggaaaaagea.
+.acdaeggggggdca.
+aiidcfffffffdiia
+aeebcccccccccgga
+.abbbbaaaabbbaa.
+frame
+................
+................
+....aaaaaaaa....
+...affffffffa...
+.aaffffffffffaa.
+acacffffffffcaca
+accccccciiicccca
+abcccccciiicccba
+abbbbbbbbbbbbba.
+abbbheeeeeeeeeaa
+aehhggggggggggga
+aeehggajjajjagga
+.aaegggaaaaagea.
+aacdaeggggggdcaa
+aeebcccccccccgga
+.abbbbaaaabbbaa.
