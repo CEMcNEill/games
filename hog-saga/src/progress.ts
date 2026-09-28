@@ -2,7 +2,7 @@
 import { K, meta, achieve, heatRow, TitleRow } from '@shared/kit';
 import type { AchievementDef } from '@shared/meta';
 import { hooks } from '@shared/hooks';
-import { R, BOSS, levelUp, freshParty } from './state';
+import { R, BOSS, levelUp, freshParty, scoreMult } from './state';
 import { autoEquip } from './gear';
 import { saga, saveWin, addBreaks, markWyrm, ngReady } from './save';
 
@@ -23,9 +23,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'ngplus', name: 'Sequel', desc: 'Win a New Game+' },
 ];
 
-/** Title rows: MODE (new, NG+, challenges; locked until the first win) and HEAT. */
+/** Title rows after the first win: MODE (new, NG+, challenges, daily) and HEAT. None before it. */
 export function titleMenu(): TitleRow[] {
   const won = meta.data.wins > 0;
+  if (!won && !ngReady()) return []; // first visits get the plain title: PRESS ENTER
   const rows: TitleRow[] = [{ key: 'mode', label: 'MODE', choices: [
     { label: 'NEW GAME', value: 'standard' },
     { label: 'NEW GAME+', value: 'ngplus', locked: !ngReady() },
@@ -65,7 +66,8 @@ export function endSummary(): string[] {
     R.mode === 'speedrun' ? 'SPEEDRUN' : '', R.mode === 'daily' ? `DAILY ${new Date().toISOString().slice(0, 10)}` : '',
     R.heat ? `HEAT ${R.heat}` : ''].filter(Boolean);
   if (tags.length) out.push(tags.join('  '));
-  out.push(`BREAKS ${R.breaks}   COMBOS ${R.combos}   GOLD ${R.gold}`);
+  const mult = scoreMult();
+  out.push(`BREAKS ${R.breaks}   COMBOS ${R.combos}   GOLD ${R.gold}${mult > 1 ? `   SCORE x${mult.toFixed(2)}` : ''}`);
   const s = saga();
   if (R.mode === 'speedrun' && s.bestTimeS) out.push(`BEST TIME ${fmtTime(s.bestTimeS)}`);
   if (meta.data.wins === 1 && R.cleared.has(BOSS)) out.push('NEW GAME+, CHALLENGES AND HEAT UNLOCKED');

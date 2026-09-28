@@ -264,9 +264,17 @@ export const featured = (id: SkillId) => !!SKILLS[id].product && (K.theme.produc
 
 export const theName = (n: string) => (/^the\s/i.test(n) ? `the ${n.slice(4)}` : `the ${n}`);
 
+/** Score: the old base plus breaks, combos and secrets, times a bonus for heat, NG+ and challenges. */
 export function score(won: boolean) {
-  const lv = R.party.reduce((a, m) => a + m.lv, 0);
-  return R.kills * 60 + lv * 120 + R.chests.size * 150 + (won ? 4000 : 0) + Math.max(0, 1500 - R.rounds * 15);
+  const lv = R.party.reduce((a, m) => a + m.lv, 0) * (R.party.length === 1 ? 3 : 1);
+  const base = R.kills * 60 + lv * 120 + R.chests.size * 150 + (won ? 4000 : 0) + Math.max(0, 1500 - R.rounds * 15)
+    + R.breaks * 40 + R.combos * 50 + R.secrets.size * 300;
+  return Math.round(base * scoreMult());
+}
+
+/** x1 on a plain run; +20% per heat, +25% per NG+ cycle, +50% solo, +30% no items. */
+export function scoreMult() {
+  return (1 + 0.2 * R.heat) * (1 + 0.25 * R.ng) * (R.mode === 'solo' ? 1.5 : 1) * (R.mode === 'noitems' ? 1.3 : 1);
 }
 
 export function endData(won: boolean) {
@@ -277,7 +285,7 @@ export function endData(won: boolean) {
     stats: [
       ['Monsters beaten', R.kills],
       ['Party level', R.party.map((m) => m.lv).join(' / ')],
-      ['Chests found', `${R.chests.size}/${CHESTS.length}`],
+      ['Chests / secrets', `${R.chests.size}/${CHESTS.length}  ${R.secrets.size}/4`],
       ['Battle rounds', R.rounds],
     ] as [string, string | number][],
     props: { kills: R.kills, level: R.party[0]?.lv, chests: R.chests.size, rounds: R.rounds },

@@ -122,7 +122,7 @@ Autopilot at speed 8, default theme, 10 runs per row unless noted (2026-09-28). 
 | normal, newcomer bot (`naive`: no scan, weakness, DEFEND or rows; does press SHIP IT!) | 9/10 | 322 (301-343) | 8-12 | 49% | 9.5 / 3.7 / 0 |
 | hard, newcomer bot (8 runs) | 7/8 | ~373 | 10-19 | ~27%, several near-wipes | 12 / 5.2 / 0 |
 | normal + optional content (`optional`, 4 runs) | 4/4 | 487 | 5-8 | 63% | all 7 chests, 4/4 secrets, Wyrm beaten, LV 7 |
-| heat 3 / heat 5 (4 runs each, before the last heat bump) | 3/4 / 4/4 | 431 / 540 | - | - | heat 5: 46 rounds a run, 0 potions |
+| heat 3 / heat 5 (6 runs each) | 6/6 / 4/6 | 454 / 520 | 12-14 / 14-18 | 46-57% / 34-41% | heat 5 losses come in the first fights (0 potions, 3-monster packs) |
 | SOLO HOG (8 runs) | 7/8 | 407 | 17-26 | 9-34% | - |
 | NEW GAME+ after a real win (2 chains) | 2/2 | - | 11 | 52% | party LV 6 -> 8 |
 
