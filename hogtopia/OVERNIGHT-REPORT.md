@@ -31,8 +31,11 @@ existing theme (default, 3 examples, the real `ledgerly-hogtopia` prospect) load
 - **de0c68a** rival-turn banner prioritises fights and captures, key-fuzz playtest tool.
 - **5f7d508** fixes from an independent code review (see below).
 - **e45ccbf** threatened-city "!" badge, best grade, readable key hints, overnight screenshots.
-- Final commit: new sounds (warn, fanfare, veteran), End names the next map, rival style in the info
-  panel, no second rival on the small map, perks line capped to one line, this report.
+- **1a1431c** new sounds (warn, fanfare, veteran), End names the next map, rival style in the info
+  panel, no second rival on the small map, perks line capped to one line, report.
+- **Archipelago map** (the brief's "if boats are feasible"): islands, everyone starts with Sailing, the
+  capitals on different islands; boats drawn under units. It favours the player a little (normal ~77%).
+  Hard growth nudged 0.55 -> 0.62 to keep the rotation average in range.
 
 ## Review fixes (5f7d508)
 An independent review of the diff found: losing a *non-home* capital (heat 4+, a rival retaking a capital
@@ -44,7 +47,7 @@ map attempts instead of the original 60 (a first-game difference on rare seeds).
 
 ## Balance (headless AI vs AI, `tools/run-sim.sh`, details in DESIGN-NOTES.md)
 Later runs (map rotation, heat 0, 80 seeds per cell, autopilot win rate):
-easy 96-100%, normal 54-68% (avg 61%), hard 29-50% (avg 37%). ~40% of normal wins are dominations;
+easy 98-100%, normal 58-71% (avg 65%), hard 33-49% (avg 42%). ~40% of normal wins are dominations;
 normal Aggressors take the autopilot's capital in 20% of games.
 First game (classic map, Expander, `FIRST_GAME` overrides): autopilot 100/99/96%, a "casual first-timer"
 stand-in 80/54/9% (the original kit gave that stand-in 44/20/14%). A passive player loses the capital on
@@ -54,8 +57,6 @@ Real-time: an autopilot game at normal speed ~150 s, ~1.9 s per rival turn.
 
 ## Cut or not done
 - No map larger than 18x12 (would need a scrolling viewport); size variety is Skirmish 14x10 vs 18x12.
-- Archipelago maps: Sailing/boats exist, but every map is still validated for land reachability, so
-  there is no islands-only map type.
 - The rival still has no tech tree (by design: PostHog products are the player's edge). Its techs are
   turn-based unlocks, which count for score and monuments.
 - Easy sits at ~98% for the autopilot instead of ~90%: easy is tuned for a casual first-timer (~80%).
@@ -65,7 +66,7 @@ Real-time: an autopilot game at normal speed ~150 s, ~1.9 s per rival turn.
 monuments + attack forecast, `07-summary` rival turn banner, `08-truce` truce offer, `10-end` End screen
 with grade and breakdown, `11-run2` second run intro banner (Highlands), `12-title-returning` title with
 MAP/HEAT rows, `train` train menu with Catapult, `mass-warning` rival massing warning + "!" badge,
-`heat5` two rivals, `map-small` / `map-lakes` map types.
+`heat5` two rivals, `map-small` / `map-lakes` / `map-archipelago-play` map types (boats).
 
 ## For a human to decide
 - Grade thresholds (S 4200 / A 3300 / B 2400 / C 1500) are set from autopilot scores; a first-time human

@@ -5,7 +5,7 @@ import {
   MAX_TURNS, UNITS, UnitType, TECHS, TIER2, BASE_TECHS, TECH_COST, RIVAL_TECHS, DIFF, Diff, HEAT, LEVEL_REWARDS,
   Personality, PERSONALITIES, AUTOPILOT, FIRST_GAME, VET_KILLS, VET_HP, MONUMENTS, MONUMENT_SCORE, PARK_SCORE, Res,
 } from './data';
-import { MapData, Tile, City, generateMap, landDist, cheb, land, rng, hash } from './mapgen';
+import { MapData, Tile, City, generateMap, landDist, cheb, land, rng, hash, MAP_TYPES } from './mapgen';
 
 export { MAX_TURNS, UNITS, TECHS, cheb, land, rng, hash };
 export type { Tile, City, UnitType };
@@ -33,7 +33,7 @@ export const team = (o: number) => (o === 0 ? 0 : 1);
 export const foes = (a: number, b: number) => team(a) !== team(b);
 
 export class World {
-  W: number; H: number; mapType: string; biome: string;
+  W: number; H: number; mapType: string; biome: string; sea = false;
   tiles: Tile[]; cities: City[];
   units: Unit[] = [];
   f: Faction[];
@@ -63,8 +63,9 @@ export class World {
     this.products = s.products.filter((p) => TECHS[p]?.tier === 1);
     const m: MapData = generateMap(s.seed, s.biome, s.map ?? 'classic', H0.ruins);
     this.W = m.W; this.H = m.H; this.tiles = m.tiles; this.cities = m.cities; this.mapType = m.type;
+    this.sea = !!MAP_TYPES[m.type]?.sea;
     const hasWater = this.tiles.some((t) => t.t === 'water');
-    this.techList = [...BASE_TECHS.filter((b) => b !== 'sailing' || hasWater), ...this.products.flatMap((p) => [p, TIER2[p]].filter(Boolean))];
+    this.techList = [...BASE_TECHS.filter((b) => b !== 'sailing' || (hasWater && !this.sea)), ...this.products.flatMap((p) => [p, TIER2[p]].filter(Boolean))];
     const persona = PERSONALITIES[s.personality ?? ''] ?? PERSONALITIES.opportunist;
     const mk = (stars: number, p: Personality): Faction => ({ stars, techs: [], kills: 0, lost: 0, undoUsed: false, named: 0, wins: 0, persona: p, alive: true, ai: { target: -1, assault: false } });
     this.f = [mk(5, AUTOPILOT), mk(this.diff.rivalStars + H0.stars, persona)];
@@ -104,6 +105,7 @@ export class World {
   owners() { return this.f.map((_, i) => i); }
   rivals() { return this.owners().filter((o) => o !== 0 && this.f[o].alive); }
   has(o: Owner, tech: string) {
+    if (tech === 'sailing' && this.sea) return true;
     if (o !== 0) return RIVAL_TECHS.some(([t, turn]) => t === tech && this.turn >= turn + this.unlockShift());
     return this.f[o].techs.includes(tech);
   }

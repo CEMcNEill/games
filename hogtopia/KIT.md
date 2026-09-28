@@ -64,8 +64,9 @@ fixed `extra` sheet: giant, catapult, boat, monument, wall, park).
 
 ## Map types
 Classic (first game; the original generator), Highlands, Lakes, Continents, Frontier (4 villages a side),
-Skirmish (14x10, 2 villages a side, centred on screen). All point-symmetric and validated so every city is
-reachable over land. Run n>1 uses seed hash(name+biome+'#'+n) and map rotation[n-1]; DAILY uses the shared
+Archipelago (islands: everyone starts with Sailing, cities reachable by land or sea, the two capitals on
+different islands), Skirmish (14x10, 2 villages a side, centred on screen). All point-symmetric and
+validated so every city is reachable (over land, except Archipelago). Run n>1 uses seed hash(name+biome+'#'+n) and map rotation[n-1]; DAILY uses the shared
 daily seed for the map and the personality.
 
 ## Test hooks

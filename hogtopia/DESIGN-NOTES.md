@@ -88,23 +88,25 @@ So a first game is at least as forgiving as before on every difficulty (hard sta
 
 | diff | rival | player win | avg turns | wins: domination/score | player capital lost | final score v rival | vets | monuments (both sides) |
 |---|---|---|---|---|---|---|---|---|
-| easy | aggressor | 96% | 20.3 | 61/16 | 0 | 3699.7 v 399.1 | 1.2 | 5.1 |
-| easy | expander | 98% | 20.3 | 56/22 | 0 | 3683.6 v 530.0 | 0.8 | 5.1 |
-| easy | turtle | 100% | 20.2 | 63/17 | 0 | 3728.7 v 344.9 | 0.8 | 4.6 |
-| easy | opportunist | 96% | 19.7 | 62/15 | 0 | 3621.4 v 406.6 | 0.8 | 4.9 |
-| normal | aggressor | 54% | 22.7 | 14/29 | 16 | 2932.6 v 2498.8 | 2.3 | 6.7 |
-| normal | expander | 60% | 22.5 | 32/16 | 2 | 3829.2 v 2107.4 | 1.6 | 6.5 |
-| normal | turtle | 68% | 23.1 | 22/32 | 3 | 3438.1 v 2089.5 | 1.7 | 6.7 |
-| normal | opportunist | 61% | 23.2 | 17/32 | 3 | 3231.2 v 2342.9 | 2.5 | 6.8 |
-| hard | aggressor | 31% | 21.3 | 9/16 | 36 | 2433.6 v 2886.8 | 2.0 | 6.5 |
-| hard | expander | 29% | 22.9 | 13/10 | 8 | 3031.9 v 3529.3 | 1.9 | 6.7 |
-| hard | turtle | 50% | 23.3 | 11/29 | 13 | 2890.9 v 2906.7 | 2.2 | 6.8 |
-| hard | opportunist | 38% | 22.4 | 5/25 | 27 | 2495.0 v 3080.1 | 2.3 | 6.6 |
+| easy | aggressor | 100% | 20.3 | 62/22 | 0 | 3746.6 v 407.0 | 1.2 | 5.0 |
+| easy | expander | 98% | 20.6 | 58/24 | 0 | 3720.5 v 545.8 | 0.8 | 5.1 |
+| easy | turtle | 99% | 20.6 | 56/27 | 0 | 3730.6 v 544.1 | 0.7 | 4.8 |
+| easy | opportunist | 98% | 20.1 | 59/23 | 0 | 3678.3 v 504.5 | 0.8 | 5.1 |
+| normal | aggressor | 63% | 22.9 | 14/39 | 13 | 3127.4 v 2427.3 | 2.3 | 6.8 |
+| normal | expander | 71% | 22.0 | 37/23 | 2 | 3957.1 v 1912.2 | 1.6 | 6.4 |
+| normal | turtle | 58% | 23.4 | 15/34 | 2 | 3336.1 v 2383.0 | 1.9 | 6.8 |
+| normal | opportunist | 68% | 23.1 | 21/36 | 2 | 3324.6 v 2197.8 | 2.2 | 6.8 |
+| hard | aggressor | 37% | 21.0 | 11/20 | 40 | 2614.5 v 2722.3 | 1.9 | 6.6 |
+| hard | expander | 50% | 22.8 | 24/18 | 5 | 3541.0 v 2763.8 | 1.9 | 6.7 |
+| hard | turtle | 49% | 23.1 | 11/30 | 9 | 2988.3 v 2851.5 | 2.1 | 6.8 |
+| hard | opportunist | 38% | 22.9 | 5/27 | 23 | 2705.5 v 3073.1 | 2.4 | 6.8 |
 
 Easy sits at ~99% rather than 90%: easy is tuned so the casual stand-in wins ~80% (an exec's first game);
-the autopilot is far stronger than that. Normal averages 61% (target 55-70), hard 37% (target 30-45).
+the autopilot is far stronger than that. Normal averages 65% (target 55-70), hard 43% (target 30-45; 42% after the final growth nudge).
 Normal's Aggressor takes the autopilot's capital in 20% of games. Domination is ~40% of normal wins.
-(Numbers after the review fixes, commit 5f7d508+; the AI's target cost had a sign error before that.)
+(Numbers after the review fixes and with Archipelago in the rotation, 84 seeds per cell; the AI's target
+cost had a sign error before commit 5f7d508. Archipelago alone: normal 58-90%, hard 48-73%: the rival
+handles boats worse than land, so island maps are the friendliest later maps.)
 
 **Passive player** (never acts, `run-sim.sh 20 normal all 0 classic passive`): the rival takes the capital
 in every game, around turn 15 on normal and 18-23 on easy, so a passive player does lose the capital.

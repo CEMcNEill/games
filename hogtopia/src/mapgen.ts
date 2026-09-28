@@ -10,7 +10,7 @@ export interface City {
 }
 export interface MapData { W: number; H: number; tiles: Tile[]; cities: City[]; type: string }
 
-export interface MapType { id: string; name: string; W: number; H: number; villages: number; water: number; mountain: number; forest: number; smooth: number; minDist: number; res: number }
+export interface MapType { id: string; name: string; W: number; H: number; villages: number; water: number; mountain: number; forest: number; smooth: number; minDist: number; res: number; sea?: boolean }
 /** Map presets for runs after the first. Shares are fractions of the half map. */
 export const MAP_TYPES: Record<string, MapType> = {
   classic: { id: 'classic', name: 'Classic', W: 18, H: 12, villages: 3, water: -1, mountain: -1, forest: -1, smooth: 2, minDist: 10, res: 0.5 },
@@ -18,9 +18,11 @@ export const MAP_TYPES: Record<string, MapType> = {
   lakes: { id: 'lakes', name: 'Lakes', W: 18, H: 12, villages: 3, water: 0.26, mountain: 0.06, forest: 0.22, smooth: 3, minDist: 10, res: 0.6 },
   continents: { id: 'continents', name: 'Continents', W: 18, H: 12, villages: 3, water: 0.34, mountain: 0.08, forest: 0.2, smooth: 3, minDist: 10, res: 0.55 },
   small: { id: 'small', name: 'Skirmish', W: 14, H: 10, villages: 2, water: 0.12, mountain: 0.1, forest: 0.24, smooth: 2, minDist: 8, res: 0.6 },
+  // Islands: everyone starts with Sailing; cities only need to be reachable by land or sea.
+  archipelago: { id: 'archipelago', name: 'Archipelago', W: 18, H: 12, villages: 3, water: 0.5, mountain: 0.04, forest: 0.22, smooth: 2, minDist: 10, res: 0.6, sea: true },
   wide: { id: 'wide', name: 'Frontier', W: 18, H: 12, villages: 4, water: 0.12, mountain: 0.1, forest: 0.25, smooth: 2, minDist: 10, res: 0.45 },
 };
-export const MAP_ROTATION = ['highlands', 'lakes', 'wide', 'continents', 'small', 'classic'];
+export const MAP_ROTATION = ['highlands', 'lakes', 'wide', 'archipelago', 'continents', 'small', 'classic'];
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 export const cheb = (ax: number, ay: number, bx: number, by: number) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
@@ -170,8 +172,10 @@ function tryGenerate(r: () => number, mt: MapType, [pf, pm, pw]: number[], nRuin
   for (const c of cities) { const t = tile(c.x, c.y); t.t = 'plain'; t.res = null; t.ruins = false; }
   const m: MapData = { W, H, tiles, cities, type: mt.id };
   // Validate: every city reachable over land from the player's capital; capitals far apart.
-  const d = landDist(m, cities[0].x, cities[0].y);
+  const d = landDist(m, cities[0].x, cities[0].y, mt.sea ? (t) => t.t !== 'mountain' : land);
   if (cities.some((c) => d[c.y * W + c.x] < 0)) return null;
+  // Islands must really be islands: the two capitals may not share a landmass.
+  if (mt.sea && landDist(m, cities[0].x, cities[0].y)[caps[1].y * W + caps[1].x] >= 0) return null;
   return cheb(caps[0].x, caps[0].y, caps[1].x, caps[1].y) >= mt.minDist ? m : null;
 }
 

@@ -66,6 +66,13 @@ with sync_playwright() as p:
         pg.evaluate("__game.debug.mass()"); pg.wait_for_timeout(500); shot(pg, "mass-warning")
         pg.wait_for_timeout(1700); shot(pg, "mass-marker")
         pg.close()
+    if "sea" in want:
+        pg = start(b)
+        pg.evaluate("__game.debug.map('archipelago')"); pg.wait_for_timeout(800)
+        pg.evaluate("__game.debug.reveal(); __game.debug.speed(2); __game.debug.autopilot(true)"); pg.wait_for_timeout(14000)
+        pg.evaluate("__game.debug.autopilot(false)"); pg.wait_for_timeout(3000); shot(pg, "map-archipelago-play")
+        print("sea", json.dumps(pg.evaluate("__game.stats"))[:300])
+        pg.close()
     if "heat" in want:
         pg = start(b)
         pg.evaluate("__game.debug.heat(5)"); pg.wait_for_timeout(800); pg.evaluate("__game.debug.reveal()"); pg.wait_for_timeout(300); shot(pg, "heat5")
