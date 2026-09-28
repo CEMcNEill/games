@@ -20,7 +20,7 @@ the writing and drawing. No local models, no servers.
 2. **Pick a kit** from the table in the top-level README.
 3. **Theme**: read `<kit>/prompts/theme.md`, `shared/prompts/rules.md`, the kit's `theme.schema.json` and
    `themes/examples/*.json` (with their briefs), then write the theme JSON. Run
-   `tools/check_theme.py <kit> <brief> <theme> --fix` until it prints OK.
+   `uv run --with jsonschema --with pyyaml python tools/check_theme.py <kit> <brief> <theme> --fix` until it prints OK.
 4. **Art** (optional but worth it): for each slot in `<kit>/slots.json` that has a `prompt`, draw a
    `<slot>.sprite` following `shared/prompts/sprite-style.md`: pick a CC0 base (`assets/CATALOG.md`),
    `pixel.py grab`, edit the grid, `pixel.py render --theme <theme>`, look at the review image, fix
