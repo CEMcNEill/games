@@ -6,7 +6,8 @@ import { hooks } from '@shared/hooks';
 import { meta } from '@shared/meta';
 import { text, box, W, H, PixelText } from '@shared/ui';
 import { onKeys, starfield } from '@shared/scenes';
-import { SHOP, HEROES, ACHIEVEMENTS, WEAPONS, SUPER } from './content';
+import { SHOP, HEROES, ACHIEVEMENTS, WEAPONS, SUPER, PASSIVES, ProductId } from './content';
+import { productName } from './game';
 import { save, persist, heroUnlocked } from './save';
 
 const TABS = ['UPGRADES', 'HEROES', 'RECORDS'];
@@ -160,14 +161,22 @@ export class ShopScene extends Phaser.Scene {
       const y = 52 + (i % 7) * 11;
       T(28 + col * 215, y, `${a.got ? '*' : '-'} ${a.name}`, { color: a.got ? ui.textInt : ui.dimInt, maxWidth: 205, maxLines: 1 });
     });
-    const evos = [...Object.values(WEAPONS).map((w) => w.evo.name), SUPER.name];
-    T(28, 136, `EVOLUTIONS FOUND ${sv.codex.length}/${evos.length}`, { color: ui.accentInt });
-    evos.forEach((n, i) => {
+    // Evolution codex: found ones show their recipe, the rest stay a mystery.
+    const evos: [string, string][] = [
+      ...(Object.entries(WEAPONS) as [ProductId, (typeof WEAPONS)[ProductId]][]).map(([id, w]) =>
+        [w.evo.name, `${productName(id)} + ${PASSIVES[w.evo.passive].name}`] as [string, string]),
+      [SUPER.name, `${WEAPONS[SUPER.a].evo.name} + ${WEAPONS[SUPER.b].evo.name}`],
+    ];
+    T(28, 130, `EVOLUTIONS FOUND ${sv.codex.filter((n) => evos.some(([e]) => e === n)).length}/${evos.length}`, { color: ui.accentInt });
+    T(W - 28, 130, 'weapon LV 5 + partner + chest', { align: 'right', color: ui.dimInt });
+    evos.forEach(([n, how], i) => {
       const found = sv.codex.includes(n);
-      T(28 + (i % 2) * 215, 150 + Math.floor(i / 2) * 11, found ? n : '???', { color: found ? 0xf8d878 : ui.dimInt });
+      const y = 143 + i * 11;
+      T(28, y, found ? n : '???', { color: found ? 0xf8d878 : ui.dimInt });
+      if (found) T(160, y, how, { color: ui.dimInt, maxWidth: W - 190, maxLines: 1 });
     });
     const m = meta.data;
-    T(28, 200 + 12, `RUNS ${m.runs}   WINS ${m.wins}   BUGS ${sv.kills}   GOLD EARNED ${sv.gold}   CHESTS ${sv.chests}`,
+    T(28, 226, `RUNS ${m.runs}   WINS ${m.wins}   BUGS ${sv.kills}   GOLD EARNED ${sv.gold}   CHESTS ${sv.chests}`,
       { color: ui.dimInt, maxWidth: W - 56, maxLines: 1 });
   }
 }
