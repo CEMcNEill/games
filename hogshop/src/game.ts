@@ -1055,7 +1055,11 @@ export class GameScene extends Phaser.Scene {
       if (this.nextJam <= 0) { this.jam(this.r.int(0, 1)); this.nextJam = this.r.float(15, 24) * this.heat.every; }
     }
     this.jamSigns.forEach((s, i) => {
-      s.setText(this.jammed[i] ? K.theme.game.jam.name : '').setVisible(Math.floor(this.t * 3) % 2 === 0);
+      s.setText(this.jammed[i] ? K.theme.game.jam.name : '');
+      // the SPACE hint wins: never draw the jam sign under it (the lever sits right below the sign)
+      const underHint = this.hint.visible && this.jammed[i] &&
+        Phaser.Geom.Rectangle.Overlaps(this.hint.getBounds(), s.getBounds());
+      s.setVisible(Math.floor(this.t * 3) % 2 === 0 && !underHint);
       if (this.jammed[i] && Math.floor(this.t * 5) !== Math.floor((this.t - dt) * 5)) burst(this, 40 + this.r.int(0, 380), i === 0 ? TOP_BELT : BOT_BELT, 0xfca044, 3, { speed: 50 });
     });
     this.levers.forEach((l, i) => l.setTint(this.jammed[i] && Math.floor(this.t * 4) % 2 ? 0xff8080 : 0xffffff));
