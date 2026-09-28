@@ -225,14 +225,15 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (this.enc === WYRM) {
-      this.addFoe({ name: WYRM_NAME, pain: WYRM_TAUNT, arch: 'wyrm', key: 'wyrm', sprite: 'wyrm', hp: 1500 * mult.hp * heat.hp * ng,
-        atk: 36 * (1 + 0.15 * R.ng), def: 17, mag: 31 * (1 + 0.15 * R.ng), spd: 12, xp: 220 }, W / 2, 140, 1.7);
+      this.addFoe({ name: WYRM_NAME, pain: WYRM_TAUNT, arch: 'wyrm', key: 'wyrm', sprite: 'wyrm', hp: 2400 * mult.hp * heat.hp * ng,
+        atk: 41 * (1 + 0.25 * R.ng), def: 18, mag: 36 * (1 + 0.25 * R.ng), spd: 12, xp: 220 }, W / 2, 140, 1.7);
+      this.foes[0].phase = 2; // it hits like the angry boss from the start (double deploys, statuses)
       return;
     }
     if (this.enc === MIMIC) {
       const t = 2 + this.region * 2.5 + R.ng * 5;
       const a = ARCH.fast;
-      this.addFoe({ name: MIMIC_DEF.name, pain: MIMIC_DEF.pain, arch: 'fast', key: 'fast', sprite: 'chest', hp: Math.round(a.hp * 2.2 * (1 + 0.22 * (t - 1)) * mult.hp * heat.hp),
+      this.addFoe({ name: MIMIC_DEF.name, pain: MIMIC_DEF.pain, arch: 'fast', key: 'fast', sprite: 'chest', hp: Math.round(a.hp * 4 * (1 + 0.22 * (t - 1)) * mult.hp * heat.hp),
         atk: a.atk * (1 + 0.16 * (t - 1)), def: a.def * (1 + 0.22 * (t - 1)), mag: a.mag, spd: a.spd + t * 0.3, xp: Math.round(a.xp * 2 * (1 + 0.45 * (t - 1))) }, W / 2, 134, 4);
       return;
     }

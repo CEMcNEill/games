@@ -53,6 +53,7 @@ def one(port, a, i):
                "scans": stats.get("scans"), "gold": stats.get("gold"), "items": stats.get("items"), "chests": stats.get("chests"),
                "secrets": stats.get("secrets"), "flags": stats.get("flags"), "errors": errs[:3], "gear": stats.get("gear"),
                "boss": [x for x in (stats.get("battles") or []) if x.get("enc") in (8,)],
+               "extra": [x for x in (stats.get("battles") or []) if x.get("enc") in (9, 10)],
                "minhp": [x.get("minHp") for x in (stats.get("battles") or [])]}
         b.close()
         return out

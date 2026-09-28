@@ -62,6 +62,8 @@ note sequences), battle + boss music (ACE-Step via music.py, fixed kit audio in 
   Replay and double HP/MP growth, and solo monsters have HP x0.55 and damage x0.65: now 7/8.
 - NG+ from a real win: LV 6 -> 8, boss 11 rounds, 52% HP left (monsters +5 tiers, boss +60% HP and
   +25% power per cycle).
+- The Wyrm at 1500 HP was softer than the final boss (8-9 rounds, 53-63% HP left) and the Mimic died in
+  one round: Wyrm 2400 HP, +14% power, angry from the start (13-16 rounds, 25-54% left); Mimic HP x4.
 - Final table: KIT.md "Balance".
 
 ## M2 (P1): world, loot, replay
@@ -79,8 +81,8 @@ Road chests now hold an item plus a piece of gear.
 - a **cracked wall** in the cave hiding an old server room with the best armour;
 - the **Old Dev** in town (fixed kit NPC) lost a Lucky Keyboard in the north woods: bring it back
   for a Coffee Mug and gold;
-- the **Tech Debt Wyrm** by the desert lake, an optional superboss (1500 HP, weak DATA, resists
-  MAGIC, 6 shield). First touch warns; walk into it again to fight. Reward: Big Data Staff + gold.
+- the **Tech Debt Wyrm** by the desert lake, an optional superboss (2400 HP, hits like the angry
+  boss from the start, weak DATA, resists MAGIC, 6 shield). First touch warns; walk into it again to fight. Reward: Big Data Staff + gold.
 The footer shows gold, chests (x/7) and secrets (x/4); finding one toasts "SECRET n/4".
 
 **Replay.** The title gets a MODE row (NEW GAME, NEW GAME+, SOLO HOG, NO ITEMS, SPEEDRUN; all but
