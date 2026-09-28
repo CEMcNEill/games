@@ -519,7 +519,9 @@ export class BattleScene extends Phaser.Scene {
       this.mode = 'end';
       this.dissolve();
       K.play('kill');
-      this.say(`${this.def.name} crashes and dissolves into log lines.`, () => this.exit('debugged'));
+      const wasReady = this.mercy >= 100 || this.solved;
+      this.say(wasReady ? `${this.def.name} was ready to be spared. It looks at you, confused, then crashes into log lines.`
+        : `${this.def.name} crashes and dissolves into log lines.`, () => this.exit('debugged'));
     }
   }
 

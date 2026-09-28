@@ -354,10 +354,22 @@ export class ExploreScene extends Phaser.Scene {
     const first = !R.met.has(i);
     R.met.add(i);
     const speaker = `${npc.name}, ${npc.role}`;
-    const lines = (npc.lines as string[]).map((t) => ({ speaker, text: t }));
+    let lines = (npc.lines as string[]).map((t) => ({ speaker, text: t }));
     const memo = first ? this.remember(i) : '';
     if (memo) lines.unshift({ speaker, text: memo });
+    // Talk again after a battle: a reaction to how you're handling things, then their last line.
+    const react = first ? '' : this.reaction();
+    if (react) lines = [{ speaker, text: react }, lines[lines.length - 1]];
     this.say(lines, () => {});
+  }
+
+  /** What the team says about the run so far (fixed kit lines). */
+  private reaction(): string {
+    const done = R.spared + R.debugged;
+    if (!done) return '';
+    if (R.debugged === 0) return R.spared > 1 ? 'Everyone is so calm today. What did you DO?' : 'I heard you talked one of them down. Nice!';
+    if (R.spared === 0) return R.debugged > 1 ? 'It is getting very quiet around here. Too quiet.' : 'Did you... delete something? The logs look weird.';
+    return 'Some problems are gone, some are just... happier? Interesting approach.';
   }
 
   /** On later runs the first and last NPC remember you (fixed kit lines driven by the save). */
