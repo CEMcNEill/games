@@ -625,3 +625,125 @@ PROCEDURAL = {
     "enemy_1": _enemy_1, "enemy_2": _enemy_2, "enemy_3": _enemy_3, "enemy_4": _enemy_4, "enemy_5": _enemy_5,
     "boss": _boss,
 }
+
+
+# ---------------------------------------------------------------- 8x8 battle/HUD icons (fixed kit art)
+# 0 strike, 1 magic, 2 data, 3 unknown, 4 leak, 5 frozen, 6 throttled, 7 focused,
+# 8 gold, 9 weapon, 10 armour, 11 charm, 12 break, 13 alert, 14 star, 15 chest
+ICONS8 = [
+    ["......wk", ".....wlk", "....wlk.", "k..wlk..", ".kwlk...", "..kk....", ".kbkk...", "kb..k..."],
+    ["...y....", "...y....", "..yYy...", "yyYwYyy.", "..yYy...", "...y....", "...y..y.", "......Y."],
+    [".......k", "......Qk", "......Qk", "...Q..Qk", "...Q..Qk", "Q..Q..Qk", "Q..Q..Qk", "kkkkkkkk"],
+    ["kkkkkkkk", "kgwwwwgk", "kggggwgk", "kgggwwgk", "kggwwggk", "kggggggk", "kggwwggk", "kkkkkkkk"],
+    ["...E....", "...E....", "..EEE...", ".EEwEE..", ".EwEEE..", ".EEEEE..", "..EEE...", "........"],
+    ["C..C..C.", ".C.C.C..", "..CwC...", "CCwwwCC.", "..CwC...", ".C.C.C..", "C..C..C.", "........"],
+    ["kkkkkkk.", ".kYYYk..", "..kyk...", "...k....", "..kyk...", ".kyyyk..", "kkkkkkk.", "........"],
+    ["..iiii..", ".i....i.", "i..ii..i", "i.iwwi.i", "i.iwwi.i", "i..ii..i", ".i....i.", "..iiii.."],
+    ["..kkkk..", ".kyyyyk.", "kyYyyyyk", "kyYkkyyk", "kyYyyyyk", "kyyyyyok", ".kyyyok.", "..kkkk.."],
+    [".....ll.", "....lwl.", "...lwl..", "..lwl...", "olwl....", ".ok.....", "o.o.....", "........"],
+    ["kkkkkkk.", "kBBwBBk.", "kBBwBBk.", "kwwwwwk.", "kBBwBBk.", ".kBwBk..", "..kBk...", "...k...."],
+    ["..k.k...", ".k.k.k..", "..kPk...", ".kPIPk..", "kPIwIPk.", ".kPIPk..", "..kPk...", "...k...."],
+    ["kkkkkkk.", "kRRkRRk.", "kRk.kRk.", "kRRkRRk.", "kRkkRRk.", ".kRkRk..", "..kRk...", "...k...."],
+    ["..kRk...", "..kRk...", "..kRk...", "..kRk...", "..kRk...", "...k....", "..kRk...", "..kkk..."],
+    ["...y....", "...y....", "..yyy...", "yyyYyyy.", ".yyYyy..", "..yyy...", ".yy.yy..", ".y...y.."],
+    ["........", ".kkkkkk.", "kobbbbok", "kbbybbbk", "kkkykkkk", "kbbbbbbk", "kobbbbok", ".kkkkkk."],
+]
+SPRITES["saga_icons"] = ICONS8
+
+
+# ---------------------------------------------------------------- off-the-road extras (fixed kit art)
+def _beard(rows):
+    rows = list(rows)
+    rows[6] = ".....TllllT....."
+    rows[7] = "......llll......"
+    return rows
+
+
+def _wyrm(pal):
+    """The optional superboss (64x64): a coiled serpent of tangled legacy cables with TODO-note scales."""
+    frames = []
+    for f in range(2):
+        im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        k, body, belly, note, eye = _c(pal, "k"), rgb("#007800"), rgb("#58d854"), rgb("#f8d878"), rgb("#f83800")
+        # coils (back to front)
+        for (cx, cy, r) in ((40, 50, 13), (22, 48, 12), (32, 38, 11)):
+            d.ellipse([cx - r - 1, cy - r - 1, cx + r + 1, cy + r + 1], fill=k)
+            d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=body)
+            d.arc([cx - r + 3, cy - r + 3, cx + r - 3, cy + r - 3], 20, 160, fill=belly, width=3)
+        # sticky-note scales
+        for i, (x, y) in enumerate(((16, 44), (42, 46), (30, 33), (24, 52), (46, 54))):
+            y += (f if i % 2 else -f)
+            d.rectangle([x - 1, y - 1, x + 4, y + 4], fill=k)
+            d.rectangle([x, y, x + 3, y + 3], fill=note)
+        # neck and head
+        hx, hy = 38 + f, 14 - f
+        d.line([(32, 30), (36, 22), (hx, hy + 6)], fill=k, width=9)
+        d.line([(32, 30), (36, 22), (hx, hy + 6)], fill=body, width=6)
+        d.polygon([(hx - 12, hy - 2), (hx + 12, hy - 4), (hx + 16, hy + 6), (hx - 10, hy + 10)], fill=k)
+        d.polygon([(hx - 10, hy - 1), (hx + 11, hy - 3), (hx + 14, hy + 5), (hx - 8, hy + 8)], fill=body)
+        # horns: two frayed cable ends
+        for sx in (-6, 4):
+            d.line([(hx + sx, hy - 2), (hx + sx - 3, hy - 10)], fill=k, width=3)
+            d.point([(hx + sx - 3, hy - 11), (hx + sx - 5, hy - 10), (hx + sx - 1, hy - 11)], fill=rgb("#f8b800"))
+        d.rectangle([hx - 4, hy + 1, hx - 1, hy + 3], fill=eye)
+        d.rectangle([hx + 5, hy + 1, hx + 8, hy + 3], fill=eye)
+        d.line([(hx - 6, hy + 7), (hx + 10, hy + 6)], fill=k, width=1)
+        for tx in range(hx - 4, hx + 9, 4):
+            d.point([(tx, hy + 7 + (1 if f else 0))], fill=rgb("#fcfcfc"))
+        frames.append(im)
+    return frames
+
+
+def _map_bits(pal):
+    """16x16 map props: 0 shop sign, 1 wall crack overlay, 2 the lost keyboard, 3 sparkle."""
+    k = _c(pal, "k")
+    out = []
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle([2, 2, 13, 10], fill=k)
+    d.rectangle([3, 3, 12, 9], fill=rgb("#ac7c00"))
+    d.ellipse([5, 4, 10, 8], fill=rgb("#f8b800"))            # a gold coin on the sign
+    d.point([(7, 5), (7, 6), (8, 7)], fill=rgb("#ac7c00"))
+    d.rectangle([7, 11, 8, 15], fill=k)
+    out.append(im)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.line([(8, 1), (6, 5), (9, 8), (6, 12), (8, 15)], fill=k, width=1)
+    d.line([(9, 8), (13, 10)], fill=k, width=1)
+    d.line([(6, 5), (3, 4)], fill=k, width=1)
+    out.append(im)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle([1, 6, 14, 13], fill=k)
+    d.rectangle([2, 7, 13, 12], fill=rgb("#bcbcbc"))
+    for yy in (8, 10):
+        for xx in range(3, 13, 2):
+            d.point([(xx, yy)], fill=k)
+    d.line([(5, 12), (10, 12)], fill=k)
+    d.point([(13, 3), (12, 4), (14, 4), (13, 5)], fill=rgb("#fcfcfc"))
+    out.append(im)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for (x, y) in ((8, 4), (8, 12), (4, 8), (12, 8)):
+        d.point([(x, y)], fill=rgb("#f8d878"))
+    d.line([(8, 5), (8, 11)], fill=rgb("#fcfcfc"))
+    d.line([(5, 8), (11, 8)], fill=rgb("#fcfcfc"))
+    out.append(im)
+    return out
+
+
+PROCEDURAL["quest_npc"] = _person("l", "t", "q", "g", _beard)
+PROCEDURAL["wyrm"] = _wyrm
+PROCEDURAL["saga_map"] = _map_bits
+
+
+def _hat(rows):
+    rows = list(rows)
+    rows[0] = "....kkkkkkkk...."
+    rows[1] = "...kOOOOOOOOk..."
+    rows[2] = "..kkkkkkkkkkkk.."
+    return rows
+
+
+PROCEDURAL["merchant"] = _person("b", "a", "p", "b", _hat)

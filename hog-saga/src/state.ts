@@ -2,18 +2,23 @@
 // encounter table. All numbers live here; the theme only names and flavours things.
 import { K } from '@shared/kit';
 import products from '../../shared/products.json';
+import type { Kind, StatusId, FoeKey } from './rules';
+import { HEAT } from './rules';
+import { gearStat, hasFx, GearId, Slot } from './gear';
+import { saga } from './save';
 
 export type ClassId = 'hero' | 'analyst' | 'support';
 export type SkillId = 'error_tracking' | 'experiments' | 'feature_flags' | 'web_analytics' | 'product_analytics'
-  | 'data_warehouse' | 'session_replay' | 'surveys' | 'coffee_run';
+  | 'data_warehouse' | 'session_replay' | 'surveys' | 'coffee_run' | 'code_review' | 'dashboards' | 'standup';
 export type Target = 'enemy' | 'enemies' | 'ally' | 'party';
 export type ItemId = 'potion' | 'ether' | 'hotfix';
 export type Arch = 'swarm' | 'fast' | 'brute' | 'tank' | 'caster';
+export type Mode = 'standard' | 'ngplus' | 'solo' | 'noitems' | 'speedrun' | 'daily';
 
 export const DIFF = {
   easy: { hp: 0.72, dmg: 0.7 },
   normal: { hp: 1, dmg: 0.9 },
-  hard: { hp: 1.2, dmg: 0.98 },
+  hard: { hp: 1.25, dmg: 1.06 },
 };
 
 interface ClassDef {
@@ -24,25 +29,29 @@ interface ClassDef {
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   hero: { base: { hp: 38, mp: 8, atk: 11, def: 7, mag: 4, spd: 9 }, grow: { hp: 8, mp: 2, atk: 3, def: 2, mag: 1, spd: 1 },
-    learn: [[1, 'error_tracking'], [2, 'experiments'], [4, 'feature_flags']] },
+    learn: [[1, 'error_tracking'], [2, 'experiments'], [4, 'feature_flags'], [7, 'code_review']] },
   analyst: { base: { hp: 27, mp: 18, atk: 6, def: 4, mag: 12, spd: 10 }, grow: { hp: 5, mp: 4, atk: 1, def: 1, mag: 3, spd: 1 },
-    learn: [[1, 'web_analytics'], [2, 'product_analytics'], [4, 'data_warehouse']] },
+    learn: [[1, 'web_analytics'], [2, 'product_analytics'], [4, 'data_warehouse'], [7, 'dashboards']] },
   support: { base: { hp: 31, mp: 16, atk: 7, def: 6, mag: 9, spd: 11 }, grow: { hp: 6, mp: 3, atk: 2, def: 2, mag: 2, spd: 1 },
-    learn: [[1, 'session_replay'], [3, 'surveys'], [5, 'coffee_run']] },
+    learn: [[1, 'session_replay'], [3, 'surveys'], [5, 'coffee_run'], [7, 'standup']] },
 };
 
-export interface SkillDef { name: string; product: string | null; mp: number; target: Target; line: string; sfx: string }
+export interface SkillDef { name: string; product: string | null; mp: number; target: Target; line: string; sfx: string; kind?: Kind }
 
 export const SKILLS: Record<SkillId, SkillDef> = {
-  error_tracking: { name: 'Error Tracking', product: 'error_tracking', mp: 3, target: 'enemy', line: 'Big hit; exposes its weak spot', sfx: 'crit' },
-  experiments: { name: 'Experiments', product: 'experiments', mp: 4, target: 'enemies', line: 'A/B strike: two random hits', sfx: 'hit' },
+  error_tracking: { name: 'Error Tracking', product: 'error_tracking', mp: 3, target: 'enemy', line: 'Big hit; exposes its weak spot', sfx: 'crit', kind: 'data' },
+  experiments: { name: 'Experiments', product: 'experiments', mp: 4, target: 'enemies', line: 'A/B strike: two random hits', sfx: 'hit', kind: 'strike' },
   feature_flags: { name: 'Feature Flags', product: 'feature_flags', mp: 6, target: 'party', line: 'Shield: party takes half damage', sfx: 'shield' },
-  web_analytics: { name: 'Web Analytics', product: 'web_analytics', mp: 3, target: 'enemy', line: 'Traffic spike on one foe', sfx: 'magic' },
-  product_analytics: { name: 'Product Analytics', product: 'product_analytics', mp: 5, target: 'enemies', line: 'Chart blast hits every foe', sfx: 'magic' },
-  data_warehouse: { name: 'Data Warehouse', product: 'data_warehouse', mp: 4, target: 'enemy', line: 'Query a foe; party regains MP', sfx: 'magic' },
-  session_replay: { name: 'Session Replay', product: 'session_replay', mp: 4, target: 'ally', line: 'Rewind: heal or revive one ally', sfx: 'heal' },
-  surveys: { name: 'Surveys', product: 'surveys', mp: 5, target: 'enemies', line: 'Foes weaken and get distracted', sfx: 'debuff' },
-  coffee_run: { name: 'Coffee Run', product: null, mp: 9, target: 'party', line: 'Heal the whole party', sfx: 'heal' },
+  web_analytics: { name: 'Web Analytics', product: 'web_analytics', mp: 3, target: 'enemy', line: 'Magic hit; reveals weak spots', sfx: 'magic', kind: 'magic' },
+  product_analytics: { name: 'Product Analytics', product: 'product_analytics', mp: 5, target: 'enemies', line: 'Chart blast hits every foe', sfx: 'magic', kind: 'magic' },
+  data_warehouse: { name: 'Data Warehouse', product: 'data_warehouse', mp: 4, target: 'enemy', line: 'Query a foe; party regains MP', sfx: 'magic', kind: 'data' },
+  session_replay: { name: 'Session Replay', product: 'session_replay', mp: 4, target: 'ally', line: 'Heal, cure or revive one ally', sfx: 'heal' },
+  surveys: { name: 'Surveys', product: 'surveys', mp: 5, target: 'enemies', line: 'Foes weaken and slow down', sfx: 'debuff' },
+  coffee_run: { name: 'Coffee Run', product: null, mp: 9, target: 'party', line: 'Heal and cure the whole party', sfx: 'heal' },
+  // LV 7 skills (reached with optional content or New Game+). Not products, like Coffee Run.
+  code_review: { name: 'Code Review', product: null, mp: 7, target: 'enemy', line: 'Two strikes; the second always crits', sfx: 'crit', kind: 'strike' },
+  dashboards: { name: 'Dashboards', product: null, mp: 8, target: 'enemies', line: 'Magic on all; reveals every weak spot', sfx: 'magic', kind: 'magic' },
+  standup: { name: 'Standup', product: null, mp: 8, target: 'party', line: 'Party FOCUSED and healed a little', sfx: 'heal' },
 };
 
 export const ITEMS: Record<ItemId, { name: string; line: string; target: Target }> = {
@@ -73,8 +82,12 @@ export const ENCOUNTERS: { tier: number; group: number[]; region: number }[] = [
 export const BOSS = 8;
 /** Map gates and the encounters that open them. */
 export const GATES: Record<string, number[]> = { G: [0, 1], g: [2, 3, 4], X: [5, 6, 7] };
-/** Chest contents in map order (c markers top to bottom, left to right). */
-export const CHESTS: (ItemId | 'relic')[] = ['potion', 'ether', 'hotfix', 'relic', 'potion'];
+/** Chest contents in map order: the 5 road chests (c, sorted by x), then the 2 hidden ones (h).
+ * Ids are items, 'relic' or gear (gear.ts). NG+ remixes some of them (world.ts). */
+export const CHESTS: string[][] = [
+  ['potion', 'hoodie'], ['ether', 'laser_pointer'], ['hotfix', 'rubber_mallet'], ['relic'], ['potion', 'standup_vest'],
+  ['merge_hammer', 'lucky_duck'], ['firewall_mail', 'hotfix'],
+];
 
 export const xpNext = (lv: number) => Math.round(12 * lv ** 1.55);
 
@@ -83,12 +96,15 @@ export interface Member {
   lv: number; xp: number; hp: number; mp: number;
   maxHp: number; maxMp: number; atk: number; def: number; mag: number; spd: number;
   skills: SkillId[];
+  status: Partial<Record<StatusId, number>>;
+  gear: Partial<Record<Slot, GearId>>;
+  row: 'front' | 'back';
 }
 
 function makeMember(cls: ClassId, name: string, role: string, sprite: string): Member {
   const b = CLASSES[cls].base;
   const m: Member = { cls, name, role, sprite, lv: 1, xp: 0, hp: b.hp, mp: b.mp, maxHp: b.hp, maxMp: b.mp,
-    atk: b.atk, def: b.def, mag: b.mag, spd: b.spd, skills: [] };
+    atk: b.atk, def: b.def, mag: b.mag, spd: b.spd, skills: [], status: {}, gear: {}, row: 'front' };
   m.skills = CLASSES[cls].learn.filter(([l]) => l <= 1).map(([, s]) => s);
   return m;
 }
@@ -96,8 +112,9 @@ function makeMember(cls: ClassId, name: string, role: string, sprite: string): M
 /** Raise a member one level; returns the stat gains and any new skill. */
 export function levelUp(m: Member): { gains: Record<string, number>; learned: SkillId | null } {
   const g = CLASSES[m.cls].grow;
+  const solo = R.mode === 'solo' ? 2 : 1;
   m.lv++;
-  m.maxHp += g.hp; m.maxMp += g.mp; m.atk += g.atk; m.def += g.def; m.mag += g.mag; m.spd += g.spd;
+  m.maxHp += g.hp * solo; m.maxMp += g.mp * solo; m.atk += g.atk; m.def += g.def; m.mag += g.mag; m.spd += g.spd;
   m.hp = Math.min(m.maxHp, m.hp + g.hp);
   m.mp = Math.min(m.maxMp, m.mp + g.mp);
   const learn = CLASSES[m.cls].learn.find(([l]) => l === m.lv);
@@ -122,6 +139,27 @@ export const R = {
   god: false,
   over: false,
   started: false,
+  /** Ship It meter 0-100, kept between battles. */
+  meter: 0,
+  /** Run settings from the title (K.run): mode, heat, NG+ cycle. */
+  mode: 'standard' as Mode,
+  heat: 0,
+  heatDef: HEAT[0],
+  ng: 0,
+  gold: 0,
+  itemsUsed: 0,
+  secrets: new Set<string>(),
+  flags: new Set<string>(),
+  optional: false,
+  /** Autopilot plays like a newcomer: ignores scan, weaknesses, combos, rows and the shop. */
+  naive: false,
+  /** Load test: keep the Ship It meter full so every turn is a combo with particles. */
+  flood: false,
+  /** Weak/resist knowledge for this run: 'tank:weak', 'boss2:resist'... */
+  known: new Set<string>(),
+  breaks: 0,
+  combos: 0,
+  scans: 0,
   log: [] as { enc: number; rounds: number; startHp: number; minHp: number; ko: number; lv: number }[],
 };
 
@@ -131,19 +169,59 @@ export function publishStats(hooks: { stats: Record<string, unknown>; score: num
     levels: R.party.map((m) => m.lv), hp: R.party.map((m) => `${m.hp}/${m.maxHp}`), mp: R.party.map((m) => `${m.mp}/${m.maxMp}`),
     cleared: [...R.cleared].sort((a, b) => a - b), chests: R.chests.size, kills: R.kills, rounds: R.rounds,
     items: { ...R.items }, relic: R.relic, pos: { ...R.pos }, battles: R.log,
+    meter: Math.round(R.meter), known: [...R.known], breaks: R.breaks, combos: R.combos, scans: R.scans,
+    gold: R.gold, secrets: [...R.secrets], flags: [...R.flags], mode: R.mode, heat: R.heat, ng: R.ng, itemsUsed: R.itemsUsed,
+    gear: R.party.map((m) => ({ ...m.gear })), status: R.party.map((m) => ({ ...m.status })),
   };
   hooks.score = score(R.cleared.has(8));
 }
 
-export function resetRun() {
+/** A new LV 1 party (hedgehog + the theme's two companions). */
+export function freshParty(): Member[] {
   const g = K.theme.game;
-  R.diff = DIFF[g.difficulty as keyof typeof DIFF] ?? DIFF.normal;
-  R.party = [
+  return [
     makeMember('hero', 'Hog', 'Hedgehog', 'hero'),
     makeMember('analyst', g.party[0].name, g.party[0].role, 'party_1'),
     makeMember('support', g.party[1].name, g.party[1].role, 'party_2'),
   ];
-  R.items = { potion: 3, ether: 1, hotfix: 1 };
+}
+
+const MODES: Mode[] = ['standard', 'ngplus', 'solo', 'noitems', 'speedrun', 'daily'];
+
+export function resetRun() {
+  const g = K.theme.game;
+  R.diff = DIFF[g.difficulty as keyof typeof DIFF] ?? DIFF.normal;
+  R.mode = (MODES as string[]).includes(K.run?.mode) ? (K.run.mode as Mode) : 'standard';
+  R.heat = Math.max(0, Math.min(HEAT.length - 1, Math.floor(Number(K.run?.heat) || 0)));
+  R.heatDef = HEAT[R.heat];
+  R.party = freshParty();
+  R.ng = 0;
+  const sv = saga();
+  if (R.mode === 'ngplus' && sv.ngParty?.length) {
+    R.ng = Math.min(3, sv.ngCycle + 1);
+    for (const m of R.party) {
+      const old = sv.ngParty.find((o) => o.cls === m.cls);
+      if (!old) continue;
+      Object.assign(m, { lv: old.lv, xp: old.xp, maxHp: old.maxHp, maxMp: old.maxMp, atk: old.atk, def: old.def, mag: old.mag, spd: old.spd,
+        skills: old.skills.length ? [...old.skills] : m.skills, gear: { ...old.gear } });
+      m.hp = m.maxHp;
+      m.mp = m.maxMp;
+    }
+  } else if (R.mode === 'ngplus') {
+    R.mode = 'standard';
+  }
+  if (R.mode === 'solo') {
+    // One hedgehog does the work of three: tougher, and it can patch itself up.
+    R.party = R.party.slice(0, 1);
+    const h = R.party[0];
+    if (R.ng <= 0) {
+      h.maxHp = Math.round(h.maxHp * 2.2); h.maxMp *= 2; h.atk += 4; h.def += 3;
+    }
+    if (!h.skills.includes('session_replay')) h.skills.push('session_replay');
+    h.hp = h.maxHp; h.mp = h.maxMp;
+  }
+  const none = R.mode === 'noitems';
+  R.items = { potion: none ? 0 : R.heatDef.potions, ether: none ? 0 : 1, hotfix: none ? 0 : 1 };
   R.relic = false;
   R.cleared = new Set();
   R.chests = new Set();
@@ -154,10 +232,26 @@ export function resetRun() {
   R.over = false;
   R.started = false;
   R.log = [];
+  R.meter = 0;
+  R.known = new Set();
+  R.breaks = 0;
+  R.combos = 0;
+  R.scans = 0;
+  R.gold = 0;
+  R.itemsUsed = 0;
+  R.secrets = new Set();
+  R.flags = new Set();
+  R.flood = false;
 }
 
+export const knows = (key: FoeKey, what: 'weak' | 'resist') => R.known.has(`${key}:${what}`);
+
 /** Effective stats including the relic bonus. */
-export const stat = (m: Member, k: 'atk' | 'def' | 'mag') => m[k] + (R.relic ? (k === 'def' ? 2 : 3) : 0);
+export const stat = (m: Member, k: 'atk' | 'def' | 'mag') => m[k] + (R.relic ? (k === 'def' ? 2 : 3) : 0) + gearStat(m, k);
+export const gearCrit = (m: Member) => (hasFx(m, 'critUp') ? 0.12 : 0);
+export const gearMagic = (m: Member) => (hasFx(m, 'magicUp') ? 1.1 : 1);
+export const gearHeal = (m: Member) => (hasFx(m, 'healUp') ? 1.3 : 1);
+export const gearDef = (m: Member) => (hasFx(m, 'guard') ? 0.9 : 1);
 
 export const productName = (id: string) => (products as Record<string, { name: string }>)[id]?.name ?? id;
 
@@ -174,9 +268,17 @@ export const featured = (id: SkillId) => !!SKILLS[id].product && (K.theme.produc
 
 export const theName = (n: string) => (/^the\s/i.test(n) ? `the ${n.slice(4)}` : `the ${n}`);
 
+/** Score: the old base plus breaks, combos and secrets, times a bonus for heat, NG+ and challenges. */
 export function score(won: boolean) {
-  const lv = R.party.reduce((a, m) => a + m.lv, 0);
-  return R.kills * 60 + lv * 120 + R.chests.size * 150 + (won ? 4000 : 0) + Math.max(0, 1500 - R.rounds * 15);
+  const lv = R.party.reduce((a, m) => a + m.lv, 0) * (R.party.length === 1 ? 3 : 1);
+  const base = R.kills * 60 + lv * 120 + R.chests.size * 150 + (won ? 4000 : 0) + Math.max(0, 1500 - R.rounds * 15)
+    + R.breaks * 40 + R.combos * 50 + R.secrets.size * 300;
+  return Math.round(base * scoreMult());
+}
+
+/** x1 on a plain run; +20% per heat, +25% per NG+ cycle, +50% solo, +30% no items. */
+export function scoreMult() {
+  return (1 + 0.2 * R.heat) * (1 + 0.25 * R.ng) * (R.mode === 'solo' ? 1.5 : 1) * (R.mode === 'noitems' ? 1.3 : 1);
 }
 
 export function endData(won: boolean) {
@@ -187,7 +289,7 @@ export function endData(won: boolean) {
     stats: [
       ['Monsters beaten', R.kills],
       ['Party level', R.party.map((m) => m.lv).join(' / ')],
-      ['Chests found', `${R.chests.size}/${CHESTS.length}`],
+      ['Chests / secrets', `${R.chests.size}/${CHESTS.length}  ${R.secrets.size}/4`],
       ['Battle rounds', R.rounds],
     ] as [string, string | number][],
     props: { kills: R.kills, level: R.party[0]?.lv, chests: R.chests.size, rounds: R.rounds },

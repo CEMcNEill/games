@@ -21,7 +21,8 @@ What you write, and where the player sees it:
   desert): each is one of their pain points as a monster. name (max 14), pain (max 50) is shown when it
   appears. archetype picks its fighting style: swarm (weak, comes in pairs; good for enemy 1), fast
   (acts often), brute (hits hard), tank (tough, hardens), caster (hits the whole party; good for enemy 5).
-  Use at least 4 different archetypes.
+  Use at least 4 different archetypes. The archetype also fixes the monster's weakness (swarm and brute:
+  MAGIC, fast and caster: STRIKE, tank: DATA), so a mix of archetypes makes the fights varied.
 - game.boss: their biggest generic problem. name (max 20), taunt (max 60) when the fight starts,
   phase2 (max 60) when it gets angry at half health.
 - game.product_lines (optional, max 40 each): skill descriptions tailored to them, by product id.
@@ -32,3 +33,7 @@ What you write, and where the player sees it:
 - music.mood (max 80): 3-8 mood words for an overworld chiptune. music.bpm: 100-150 suits this game.
 - sprite_prompt (max 160) for companions and townsfolk: one person, their look in a few words (clothes,
   one prop). For enemies and the boss: one cute monster, colours and one memorable feature.
+
+The kit adds its own fixed characters and items (the Old Dev, a travelling Merchant, the Tech Debt Wyrm,
+a Mimic Chest, gear such as the Rubber Mallet or Firewall Mail). You don't write them; avoid reusing
+those names for the prospect's monsters or boss.
