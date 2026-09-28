@@ -31,13 +31,16 @@ def one(port, a, i):
         pg.wait_for_function("window.__game && window.__game.ready", timeout=20000)
         if a.meta:
             pg.evaluate(f"__game.debug.meta({a.meta})")
-        if a.run:
-            pg.evaluate(f"(() => {{ const d = __game.debug.kitDef(); d.titleMenu = () => [{{key:'mode', choices:[{{label:'x', value:'{a.mode}'}}]}}, {{key:'heat', choices:[{{label:'h', value:{a.heat}}}]}}]; __game.debug.goto('Title'); }})()")
-            pg.wait_for_timeout(600)
+        if a.unlock:
+            pg.evaluate("__game.debug.unlockAll()")
         pg.wait_for_timeout(900)
         pg.keyboard.press("Enter"); pg.wait_for_timeout(500)
         pg.keyboard.press("Enter"); pg.wait_for_timeout(800)
-        pg.evaluate(f"__game.debug.autopilot(true); __game.debug.speed({a.speed}); {'__game.debug.optional(true);' if a.optional else ''}")
+        pg.wait_for_function("__game.debug && typeof __game.debug.autopilot === 'function'", timeout=20000)
+        if a.run:
+            pg.evaluate(f"__game.debug.run('{a.mode}', {a.heat})"); pg.wait_for_timeout(1200)
+            pg.wait_for_function("__game.debug && typeof __game.debug.autopilot === 'function'", timeout=20000)
+        pg.evaluate(f"__game.debug.autopilot(true); __game.debug.speed({a.speed}); {'__game.debug.optional(true);' if a.optional else ''}{'__game.debug.naive(true);' if a.naive else ''}")
         t0 = time.time(); st = None
         while time.time() - t0 < a.timeout:
             st = pg.evaluate("__game.state")
@@ -48,7 +51,7 @@ def one(port, a, i):
         out = {"i": i, "outcome": st if st in ("win", "lose") else "timeout", "wall": round(time.time() - t0), "game_s": round(pg.evaluate("__game.elapsed") or 0),
                "levels": stats.get("levels"), "rounds": stats.get("rounds"), "breaks": stats.get("breaks"), "combos": stats.get("combos"),
                "scans": stats.get("scans"), "gold": stats.get("gold"), "items": stats.get("items"), "chests": stats.get("chests"),
-               "secrets": stats.get("secrets"), "errors": errs[:3], "gear": stats.get("gear"),
+               "secrets": stats.get("secrets"), "flags": stats.get("flags"), "errors": errs[:3], "gear": stats.get("gear"),
                "boss": [x for x in (stats.get("battles") or []) if x.get("enc") in (8,)],
                "minhp": [x.get("minHp") for x in (stats.get("battles") or [])]}
         b.close()
@@ -59,8 +62,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--diff", default="normal"); ap.add_argument("--n", type=int, default=5); ap.add_argument("--par", type=int, default=3)
     ap.add_argument("--speed", type=int, default=8); ap.add_argument("--timeout", type=int, default=300)
-    ap.add_argument("--heat", type=int, default=0); ap.add_argument("--mode", default="standard"); ap.add_argument("--optional", action="store_true")
-    ap.add_argument("--meta", default=""); ap.add_argument("--theme", default="")
+    ap.add_argument("--heat", type=int, default=0); ap.add_argument("--mode", default="standard"); ap.add_argument("--optional", action="store_true"); ap.add_argument("--naive", action="store_true")
+    ap.add_argument("--meta", default=""); ap.add_argument("--unlock", action="store_true"); ap.add_argument("--theme", default="")
     a = ap.parse_args()
     a.run = a.heat != 0 or a.mode != "standard"
     tmp = tempfile.mkdtemp(prefix="sagabot-")
@@ -75,7 +78,7 @@ def main():
         print(json.dumps(r))
     wins = sum(r["outcome"] == "win" for r in res)
     gs = sorted(r["game_s"] for r in res)
-    print(f"SUMMARY diff={a.diff} heat={a.heat} mode={a.mode} opt={a.optional}: wins {wins}/{len(res)}  wall avg {sum(r['wall'] for r in res)/len(res):.0f}s  "
+    print(f"SUMMARY diff={a.diff} heat={a.heat} mode={a.mode} opt={a.optional} naive={a.naive}: wins {wins}/{len(res)}  wall avg {sum(r['wall'] for r in res)/len(res):.0f}s  "
           f"rounds avg {sum((r['rounds'] or 0) for r in res)/len(res):.0f}  breaks avg {sum((r['breaks'] or 0) for r in res)/len(res):.1f}  "
           f"combos avg {sum((r['combos'] or 0) for r in res)/len(res):.1f}  game_s median {gs[len(gs)//2]}")
     srv.shutdown(); shutil.rmtree(tmp, ignore_errors=True)

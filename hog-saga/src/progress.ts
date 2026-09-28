@@ -8,10 +8,10 @@ import { saga, saveWin, addBreaks, markWyrm, ngReady } from './save';
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'first_win', name: 'Shipped It', desc: 'Beat the boss' },
-  { id: 'scan', name: 'Know Thy Bug', desc: 'Scan an enemy' },
-  { id: 'break1', name: 'Breaking Change', desc: 'Break an enemy' },
-  { id: 'break10', name: 'Break Point', desc: 'Break 10 enemies (all runs)' },
-  { id: 'combo', name: 'Pair Programming', desc: 'Use a Ship It combo' },
+  { id: 'scan', name: 'Scanner', desc: 'Scan an enemy' },
+  { id: 'break1', name: 'Breaker', desc: 'Break an enemy' },
+  { id: 'break30', name: 'Break Point', desc: 'Break 30 enemies (all runs)' },
+  { id: 'combo', name: 'Pair Up', desc: 'Use a Ship It combo' },
   { id: 'all_chests', name: 'Treasure Hunter', desc: 'Open every chest in one run' },
   { id: 'secret', name: 'Off The Roadmap', desc: 'Find a secret spot' },
   { id: 'quest', name: 'Lost And Found', desc: 'Finish the side quest' },
@@ -40,7 +40,7 @@ export function titleMenu(): TitleRow[] {
 export function onBattleEnd(enc: number, breaks: number) {
   addBreaks(breaks);
   if (breaks > 0) achieve('break1');
-  if (saga().totalBreaks >= 10) achieve('break10');
+  if (saga().totalBreaks >= 30) achieve('break30');
   if (R.scans > 0) achieve('scan');
   if (R.combos > 0) achieve('combo');
   if (enc === 9) { markWyrm(); achieve('wyrm'); }

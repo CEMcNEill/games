@@ -41,3 +41,24 @@ export function chestContents(): string[][] {
   out[6] = [r.pick(TOP_POOL), 'hotfix'];
   return out;
 }
+
+/** Overworld events, seeded per run: a travelling merchant and two stray chests (each may be a mimic). */
+export const EVENT_SPOTS = [{ x: 10, y: 31 }, { x: 2, y: 19 }, { x: 27, y: 13 }, { x: 36, y: 2 }, { x: 44, y: 20 }, { x: 57, y: 14 }];
+export const MERCHANT = {
+  name: 'Merchant',
+  hello: 'Psst! Rare gear, fair prices. I move on when the run ends!',
+};
+export const MIMIC = { name: 'Mimic Chest', pain: 'Surprise! Not every chest is a feature.' };
+
+export interface RunEvents { merchant: { x: number; y: number }; stock: string[]; chests: { x: number; y: number; mimic: boolean }[] }
+
+export function rollEvents(): RunEvents {
+  const r = rng(((K.run?.seed ?? 7) ^ 0xe7e7) >>> 0);
+  const spots = r.shuffle([...EVENT_SPOTS]);
+  const stock = r.shuffle([...RARE_POOL]).slice(0, 3);
+  return {
+    merchant: spots[0],
+    stock: ['potion', 'ether', ...stock],
+    chests: [spots[1], spots[2]].map((p) => ({ ...p, mimic: r.chance(0.5) })),
+  };
+}

@@ -28,5 +28,6 @@
   {"id": "saga_icons", "w": 8, "h": 8, "frames": 16},
   {"id": "quest_npc", "w": 16, "h": 16, "frames": 2, "fps": 2},
   {"id": "wyrm", "w": 64, "h": 64, "frames": 2, "fps": 2},
-  {"id": "saga_map", "w": 16, "h": 16, "frames": 4}
+  {"id": "saga_map", "w": 16, "h": 16, "frames": 4},
+  {"id": "merchant", "w": 16, "h": 16, "frames": 2, "fps": 2}
 ]

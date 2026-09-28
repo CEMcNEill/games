@@ -6,13 +6,14 @@ import { hooks } from '@shared/hooks';
 import { capture } from '@shared/analytics';
 import { text, box, bar, PixelText, W, H } from '@shared/ui';
 import { MAP } from './map';
-import { WYRM, WYRM_NAME } from './battle';
+import { WYRM, WYRM_NAME, MIMIC } from './battle';
 import {
   publishStats, R, BOSS, ENCOUNTERS, GATES, CHESTS, ITEMS, ItemId, resetRun, endData, relicName, levelUp, theName, productName, stat,
 } from './state';
 import { ShopMenu } from './shop';
-import { SECRETS, SECRET_TEXT, SecretId, QUEST, WYRM_LINES, chestContents } from './world';
-import { autoEquip, gearDef, gearLine, SHOP, price } from './gear';
+import { SECRETS, SECRET_TEXT, SecretId, QUEST, WYRM_LINES, chestContents, rollEvents, RunEvents, MERCHANT, MIMIC as MIMIC_DEF } from './world';
+import { rng } from '@shared/meta';
+import { autoEquip, gearDef, gearLine, SHOP, price, RARE_POOL } from './gear';
 import { checkFinds, fmtTime, onWin } from './progress';
 import { ICON, HEAT as HEAT_T } from './rules';
 import { toast } from '@shared/juice';
@@ -123,6 +124,10 @@ export class ExploreScene extends Phaser.Scene {
   private questNpc: Phaser.GameObjects.Sprite | null = null;
   private questItem: Phaser.GameObjects.Image | null = null;
   private contents: string[][] = [];
+  private ev!: RunEvents;
+  private evChests: { x: number; y: number; mimic: boolean; opened: boolean; s: Phaser.GameObjects.Sprite }[] = [];
+  private mimicAt = -1;
+  private menuSel = 0;
   private foot!: { gold: PixelText; chests: PixelText; secrets: PixelText; tag: PixelText };
 
   constructor() { super('Explore'); }
@@ -174,6 +179,11 @@ export class ExploreScene extends Phaser.Scene {
       this.tweens.add({ targets: tw, alpha: 1, duration: 300, yoyo: true, repeat: -1, repeatDelay: 2600, delay: 1000 });
     }
     this.shop = new ShopMenu(this, () => { hooks.state = 'explore'; this.refreshHud(); });
+    // Seeded overworld events: a travelling merchant and two stray chests (some bite).
+    this.ev = rollEvents();
+    this.add.sprite(this.ev.merchant.x * TILE + 8, this.ev.merchant.y * TILE + 6, spr('merchant')).play(anim('merchant')).setDepth(this.ev.merchant.y + 3);
+    this.evChests = this.ev.chests.map((c) => ({ ...c, opened: false, s: this.add.sprite(c.x * TILE, c.y * TILE, spr('chest'), 0).setOrigin(0).setDepth(2) }));
+    this.mimicAt = -1;
     // Party
     this.pos = { ...M.start };
     this.trail = [{ ...M.start }, { ...M.start }];
@@ -304,6 +314,7 @@ export class ExploreScene extends Phaser.Scene {
     for (const [g, ps] of Object.entries(M.gates)) if (!this.open.has(g) && ps.some((p) => p.x === x && p.y === y)) return true;
     if (M.npcs.some((p) => p.x === x && p.y === y)) return true;
     if (M.quest.x === x && M.quest.y === y) return true;
+    if (this.ev && ((this.ev.merchant.x === x && this.ev.merchant.y === y) || this.evChests.some((c) => c.x === x && c.y === y))) return true;
     if (forBot && !R.optional && (M.secret[`${x},${y}`] || (M.item.x === x && M.item.y === y))) return true;
     if (M.chests.some((p) => p.x === x && p.y === y)) return true;
     if (forBot) {
@@ -332,6 +343,15 @@ export class ExploreScene extends Phaser.Scene {
     if (this.menu) {
       if (e.code === 'Escape' || e.code === 'KeyX') this.closeMenu();
       else if (['Enter', 'Space'].includes(e.code) && !e.repeat) this.menuUsePotion();
+      else if (['ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'].includes(e.code)) {
+        const n = R.party.length;
+        this.menuSel = (this.menuSel + (['ArrowUp', 'KeyW'].includes(e.code) ? n - 1 : 1)) % n;
+        K.play('move', 0.4);
+        this.redrawMenu();
+      } else if (['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(e.code)) {
+        const m = R.party[this.menuSel];
+        if (m) { m.row = m.row === 'back' ? 'front' : 'back'; K.play('select', 0.5); this.redrawMenu(); }
+      }
       return;
     }
     if (!R.started) return;
@@ -397,6 +417,8 @@ export class ExploreScene extends Phaser.Scene {
     if (enc >= 0) { this.startBattle(enc); return; }
     const chest = M.chests.findIndex((p) => p.x === nx && p.y === ny);
     if (chest >= 0 && !R.chests.has(chest)) { this.openChest(chest); return; }
+    const evc = this.evChests.findIndex((c) => c.x === nx && c.y === ny && !c.opened);
+    if (evc >= 0) { this.openEventChest(evc); return; }
     const gate = Object.entries(M.gates).find(([g, ps]) => !this.open.has(g) && ps.some((p) => p.x === nx && p.y === ny));
     if (gate) {
       if (this.time.now - this.bumpAt > 1500) { this.bumpAt = this.time.now; this.gateMessage(gate[0]); }
@@ -474,6 +496,16 @@ export class ExploreScene extends Phaser.Scene {
     const t = this.facing();
     const g = K.theme.game;
     if (M.quest.x === t.x && M.quest.y === t.y) { this.talkQuest(); return; }
+    if (this.ev.merchant.x === t.x && this.ev.merchant.y === t.y) {
+      R.flags.add('merchant');
+      this.say([{ speaker: MERCHANT.name, text: MERCHANT.hello }], () => {
+        hooks.state = 'shop';
+        this.shop.showStock(this.ev.stock, 'MERCHANT', 0.8);
+      });
+      return;
+    }
+    const evc = this.evChests.findIndex((c) => c.x === t.x && c.y === t.y && !c.opened);
+    if (evc >= 0) { this.openEventChest(evc); return; }
     if (isShop(t.x, t.y)) {
       K.play('select');
       hooks.state = 'shop';
@@ -533,6 +565,28 @@ export class ExploreScene extends Phaser.Scene {
     }
     this.refreshHud();
     checkFinds(CHESTS.length);
+    this.say(pages, () => {});
+  }
+
+  /** A stray event chest: supplies, or a mimic fight. */
+  private openEventChest(i: number) {
+    const c = this.evChests[i];
+    if (c.mimic) {
+      this.mimicAt = i;
+      K.play('boss', 0.5);
+      this.tweens.add({ targets: c.s, y: c.s.y - 4, duration: 60, yoyo: true, repeat: 3 });
+      this.say([{ text: `The chest has teeth! It's a ${MIMIC_DEF.name.toUpperCase()}!` }], () => this.startBattle(MIMIC));
+      return;
+    }
+    c.opened = true;
+    c.s.setFrame(1);
+    K.play('chest');
+    R.flags.add(`evchest${i}`);
+    const gold = 20 + 10 * regionOf(c);
+    R.gold += gold;
+    const pages: Page[] = [{ text: `A stray supply chest! Got ${gold} gold${R.mode === 'noitems' ? '' : ' and a Potion'}.` }];
+    if (R.mode !== 'noitems') R.items.potion++;
+    this.refreshHud();
     this.say(pages, () => {});
   }
 
@@ -606,17 +660,24 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- menu (ESC)
-  private openMenu() {
+  private openMenu(quiet = false) {
     const ui = K.ui;
     hooks.state = 'menu';
-    K.play('select');
+    if (!quiet) K.play('select');
+    this.menuSel = Math.min(this.menuSel, R.party.length - 1);
     const objs: Phaser.GameObjects.GameObject[] = [];
     objs.push(box(this, 40, 26, W - 80, H - 52, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(960));
     objs.push(text(this, W / 2, 34, 'PARTY', { align: 'center', color: ui.accentInt, scale: 2, fixed: true, depth: 961 }));
     R.party.forEach((m, i) => {
       const y = 54 + i * 45;
-      objs.push(this.add.image(58, y + 10, spr(m.sprite), 0).setScale(2).setScrollFactor(0).setDepth(961));
+      if (i === this.menuSel) {
+        const c = this.add.graphics().setScrollFactor(0).setDepth(961);
+        c.fillStyle(ui.accentInt).fillTriangle(44, y + 6, 44, y + 14, 49, y + 10);
+        objs.push(c);
+      }
+      objs.push(this.add.image(m.row === 'back' ? 62 : 58, y + 10, spr(m.sprite), 0).setScale(2).setScrollFactor(0).setDepth(961));
       objs.push(text(this, 76, y, `${m.name}  LV ${m.lv}  ${m.role}`, { fixed: true, depth: 961, color: m.hp > 0 ? ui.textInt : 0x7c7c7c }));
+      objs.push(text(this, W - 50, y, m.row === 'back' ? 'BACK' : 'FRONT', { fixed: true, depth: 961, align: 'right', color: m.row === 'back' ? ui.dimInt : ui.accentInt }));
       objs.push(text(this, 76, y + 10, `HP ${m.hp}/${m.maxHp}  MP ${m.mp}/${m.maxMp}  ATK ${stat(m, 'atk')} DEF ${stat(m, 'def')} MAG ${stat(m, 'mag')}`,
         { fixed: true, depth: 961, color: ui.dimInt }));
       objs.push(text(this, 76, y + 20, m.skills.map((s) => (s === 'coffee_run' ? 'Coffee Run' : productName(s))).join(', '), { fixed: true, depth: 961, color: ui.dimInt, maxWidth: W - 130, maxLines: 1 }));
@@ -625,8 +686,15 @@ export class ExploreScene extends Phaser.Scene {
     });
     const inv = `Potion x${R.items.potion}   Ether x${R.items.ether}   Hotfix x${R.items.hotfix}   Gold ${R.gold}${R.relic ? `   ${relicName()}` : ''}`;
     objs.push(text(this, W / 2, 192, inv, { align: 'center', fixed: true, depth: 961, color: ui.textInt, maxWidth: W - 100, maxLines: 2 }));
-    objs.push(text(this, W / 2, H - 42, 'ENTER use a Potion   ESC close', { align: 'center', fixed: true, depth: 961, color: ui.accentInt }));
+    objs.push(text(this, W / 2, 204, 'Back row: takes and deals less physical damage.', { align: 'center', fixed: true, depth: 961, color: ui.dimInt }));
+    objs.push(text(this, W / 2, H - 40, 'LEFT/RIGHT row   ENTER Potion   ESC close', { align: 'center', fixed: true, depth: 961, color: ui.accentInt }));
     this.menu = objs;
+  }
+
+  private redrawMenu() {
+    this.menu?.forEach((o) => o.destroy());
+    this.menu = null;
+    this.openMenu(true);
   }
 
   private closeMenu() {
@@ -637,14 +705,13 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   private menuUsePotion() {
-    const alive = R.party.filter((m) => m.hp > 0 && m.hp < m.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
-    if (!alive || R.items.potion <= 0) { K.play('bump'); return; }
+    const m = R.party[this.menuSel];
+    if (!m || m.hp <= 0 || m.hp >= m.maxHp || R.items.potion <= 0) { K.play('bump'); return; }
     R.items.potion--;
-    alive.hp = Math.min(alive.maxHp, alive.hp + 60);
+    m.hp = Math.min(m.maxHp, m.hp + 60);
     K.play('heal');
     this.refreshHud();
-    this.closeMenu();
-    this.openMenu();
+    this.redrawMenu();
   }
 
   // ---------------------------------------------------------------- battles
@@ -658,7 +725,8 @@ export class ExploreScene extends Phaser.Scene {
     this.cameras.main.flash(120, 255, 255, 255);
     swirl(this, 420, () => {
       this.scene.sleep();
-      this.scene.launch('Battle', { enc, region: enc === BOSS ? 3 : enc === WYRM ? 2 : ENCOUNTERS[enc].region, showcase });
+      const region = enc === BOSS ? 3 : enc === WYRM ? 2 : enc === MIMIC ? regionOf(this.pos) : ENCOUNTERS[enc].region;
+      this.scene.launch('Battle', { enc, region, showcase });
     });
   }
 
@@ -672,6 +740,16 @@ export class ExploreScene extends Phaser.Scene {
       R.cleared.add(data.enc);
       const s = this.encs[data.enc];
       if (s) this.tweens.add({ targets: s, alpha: 0, duration: 300, onComplete: () => s.setVisible(false) });
+      if (data.enc === MIMIC && this.mimicAt >= 0) {
+        const c = this.evChests[this.mimicAt];
+        c.opened = true;
+        c.s.setVisible(false);
+        R.flags.add(`mimic${this.mimicAt}`);
+        this.mimicAt = -1;
+        R.gold += 40;
+        const id = rng(((K.run?.seed ?? 3) ^ R.kills) >>> 0).pick(RARE_POOL);
+        this.say([{ text: `The mimic spits out 40 gold and some loot.` }, { text: this.giveGear(id) }], () => {});
+      }
       if (data.enc === WYRM) {
         R.gold += WYRM_LINES.reward.gold;
         this.say([{ text: `The ${WYRM_NAME} crumbles into a pile of closed tickets! Got ${WYRM_LINES.reward.gold} gold.` },
@@ -725,7 +803,13 @@ export class ExploreScene extends Phaser.Scene {
     const goals: { name: string; tiles: P[]; act: 'step' | 'interact' }[] = [];
     M.npcs.forEach((p, i) => { if (!R.talked.has(i)) goals.push({ name: `npc${i}`, tiles: [p], act: 'interact' }); });
     if (this.needsRest()) goals.push({ name: 'rest', tiles: [...M.inn, ...M.heals], act: 'interact' });
-    if (this.wantShop()) goals.push({ name: 'shop', tiles: [{ x: 3, y: 9 }, { x: 4, y: 9 }], act: 'interact' });
+    if (!R.naive && this.wantShop()) goals.push({ name: 'shop', tiles: [{ x: 3, y: 9 }, { x: 4, y: 9 }], act: 'interact' });
+    // Formation: casters and healers stand in the back row.
+    if (!R.naive) for (const m of R.party) if (m.cls !== 'hero' && m.row !== 'back') m.row = 'back';
+    if (R.optional) {
+      if (!R.flags.has('merchant')) goals.push({ name: 'merchant', tiles: [this.ev.merchant], act: 'interact' });
+      this.evChests.forEach((c, i) => { if (!c.opened && !this.needsRest()) goals.push({ name: `ev${i}`, tiles: [c], act: 'step' }); });
+    }
     M.chests.forEach((p, i) => { if (!R.chests.has(i) && (R.optional || !isHiddenChest(i))) goals.push({ name: `chest${i}`, tiles: [p], act: 'step' }); });
     if (R.optional && M.quest.x >= 0) {
       if (!R.flags.has('quest_asked')) goals.push({ name: 'quest', tiles: [M.quest], act: 'interact' });
@@ -741,6 +825,7 @@ export class ExploreScene extends Phaser.Scene {
       if (!path) continue;
       if (g.name === 'rest' && path.length > 45) continue; // too far: keep going, potions will do
       if (g.name === 'shop' && path.length > 30) continue;
+      this.bot.goal = g.name;
       if (g.name === 'wyrm' && path.length === 1 && !R.flags.has('wyrm_warned')) R.flags.add('wyrm_warned');
       const nxt = path[0];
       const d = (Object.keys(DIRS) as Dir[]).find((k) => this.pos.x + DIRS[k][0] === nxt.x && this.pos.y + DIRS[k][1] === nxt.y)!;
@@ -767,9 +852,12 @@ export class ExploreScene extends Phaser.Scene {
 
   /** Autopilot in the shop: best affordable gear for empty slots first, then potions. */
   private botShop() {
-    const gear = SHOP.filter((id) => gearDef(id) && this.shopWants(id)).sort((a, b) => price(b) - price(a));
-    for (const id of gear) if (R.gold >= price(id)) this.shop.buy(SHOP.indexOf(id));
-    while (R.mode !== 'noitems' && R.items.potion < 4 && R.gold >= price('potion')) this.shop.buy(SHOP.indexOf('potion'));
+    const stock = this.shop.stock;
+    const gear = stock.filter((id) => gearDef(id) && (this.shopWants(id) || stock !== SHOP)).sort((a, b) => price(b) - price(a));
+    for (const id of gear) if (R.gold >= this.shop.cost(id)) this.shop.buy(stock.indexOf(id));
+    while (R.mode !== 'noitems' && R.items.potion < 4 && R.gold >= price('potion') && stock.includes('potion')) {
+      if (!this.shop.buy(stock.indexOf('potion'))) break;
+    }
     this.bot.shopped = R.gold;
     this.shop.close();
   }
@@ -790,6 +878,7 @@ export class ExploreScene extends Phaser.Scene {
       meter: (n = METER.max) => { R.meter = Math.max(0, Math.min(METER.max, Number(n) || 0)); if (battleOn()) battle().debugMeter?.(); return R.meter; },
       breakAll: () => { if (battleOn()) battle().debugBreak(); },
       optional: (on = true) => { R.optional = !!on; },
+      naive: (on = true) => { R.naive = !!on; },
       god: (on = true) => { R.god = !!on; },
       lose: () => {
         if (battleOn()) battle().forceEnd(false);
@@ -833,17 +922,27 @@ export class ExploreScene extends Phaser.Scene {
       place: (what: string) => {
         const spots: Record<string, P> = { shop: { x: 3, y: 10 }, quest: { x: M.quest.x, y: M.quest.y + 1 }, item: { x: M.item.x + 1, y: M.item.y },
           grove: { x: 31, y: 8 }, vault: { x: 32, y: 29 }, wyrm: { x: M.wyrm.x - 1, y: M.wyrm.y } };
+        const adj = (q: { x: number; y: number }) => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: q.x + dx, y: q.y + dy })).find((o) => !this.blocked(o.x, o.y, true))!;
+        spots.merchant = adj(this.ev.merchant);
+        this.evChests.forEach((c, i) => { spots[`ev${i}`] = adj(c); });
         const p = spots[what];
         if (!p) return Object.keys(spots);
         if (what === 'vault' || what === 'wyrm' || what === 'grove' || what === 'item') { for (let i = 0; i < 8; i++) R.cleared.add(i); this.encs.forEach((s, i) => s?.setVisible(!R.cleared.has(i))); this.checkGates(); }
         this.skipDialogue();
         this.pos = { ...p }; this.trail = [{ ...p }, { ...p }]; this.stepT = 1; this.placeParty(); this.enterRegion();
-        this.dir = what === 'shop' || what === 'quest' || what === 'grove' ? 'up' : what === 'item' ? 'left' : 'right';
+        const face = what === 'merchant' ? this.ev.merchant : what.startsWith('ev') ? this.evChests[+what.slice(2)] : null;
+        this.dir = face ? ((Object.keys(DIRS) as Dir[]).find((k) => p.x + DIRS[k][0] === face.x && p.y + DIRS[k][1] === face.y) ?? 'up')
+          : what === 'shop' || what === 'quest' || what === 'grove' ? 'up' : what === 'item' ? 'left' : 'right';
         this.player.setFrame(DIRS[this.dir][2]);
         return p;
       },
+      // Load test (tests/accept.py): the showcase fight with a combo every turn, forever (use with god).
+      flood: () => { R.flood = true; if (!battleOn()) (hooks.debug.showcase as () => void)(); },
       wyrm: () => { if (!battleOn()) { this.skipDialogue(); this.startBattle(WYRM); } },
       secrets: () => [...R.secrets],
+      botGoal: () => this.bot.goal,
+      events: () => ({ merchant: this.ev.merchant, stock: this.ev.stock, chests: this.evChests.map((c) => ({ x: c.x, y: c.y, mimic: c.mimic, opened: c.opened })) }),
+      mimic: () => { if (!battleOn()) { this.skipDialogue(); this.mimicAt = this.evChests.findIndex((c) => !c.opened); this.startBattle(MIMIC); } },
       saga: () => saga(),
     };
   }

@@ -152,7 +152,43 @@ export function bestCombo(v: BattleView, m: Member): ComboId | null {
   return pref.find((p) => opts.includes(p)) ?? opts[0];
 }
 
+/** The pre-overnight autopilot: no scanning, no weakness reading, no combos, no row changes. Used by
+ * debug.naive(true) to check that a player who ignores the new systems still gets through. */
+function naiveMove(v: BattleView, m: Member): Act {
+  const foes = v.foes;
+  // A newcomer does press the flashing SHIP IT! at the top of the menu.
+  const combo = bestCombo(v, m);
+  if (combo) return { kind: 'combo', id: combo, target: [...foes].sort((a, b) => b.hp - a.hp)[0] };
+  const party = R.party;
+  const ko = party.filter((p) => p.hp <= 0);
+  const hurt = party.filter((p) => p.hp > 0 && frac(p) < 0.45).sort((a, b) => frac(a) - frac(b));
+  const can = (id: SkillId) => m.skills.includes(id) && m.mp >= SKILLS[id].mp;
+  const tough = [...foes].sort((a, b) => b.hp - a.hp)[0];
+  const weakest = [...foes].sort((a, b) => a.hp - b.hp)[0];
+  if (m.cls === 'support') {
+    if (ko.length && can('session_replay')) return { kind: 'skill', id: 'session_replay', target: ko[0] };
+    if (party.filter((p) => p.hp > 0 && frac(p) < 0.6).length >= 2 && can('coffee_run')) return { kind: 'skill', id: 'coffee_run' };
+    if (hurt.length && can('session_replay')) return { kind: 'skill', id: 'session_replay', target: hurt[0] };
+  }
+  if (v.hasItems && ko.length && R.items.hotfix > 0) return { kind: 'item', id: 'hotfix', target: ko[0] };
+  if (v.hasItems && hurt.length && R.items.potion > 0) return { kind: 'item', id: 'potion', target: hurt[0] };
+  if (m.cls === 'support') {
+    if ((foes.length >= 2 || v.boss) && can('surveys') && !foes.some((f) => f.weak > 0)) return { kind: 'skill', id: 'surveys' };
+    return { kind: 'fight', target: weakest };
+  }
+  if (m.cls === 'analyst') {
+    if (foes.length >= 2 && can('product_analytics')) return { kind: 'skill', id: 'product_analytics' };
+    if (can('web_analytics')) return { kind: 'skill', id: 'web_analytics', target: tough };
+    return { kind: 'fight', target: weakest };
+  }
+  if (v.boss && can('feature_flags') && v.shield <= 0) return { kind: 'skill', id: 'feature_flags' };
+  if (can('error_tracking') && tough.exposed <= 0 && tough.hp > 30) return { kind: 'skill', id: 'error_tracking', target: tough };
+  if (foes.length >= 2 && can('experiments')) return { kind: 'skill', id: 'experiments' };
+  return { kind: 'fight', target: tough };
+}
+
 export function partyMove(v: BattleView, m: Member): Act {
+  if (R.naive) return naiveMove(v, m);
   const foes = v.foes;
   const party = R.party;
   const ko = party.filter((p) => p.hp <= 0);
@@ -185,6 +221,8 @@ export function partyMove(v: BattleView, m: Member): Act {
   if (items && hurt.length && R.items.potion > 0 && (!healer || hurt.length >= 2 || frac(hurt[0]) < 0.25))
     return { kind: 'item', id: 'potion', target: hurt[0] };
   if (items && v.boss && m.mp < 5 && m.cls !== 'hero' && R.items.ether > 0) return { kind: 'item', id: 'ether', target: m };
+  // Solo hedgehog: patch itself up when potions are gone.
+  if (m.cls === 'hero' && hurt.includes(m) && can('session_replay')) return { kind: 'skill', id: 'session_replay', target: m };
   // Read the enemy first: scan an unknown foe once per round in a fight that matters.
   const unknown = foes.filter((f) => !knows(f.key, 'weak'));
   if (unknown.length && worth && !v.scanned && !(m.cls === 'analyst' && can('web_analytics')))

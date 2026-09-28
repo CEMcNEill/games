@@ -40,6 +40,8 @@ export const STATUS: Record<StatusId, StatusDef> = {
 export const LEAK_FRAC = 0.06;
 export const CRIT_BASE = 0.08;
 export const CRIT_FOCUSED = 0.5;
+/** Back row: physical damage dealt and taken x0.7 (magic and heals are unaffected). */
+export const BACK_ROW = 0.7;
 
 /** Ship It meter gains. */
 export const METER = { max: 100, hit: 2, weak: 3, brk: 6, hurtScale: 18 };
@@ -69,9 +71,12 @@ export const AI = {
 /** Heat 0-5: enemy scaling, extra formation members, fewer starting potions, boss phase 3 at 3+. */
 export const HEAT = [
   { hp: 1, dmg: 1, extra: false, potions: 3, phase3: false },
-  { hp: 1.12, dmg: 1.06, extra: false, potions: 3, phase3: false },
-  { hp: 1.22, dmg: 1.1, extra: true, potions: 2, phase3: false },
-  { hp: 1.32, dmg: 1.14, extra: true, potions: 2, phase3: true },
-  { hp: 1.45, dmg: 1.2, extra: true, potions: 1, phase3: true },
-  { hp: 1.6, dmg: 1.26, extra: true, potions: 0, phase3: true },
+  { hp: 1.12, dmg: 1.08, extra: false, potions: 3, phase3: false },
+  { hp: 1.25, dmg: 1.15, extra: true, potions: 2, phase3: false },
+  { hp: 1.35, dmg: 1.22, extra: true, potions: 2, phase3: true },
+  { hp: 1.5, dmg: 1.3, extra: true, potions: 1, phase3: true },
+  { hp: 1.65, dmg: 1.4, extra: true, potions: 0, phase3: true },
 ];
+
+/** SOLO HOG: one hedgehog instead of three, so monsters have less HP and hit softer. */
+export const SOLO = { hp: 0.55, dmg: 0.65 };

@@ -18,7 +18,7 @@ export type Mode = 'standard' | 'ngplus' | 'solo' | 'noitems' | 'speedrun';
 export const DIFF = {
   easy: { hp: 0.72, dmg: 0.7 },
   normal: { hp: 1, dmg: 0.9 },
-  hard: { hp: 1.2, dmg: 0.98 },
+  hard: { hp: 1.25, dmg: 1.06 },
 };
 
 interface ClassDef {
@@ -94,12 +94,13 @@ export interface Member {
   skills: SkillId[];
   status: Partial<Record<StatusId, number>>;
   gear: Partial<Record<Slot, GearId>>;
+  row: 'front' | 'back';
 }
 
 function makeMember(cls: ClassId, name: string, role: string, sprite: string): Member {
   const b = CLASSES[cls].base;
   const m: Member = { cls, name, role, sprite, lv: 1, xp: 0, hp: b.hp, mp: b.mp, maxHp: b.hp, maxMp: b.mp,
-    atk: b.atk, def: b.def, mag: b.mag, spd: b.spd, skills: [], status: {}, gear: {} };
+    atk: b.atk, def: b.def, mag: b.mag, spd: b.spd, skills: [], status: {}, gear: {}, row: 'front' };
   m.skills = CLASSES[cls].learn.filter(([l]) => l <= 1).map(([, s]) => s);
   return m;
 }
@@ -107,8 +108,9 @@ function makeMember(cls: ClassId, name: string, role: string, sprite: string): M
 /** Raise a member one level; returns the stat gains and any new skill. */
 export function levelUp(m: Member): { gains: Record<string, number>; learned: SkillId | null } {
   const g = CLASSES[m.cls].grow;
+  const solo = R.mode === 'solo' ? 2 : 1;
   m.lv++;
-  m.maxHp += g.hp; m.maxMp += g.mp; m.atk += g.atk; m.def += g.def; m.mag += g.mag; m.spd += g.spd;
+  m.maxHp += g.hp * solo; m.maxMp += g.mp * solo; m.atk += g.atk; m.def += g.def; m.mag += g.mag; m.spd += g.spd;
   m.hp = Math.min(m.maxHp, m.hp + g.hp);
   m.mp = Math.min(m.maxMp, m.mp + g.mp);
   const learn = CLASSES[m.cls].learn.find(([l]) => l === m.lv);
@@ -145,6 +147,10 @@ export const R = {
   secrets: new Set<string>(),
   flags: new Set<string>(),
   optional: false,
+  /** Autopilot plays like a newcomer: ignores scan, weaknesses, combos, rows and the shop. */
+  naive: false,
+  /** Load test: keep the Ship It meter full so every turn is a combo with particles. */
+  flood: false,
   /** Weak/resist knowledge for this run: 'tank:weak', 'boss2:resist'... */
   known: new Set<string>(),
   breaks: 0,
@@ -200,7 +206,16 @@ export function resetRun() {
   } else if (R.mode === 'ngplus') {
     R.mode = 'standard';
   }
-  if (R.mode === 'solo') R.party = R.party.slice(0, 1);
+  if (R.mode === 'solo') {
+    // One hedgehog does the work of three: tougher, and it can patch itself up.
+    R.party = R.party.slice(0, 1);
+    const h = R.party[0];
+    if (R.ng <= 0) {
+      h.maxHp = Math.round(h.maxHp * 2.2); h.maxMp *= 2; h.atk += 4; h.def += 3;
+    }
+    if (!h.skills.includes('session_replay')) h.skills.push('session_replay');
+    h.hp = h.maxHp; h.mp = h.maxMp;
+  }
   const none = R.mode === 'noitems';
   R.items = { potion: none ? 0 : R.heatDef.potions, ether: none ? 0 : 1, hotfix: none ? 0 : 1 };
   R.relic = false;
@@ -222,6 +237,7 @@ export function resetRun() {
   R.itemsUsed = 0;
   R.secrets = new Set();
   R.flags = new Set();
+  R.flood = false;
 }
 
 export const knows = (key: FoeKey, what: 'weak' | 'resist') => R.known.has(`${key}:${what}`);

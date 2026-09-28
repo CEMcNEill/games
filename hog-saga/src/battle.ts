@@ -14,11 +14,12 @@ import {
 } from './state';
 import {
   AFFINITY, FoeKey, Kind, KIND_ICON, KIND_NAME, ICON, STATUS, StatusId, COMBOS, ComboId, METER, WEAK_MULT, RESIST_MULT,
-  BREAK_MULT, LEAK_FRAC, CRIT_BASE, CRIT_FOCUSED,
+  BREAK_MULT, LEAK_FRAC, CRIT_BASE, CRIT_FOCUSED, BACK_ROW, SOLO,
 } from './rules';
 import { foeMove, partyMove, randomVictim, BattleView, FoeMove } from './ai';
 import { onWin, onBattleEnd } from './progress';
 import { hasFx } from './gear';
+import { MIMIC as MIMIC_DEF } from './world';
 import { slash, sparkle, pop, cutIn, jingle, VICTORY, FANFARE, reveal, battleMusic } from './fx';
 
 export interface Foe {
@@ -78,11 +79,13 @@ export class BattleScene extends Phaser.Scene {
   private over = false;
   private xpGain = 0;
   private showcase = false;
+  private region = 0;
   private tipShown = false;
 
   constructor() { super('Battle'); }
 
   create(data: { enc: number; region: number; showcase?: boolean }) {
+    this.region = data.region;
     this.enc = data.enc;
     this.over = false;
     this.shield = 0;
@@ -117,7 +120,8 @@ export class BattleScene extends Phaser.Scene {
     const rowH = R.party.length === 1 ? 0 : 32;
     R.party.forEach((m, i) => {
       const y = 170 + i * rowH;
-      const s = this.add.sprite(166, y + 15, spr(m.sprite), 0).setScale(2).setDepth(101);
+      const s = this.add.sprite(this.homeX(m), y + 15, spr(m.sprite), 0).setScale(2).setDepth(101);
+      if (m.row === 'back') text(this, 150, y + 22, 'B', { depth: 102, color: K.ui.dimInt });
       if (m.sprite !== 'hero') s.play(anim(m.sprite));
       const name = text(this, 186, y + 2, '', { depth: 101 });
       const hp = bar(this, 290, y + 5, 70, 4, 0x58d854, 0x000000, ui.panelInt);
@@ -210,18 +214,26 @@ export class BattleScene extends Phaser.Scene {
 
   private spawnFoes() {
     const g = K.theme.game;
-    const mult = R.diff;
+    const solo = R.mode === 'solo' ? SOLO.hp : 1;
+    const mult = { hp: R.diff.hp * solo, dmg: R.diff.dmg };
     const heat = R.heatDef;
-    const ng = 1 + 0.35 * R.ng;
+    const ng = 1 + 0.6 * R.ng;
     if (this.enc === BOSS) {
-      this.addFoe({ name: g.boss.name, pain: g.boss.taunt, arch: 'boss', key: 'boss', sprite: 'boss', hp: 1450 * mult.hp * heat.hp * ng,
-        atk: 33 * (1 + 0.15 * R.ng), def: 15, mag: 29 * (1 + 0.15 * R.ng), spd: 11, xp: 0 }, W / 2, 140, 1.7);
+      this.addFoe({ name: g.boss.name, pain: g.boss.taunt, arch: 'boss', key: 'boss', sprite: 'boss', hp: 1400 * mult.hp * heat.hp * ng,
+        atk: 33 * (1 + 0.25 * R.ng), def: 15, mag: 29 * (1 + 0.25 * R.ng), spd: 11, xp: 0 }, W / 2, 140, 1.7);
       this.foes[0].canRollback = false;
       return;
     }
     if (this.enc === WYRM) {
       this.addFoe({ name: WYRM_NAME, pain: WYRM_TAUNT, arch: 'wyrm', key: 'wyrm', sprite: 'wyrm', hp: 1500 * mult.hp * heat.hp * ng,
         atk: 36 * (1 + 0.15 * R.ng), def: 17, mag: 31 * (1 + 0.15 * R.ng), spd: 12, xp: 220 }, W / 2, 140, 1.7);
+      return;
+    }
+    if (this.enc === MIMIC) {
+      const t = 2 + this.region * 2.5 + R.ng * 5;
+      const a = ARCH.fast;
+      this.addFoe({ name: MIMIC_DEF.name, pain: MIMIC_DEF.pain, arch: 'fast', key: 'fast', sprite: 'chest', hp: Math.round(a.hp * 2.2 * (1 + 0.22 * (t - 1)) * mult.hp * heat.hp),
+        atk: a.atk * (1 + 0.16 * (t - 1)), def: a.def * (1 + 0.22 * (t - 1)), mag: a.mag, spd: a.spd + t * 0.3, xp: Math.round(a.xp * 2 * (1 + 0.45 * (t - 1))) }, W / 2, 134, 4);
       return;
     }
     const e = ENCOUNTERS[this.enc];
@@ -232,7 +244,7 @@ export class BattleScene extends Phaser.Scene {
     }
     if (heat.extra && ids.length < 3) ids.push(e.group[0]);   // hotter runs: bigger formations
     ids = ids.slice(0, 3);
-    const tier = e.tier + R.ng * 3;
+    const tier = e.tier + R.ng * 5;
     const sc = 1 + 0.22 * (tier - 1);     // toughness grows faster than hitting power
     const sa = 1 + 0.16 * (tier - 1);
     const xs = ids.length === 1 ? [W / 2] : ids.length === 2 ? [W / 2 - 70, W / 2 + 70] : [W / 2 - 120, W / 2, W / 2 + 120];
@@ -434,6 +446,7 @@ export class BattleScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- party turn + menus
   private partyTurn(m: Member) {
+    if (R.flood) { R.meter = METER.max; this.drawMeter(); }
     this.ui.member = m;
     hooks.state = 'battle';
     this.refreshRows();
@@ -682,6 +695,11 @@ export class BattleScene extends Phaser.Scene {
     return Math.max(1, Math.round((atk * 1.5 - def * 0.8) * Phaser.Math.FloatBetween(0.85, 1.15)));
   }
 
+  /** A party member's physical hit: the back row hits for less. */
+  private physBy(m: Member, atk: number, def: number) {
+    return Math.max(1, Math.round(this.phys(atk, def) * (m.row === 'back' ? BACK_ROW : 1)));
+  }
+
   private magic(mag: number, power: number, def: number) {
     return Math.max(1, Math.round((mag * power * 1.4 - def * 0.3) * Phaser.Math.FloatBetween(0.9, 1.1)));
   }
@@ -745,6 +763,7 @@ export class BattleScene extends Phaser.Scene {
       gain += f.broken ? METER.brk : 0;
     }
     this.addMeter(gain);
+    if (f.hp <= 0 && R.flood) f.hp = f.maxHp; // load test: the fight never ends
     if (f.hp <= 0) this.killFoe(f);
     else this.checkPhase(f);
     this.drawFoeBar(f);
@@ -804,11 +823,14 @@ export class BattleScene extends Phaser.Scene {
     for (const k of Object.keys(m.status) as StatusId[]) if (!STATUS[k].good) delete m.status[k];
   }
 
+  /** Party sprite x in the bottom panel: the back row stands a little further back. */
+  private homeX(m: Member) { return m.row === 'back' ? 172 : 166; }
+
   private lunge(m: Member) {
     const r = this.rows[R.party.indexOf(m)];
     if (!r) return;
     this.tweens.add({ targets: r.s, x: r.s.x - 8, y: r.s.y - 4, duration: Math.max(16, 70 / R.speed), yoyo: true,
-      onComplete: () => r.s.setPosition(166, r.y + 15) });
+      onComplete: () => r.s.setPosition(this.homeX(m), r.y + 15) });
   }
 
   // ---------------------------------------------------------------- party actions
@@ -822,7 +844,7 @@ export class BattleScene extends Phaser.Scene {
         const crit = this.crit(m);
         this.lunge(m);
         this.msg.setText(`${m.name} attacks ${f.name}!${crit ? ' A critical hit!' : ''}`);
-        this.hitFoe(f, this.phys(stat(m, 'atk'), f.def), 'strike', { crit });
+        this.hitFoe(f, this.physBy(m, stat(m, 'atk'), f.def), 'strike', { crit });
         nextIn(700);
         return;
       }
@@ -892,7 +914,7 @@ export class BattleScene extends Phaser.Scene {
             this.lunge(m);
             this.msg.setText(`${m.name} uses Error Tracking! ${f.name}'s weak spot is exposed.`);
             f.exposed = 3;
-            this.hitFoe(f, Math.round(this.phys(atk, f.def) * 1.6), 'data', { crit: this.crit(m) });
+            this.hitFoe(f, Math.round(this.physBy(m, atk, f.def) * 1.6), 'data', { crit: this.crit(m) });
             break;
           }
           case 'experiments': {
@@ -903,7 +925,7 @@ export class BattleScene extends Phaser.Scene {
                 const alive = this.aliveFoes();
                 if (!alive.length || this.over) return;
                 const f = alive[Math.floor(Math.random() * alive.length)];
-                this.hitFoe(f, Math.round(this.phys(atk, f.def) * 0.9), 'strike', { crit: this.crit(m) });
+                this.hitFoe(f, Math.round(this.physBy(m, atk, f.def) * 0.9), 'strike', { crit: this.crit(m) });
               });
             }
             break;
@@ -1040,7 +1062,7 @@ export class BattleScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- foe turns
   private hurt(m: Member, raw: number, f?: Foe) {
-    let dmg = raw * R.diff.dmg * R.heatDef.dmg * gearDef(m);
+    let dmg = raw * R.diff.dmg * R.heatDef.dmg * gearDef(m) * (R.mode === 'solo' ? SOLO.dmg : 1);
     if (f && (f.status.focused ?? 0) > 0 && Math.random() < 0.35) dmg *= 1.5;
     if (this.shield > 0) dmg *= 0.5;
     if (this.defending.has(m)) dmg *= 0.5;
@@ -1050,7 +1072,7 @@ export class BattleScene extends Phaser.Scene {
     const r = this.rows[R.party.indexOf(m)];
     pop(this, r.s.x, r.y + 4, `${dmg}`, 0xf83800);
     flash(r.s, 0xf83800, 90);
-    this.tweens.add({ targets: r.s, x: r.s.x + 3, duration: 40, yoyo: true, repeat: 2, onComplete: () => r.s.setX(166) });
+    this.tweens.add({ targets: r.s, x: r.s.x + 3, duration: 40, yoyo: true, repeat: 2, onComplete: () => r.s.setX(this.homeX(m)) });
     K.play('hurt', 0.6, 40);
     shake(this, 2, 100);
     this.addMeter((dmg / m.maxHp) * METER.hurtScale);
@@ -1098,7 +1120,7 @@ export class BattleScene extends Phaser.Scene {
     const v = mv.target && mv.target.hp > 0 ? mv.target : randomVictim();
     const boss = isBossLike(f);
     const p2 = boss ? 1 + 0.2 * (f.phase - 1) : 1;
-    const strike = (m: Member, mult = 1) => this.hurt(m, this.phys(f.atk * weak * p2, stat(m, 'def')) * mult, f);
+    const strike = (m: Member, mult = 1) => this.hurt(m, this.phys(f.atk * weak * p2, stat(m, 'def')) * mult * (m.row === 'back' ? BACK_ROW : 1), f);
     const spell = (m: Member, mult: number) => this.hurt(m, Math.max(1, f.mag * mult * weak * p2 - stat(m, 'def') * 0.3), f);
     if (!v && !['guard', 'harden', 'cure', 'focus', 'windup', 'charge', 'rollback'].includes(mv.id)) { done(100); return; }
     switch (mv.id) {
@@ -1205,7 +1227,7 @@ export class BattleScene extends Phaser.Scene {
         this.msg.setText(`${f.name} unleashes a MASS OUTAGE!`);
         this.cameras.main.flash(200, 248, 56, 0);
         shake(this, 6, 300);
-        for (const m of this.aliveParty()) spell(m, 2.0);
+        for (const m of this.aliveParty()) spell(m, OUTAGE);
         done(1200);
         return;
       case 'slam':
@@ -1322,7 +1344,11 @@ export class BattleScene extends Phaser.Scene {
   }
 }
 
+/** MASS OUTAGE power (telegraphed a turn ahead; DEFEND and Feature Flags each halve it). */
+const OUTAGE = 1.7;
+
 export const WYRM = 9;
+export const MIMIC = 10;
 export const WYRM_NAME = 'Tech Debt Wyrm';
 export const WYRM_TAUNT = 'I am every shortcut you ever took!';
 

@@ -736,3 +736,14 @@ def _map_bits(pal):
 PROCEDURAL["quest_npc"] = _person("l", "t", "q", "g", _beard)
 PROCEDURAL["wyrm"] = _wyrm
 PROCEDURAL["saga_map"] = _map_bits
+
+
+def _hat(rows):
+    rows = list(rows)
+    rows[0] = "....kkkkkkkk...."
+    rows[1] = "...kOOOOOOOOk..."
+    rows[2] = "..kkkkkkkkkkkk.."
+    return rows
+
+
+PROCEDURAL["merchant"] = _person("b", "a", "p", "b", _hat)
