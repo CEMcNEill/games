@@ -40,7 +40,7 @@ def one(port, a, i):
             pg.wait_for_timeout(300)
             pg.evaluate(f"__game.debug.heat({a.heat})")
             pg.wait_for_timeout(500)
-        pg.evaluate(f"__game.debug.autopilot(true); __game.debug.speed({a.speed})")
+        pg.evaluate(f"__game.debug.botPlan({a.plan}); __game.debug.autopilot(true); __game.debug.speed({a.speed})")
         t0 = time.time()
         while time.time() - t0 < a.timeout and pg.evaluate("__game.state") not in ("win", "lose"):
             pg.wait_for_timeout(500)
@@ -48,7 +48,8 @@ def one(port, a, i):
         out = {"run": i, "outcome": pg.evaluate("__game.state"), "secs": round(time.time() - t0), "game_s": round(pg.evaluate("__game.elapsed")),
                "score": pg.evaluate("__game.score"), "quality": st.get("quality"), "processed": st.get("processed"), "correct": st.get("correct"),
                "missed": st.get("missed"), "falseFlags": st.get("falseFlags"), "reasons": f"{st.get('reasonsRight')}/{(st.get('reasonsRight') or 0) + (st.get('reasonsWrong') or 0)}",
-               "grades": "".join(st.get("grades") or []), "credits": st.get("credits"), "ending": pg.evaluate("__game.debug.endings && __game.meta.kit.endings"),
+               "grades": "".join(st.get("grades") or []), "credits": st.get("credits"), "ending": pg.evaluate("__game.meta.kit.endings"),
+               "story": {k: st.get(k) for k in ("corners", "stress", "junk", "tools")},
                "errors": errs}
         b.close()
         return out
@@ -64,6 +65,7 @@ def main():
     ap.add_argument("--theme")
     ap.add_argument("--timeout", type=int, default=240)
     ap.add_argument("--parallel", type=int, default=2)
+    ap.add_argument("--plan", default="{}", help='JSON for __game.debug.botPlan, e.g. {"pace":4,"accuracy":0.85}')
     ap.add_argument("--fresh", action="store_true", help="reset meta before each run")
     a = ap.parse_args()
     tmp = tempfile.mkdtemp(prefix="botrun-")
@@ -77,7 +79,7 @@ def main():
     for r in res:
         print(json.dumps(r))
     wins = sum(r["outcome"] == "win" for r in res)
-    print(f"SUMMARY difficulty={a.difficulty} heat={a.heat} mode={a.mode}: {wins}/{len(res)} wins, "
+    print(f"SUMMARY difficulty={a.difficulty} heat={a.heat} mode={a.mode} plan={a.plan}: {wins}/{len(res)} wins, "
           f"avg score {sum(r['score'] or 0 for r in res) / len(res):.0f}, avg game_s {sum(r['game_s'] for r in res) / len(res):.0f}, "
           f"avg real s {sum(r['secs'] for r in res) / len(res):.0f}")
     srv.shutdown()

@@ -6,10 +6,10 @@ import { K, spr, anim, meta, achieve } from '@shared/kit';
 import { hooks, sharedDebug } from '@shared/hooks';
 import { capture } from '@shared/analytics';
 import { text, box, wrap, W, H } from '@shared/ui';
-import { rng, randomSeed } from '@shared/meta';
+import { rng, randomSeed, dailySeed } from '@shared/meta';
 import { hitstop, hitstopped, setJuiceSpeed, toast } from '@shared/juice';
 import products from '../../shared/products.json';
-import { World, Rec, Rule, RuleType, DESK_TYPES, fieldFor, docFor } from './rules';
+import { World, Rec, Rule, RuleType, DESK_TYPES, FLAG_PROP, fieldFor, docFor } from './rules';
 import { buildDoc, TABS } from './docs';
 import { Desk, RED, GREEN, GOLD, GREY, productColor } from './desk';
 import {
@@ -43,6 +43,8 @@ interface DayStats { processed: number; correct: number; caught: number; missed:
 const emptyStats = (): DayStats => ({ processed: 0, correct: 0, caught: 0, missed: 0, falseFlags: 0, skipped: 0 });
 interface Adj { clock: number; charges: number; quality: number; notes: string[] }
 const noAdj = (): Adj => ({ clock: 0, charges: 0, quality: 0, notes: [] });
+
+interface BotPlan { requests: 'yes' | 'no'; bills: 'all' | 'none'; pattern: boolean; pace: number; accuracy: number; reasons: number }
 
 export interface KitSave extends Record<string, unknown> { endings: string[]; bestGrade: Record<string, string>; endlessBest: number }
 export const kitSave = () => meta.kitData<KitSave>({ endings: [], bestGrade: {}, endlessBest: 0 });
@@ -94,6 +96,8 @@ export class GameScene extends Phaser.Scene {
   private lastFlag = false;
   private god = false;
   private autopilot = false;
+  /** How the autopilot plays (debug.botPlan): answer requests yes/no, pay bills, flag the 3 AM story, pace, accuracy. */
+  private plan: BotPlan = { requests: 'no', bills: 'all', pattern: false, pace: 0.9, accuracy: 0.92, reasons: 0.88 };
   private simSpeed = 1;
   private finished = false;
   // the week around the desk
@@ -112,6 +116,11 @@ export class GameScene extends Phaser.Scene {
   private todayExempt: string[] = [];
   private quotasMet = 0;
   private finalCaught = false;
+  // the hidden story: one user at 3 AM on days 2-4
+  private patternSeen = new Set<number>();
+  private patternNoted = 0;
+  private patternEvent = '';
+  private pickRng = rng(randomSeed());
 
   constructor() { super('Game'); }
 
@@ -121,7 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.runMode = run.mode === 'endless' ? 'endless' : run.mode === 'daily' ? 'daily' : 'week';
     this.heatN = Math.max(0, Math.min(5, run.heat | 0));
     this.heat = HEAT[this.heatN];
-    const r = rng(run.seed || randomSeed());
+    const r = rng(this.runMode === 'daily' ? dailySeed() : run.seed || randomSeed());
     const firstWeek = meta.data.runs === 0 && this.heatN === 0 && this.runMode === 'week';
     const kinds = r.shuffle([...DESK_TYPES]);
     const desk: (RuleType | null)[] = this.runMode === 'endless' ? kinds
@@ -139,8 +148,9 @@ export class GameScene extends Phaser.Scene {
       rec: null, broken: [], options: [], readyAt: 0, nextAt: -1, botT: 0, overlayT: 0, overlay: [], timers: [], lastTick: 0,
       simSpeed: 1, finished: false, credits: START_CREDITS, grades: [], adj: noAdj(), pending: noAdj(), request: null,
       choices: {}, corners: 0, integrity: 0, stress: 0, junk: 0, todayExempt: [], quotasMet: 0, finalCaught: false,
-      upgraded: new Set(), charges: new Map(),
+      upgraded: new Set(), charges: new Map(), patternSeen: new Set(), patternNoted: 0,
     });
+    this.patternEvent = r.pick(this.world.events).name;
     hooks.scene = 'Game';
     hooks.elapsed = 0;
     hooks.score = 0;
@@ -530,7 +540,10 @@ export class GameScene extends Phaser.Scene {
     const endless = this.runMode === 'endless';
     const badChance = final ? 1 : endless ? Math.min(0.6, 0.4 + this.total.processed * 0.004) : 0.35 + this.day * 0.04 + this.heat.bad;
     const exempt = [...w.exempt];
-    if (!final && exempt.length && r.chance(0.16)) {
+    if (!final && this.runMode !== 'endless' && this.day >= 1 && this.day <= 3 && !this.patternSeen.has(this.day)
+      && this.stats.processed >= 2 + (this.day % 2)) {
+      this.patternRecord(rec);
+    } else if (!final && exempt.length && r.chance(0.16)) {
       rec.source = r.pick(exempt); // the deal: noisy junk you were told to wave through
       if (r.chance(0.7)) for (const rule of r.shuffle([...active])) if (w.breakRule(rec, rule)) break;
       rec.source = r.pick(exempt);
@@ -544,6 +557,12 @@ export class GameScene extends Phaser.Scene {
     rec.final = final;
     this.rec = rec;
     this.broken = w.violations(rec, active);
+    if (rec.pattern && this.broken.length) rec.pattern = false;
+    if (rec.pattern) {
+      this.patternSeen.add(this.day);
+      const who = w.personaNames[rec.persona] ?? 'someone';
+      this.say(this.patternSeen.size === 1 ? `Hm. ${who}, up at 3 AM?` : `${who} again. 3 AM again. Same event...`, K.ui.dimInt);
+    }
     w.shown(rec);
     this.readyAt = this.t + 0.3;
     this.nextAt = -1;
@@ -552,6 +571,17 @@ export class GameScene extends Phaser.Scene {
     this.desk.drawCard(rec, { persona: p, portrait: spr(`persona_${rec.persona + 1}`), exempt: w.exempt.has(rec.source) ? rec.source : null, final });
     K.play('paper', 0.6);
     this.refreshHud();
+  }
+
+  /** Same user, same event, in the middle of the night: legal, but odd. Flag all three for the secret ending. */
+  private patternRecord(rec: Rec) {
+    const w = this.world;
+    const ev = w.events.find((e) => e.name === this.patternEvent) ?? w.events[0];
+    const persona = w.personas - 1;
+    const fresh = w.baseline(ev);
+    Object.assign(rec, { event: fresh.event, props: fresh.props.filter(([k]) => k !== FLAG_PROP), persona,
+      email: w.directory[persona] ?? rec.email, pattern: true });
+    w.setTime(rec, 0, 180 + w.r.int(0, 40));
   }
 
   // ---------------------------------------------------------------- decisions
@@ -565,7 +595,7 @@ export class GameScene extends Phaser.Scene {
 
   /** FLAG asks why: up to 4 active rules, including one that is broken when the record is bad. */
   private openPicker(active: Rule[]) {
-    const r = this.world.r;
+    const r = this.pickRng; // not the world's RNG: the daily record stream must not depend on the player's flags
     const n = Math.min(4, active.length);
     let opts: Rule[];
     if (active.length <= 4) opts = [...active];
@@ -606,6 +636,7 @@ export class GameScene extends Phaser.Scene {
 
   private resolve(flag: boolean, reason: Rule | null) {
     const rec = this.rec!;
+    if (flag && rec.pattern && !this.broken.length) { this.notePattern(); return; }
     const bad = this.broken.length > 0;
     const correct = flag === bad;
     this.lastFlag = flag;
@@ -636,8 +667,11 @@ export class GameScene extends Phaser.Scene {
       this.desk.float(`+${pts}`, bad && !reasonRight ? GOLD : GREEN);
       if (this.streak > 0 && this.streak % 5 === 0) this.desk.boss_('good');
       if (!bad) this.say('Clean record. Into the warehouse it goes.');
-      else if (reasonRight) this.say(`CAUGHT IT: ${reason!.text}`, GREEN);
-      else this.say(`Right call, wrong reason. It was: ${this.broken[0].text}`, GOLD);
+      else if (reasonRight) this.say(`CAUGHT: ${reason!.text}`, GREEN);
+      else {
+        this.say(`Right call, wrong reason: it was rule #${this.world.active(this.day).indexOf(this.broken[0]) + 1}.`, GOLD);
+        this.desk.highlight(fieldFor(this.broken[0], this.world));
+      }
     } else {
       this.streak = 0;
       if (bad) { this.stats.missed++; this.total.missed++; } else { this.stats.falseFlags++; this.total.falseFlags++; }
@@ -663,6 +697,21 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.quality <= 0 && !this.god) this.time.delayedCall(700, () => this.finish(false));
+  }
+
+  private notePattern() {
+    this.lastFlag = true;
+    this.desk.stamp(true);
+    K.play('stamp');
+    hitstop(this, 45);
+    this.stats.processed++; this.total.processed++;
+    this.stats.correct++; this.total.correct++;
+    this.patternNoted++;
+    const who = this.world.personaNames[this.rec!.persona] ?? 'someone';
+    this.say(`No rule broken... but you note ${who} at 3 AM. (${this.patternNoted}/3)`, GOLD);
+    this.desk.float('NOTED', GOLD);
+    this.nextAt = this.t + 0.6;
+    this.refreshHud();
   }
 
   private hitQuality(n: number) {
@@ -807,12 +856,13 @@ export class GameScene extends Phaser.Scene {
     this.botT += dt;
     if (['intro', 'request', 'reply', 'summary', 'finalintro'].includes(this.mode) && this.overlayT > 0.6) {
       if (this.mode === 'intro') this.afterIntro();
-      else if (this.mode === 'request') this.answerRequest(false); // the bot plays it straight
+      else if (this.mode === 'request') this.answerRequest(this.plan.requests === 'yes'); // by default the bot plays it straight
       else if (this.mode === 'reply') this.startShift();
       else if (this.mode === 'summary') {
         if (this.quality <= 0) return;
         if (this.day + 1 < DAYS) {
-          this.billOn = { infra: true, coffee: true, tooling: true };
+          const pay = this.plan.bills === 'all';
+          this.billOn = { infra: pay, coffee: pay, tooling: pay };
           this.fitBills();
         }
         this.payBills();
@@ -822,11 +872,12 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'reason' && this.botT > 0.25) {
       const bad = this.broken.length > 0;
       const i = this.options.findIndex((o) => this.broken.includes(o));
-      this.pickReason(bad && i >= 0 && Math.random() < 0.88 ? i : Math.floor(Math.random() * this.options.length));
+      this.pickReason(bad && i >= 0 && Math.random() < this.plan.reasons ? i : Math.floor(Math.random() * this.options.length));
       return;
     }
-    if ((this.mode === 'playing' || this.mode === 'final') && this.rec && this.nextAt === -1 && this.t >= this.readyAt && this.botT > 0.9) {
+    if ((this.mode === 'playing' || this.mode === 'final') && this.rec && this.nextAt === -1 && this.t >= this.readyAt && this.botT > this.plan.pace) {
       const bad = this.broken.length > 0;
+      if (this.plan.pattern && this.rec.pattern) { this.answer(true); return; }
       if (bad) {
         const doc = docFor(this.broken[0]);
         if (this.desk.docs.some((d) => d.id === doc)) this.desk.switchTab(doc);
@@ -836,7 +887,7 @@ export class GameScene extends Phaser.Scene {
           if (this.nextAt !== -1) return;
         }
       }
-      const right = this.rec.final || Math.random() < 0.92;
+      const right = this.rec.final || Math.random() < this.plan.accuracy;
       this.answer(right ? bad : !bad);
     }
   }
@@ -869,7 +920,7 @@ export class GameScene extends Phaser.Scene {
     const weekGrade = letter(pts);
     if (won) this.score += this.credits * 5;
     const ending = pickEnding({ won, corners: this.corners, integrity: this.integrity, stress: this.stress, junk: this.junk,
-      missed: this.total.missed, accuracy: acc, quotasMet: this.quotasMet, days: DAYS, pattern: false });
+      missed: this.total.missed, accuracy: acc, quotasMet: this.quotasMet, days: DAYS, pattern: this.patternNoted >= 3 });
     lastEnd.ending = ending;
     lastEnd.grade = won ? weekGrade : '';
     if (ending && !save.endings.includes(ending.id)) save.endings.push(ending.id);
@@ -881,6 +932,7 @@ export class GameScene extends Phaser.Scene {
     meta.save();
     if (won) {
       achieve('first_week');
+      if (this.patternNoted >= 3) achieve('pattern');
       if (this.toolsUsed === 0) achieve('no_tools');
       if (this.reasonsWrong === 0 && this.reasonsRight >= 3) achieve('reasons');
       if (weekGrade === 'S') achieve('grade_s');
@@ -914,6 +966,7 @@ export class GameScene extends Phaser.Scene {
       speed: (n: number) => { this.simSpeed = Math.max(1, Math.min(8, Math.round(n))); setJuiceSpeed(this.simSpeed); },
       god: (on = true) => { this.god = !!on; },
       autopilot: (on = true) => { this.autopilot = !!on; },
+      botPlan: (p: Partial<BotPlan> = {}) => Object.assign(this.plan, p),
       lose: () => this.finish(false),
       win: () => this.finish(true),
       skipDay: () => { if (this.mode === 'playing' || (this.mode === 'reason' && this.prevMode === 'playing')) this.clock = 0.01; },
@@ -929,10 +982,13 @@ export class GameScene extends Phaser.Scene {
       story: () => ({ corners: this.corners, integrity: this.integrity, stress: this.stress, junk: this.junk, choices: this.choices,
         credits: this.credits, grades: this.grades, upgraded: [...this.upgraded], exempt: [...this.world.exempt] }),
       ending: () => pickEnding({ won: true, corners: this.corners, integrity: this.integrity, stress: this.stress, junk: this.junk,
-        missed: this.total.missed, accuracy: 100, quotasMet: this.quotasMet, days: DAYS, pattern: false })?.id ?? null,
+        missed: this.total.missed, accuracy: 100, quotasMet: this.quotasMet, days: DAYS, pattern: this.patternNoted >= 3 })?.id ?? null,
       world: () => ({ outages: this.world.outages, releases: this.world.releases, directory: this.world.directory,
         textProp: this.world.textProp, money: this.world.money, desk: this.world.all.filter((r) => r.kit).map((r) => `${r.day + 1}:${r.type}`) }),
       endings: () => kitSave().endings,
+      /** The next records' fingerprints (event/id/time), without showing them: checks the daily stream is seeded. */
+      peek: () => this.rec ? `${this.rec.event}|${this.rec.id}|${this.rec.time}|${this.rec.email}` : null,
+      pattern: () => ({ seen: [...this.patternSeen].map((d) => d + 1), noted: this.patternNoted, event: this.patternEvent }),
       /** Restart the game scene with a heat level / mode (e.g. heat(5), mode('endless')). */
       heat: (n: number) => { K.run.heat = Math.max(0, Math.min(5, n | 0)); K.run.choices.heat = K.run.heat; this.scene.restart(); },
       mode: (m: string) => { K.run.mode = m; K.run.choices.mode = m; this.scene.restart(); },
@@ -941,6 +997,16 @@ export class GameScene extends Phaser.Scene {
         s.endings = ENDINGS.map((e) => e.id);
         s.bestGrade = { 0: 'A', 1: 'B', 2: 'B', 3: 'C', 4: 'C', 5: 'D' };
         return sharedDebug.unlockAll?.();
+      },
+      // Load test (tests/accept.py): the busiest desk (day 5, every document) at top bot speed.
+      flood: () => {
+        hooks.debug.showcase();
+        this.day = DAYS - 1;
+        this.world.newDay(this.day);
+        this.refreshDocs(false);
+        this.simSpeed = 8;
+        setJuiceSpeed(8);
+        this.autopilot = true;
       },
       // For the gameplay GIF: a busy day-4 shift with every document on the desk.
       showcase: () => {

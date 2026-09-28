@@ -80,7 +80,7 @@ startKit({
       const save = kitSave();
       const found = save.endings.filter((id) => ENDINGS.some((x) => x.id === id)).length;
       const best = Object.entries(save.bestGrade).sort((a, b) => +b[0] - +a[0])[0];
-      const line = `ENDINGS ${found}/${ENDINGS.length}${best ? `   BEST GRADE ${best[1]} (HEAT ${best[0]})` : ''}`;
+      const line = `ENDINGS ${found}/${ENDINGS.length}${best ? ` - BEST GRADE ${best[1]} (HEAT ${best[0]})` : ''}`;
       text(scene, W / 2, 104, line, { align: 'center', color: 0xf8b800, depth: 10 });
     }
   },

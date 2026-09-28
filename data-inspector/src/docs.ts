@@ -10,8 +10,6 @@ export const TABS: Record<DocId, string> = { rules: 'RULES', plan: 'PLAN', users
 
 export interface DocCtx { world: World; day: number; rules: Rule[]; personas: { name: string; role: string }[]; deals: string[] }
 
-const pad = (s: string, n: number) => (s.length >= n ? s + ' ' : s + ' '.repeat(n - s.length));
-
 function rules(c: DocCtx): Line[] {
   // Today's rules first (numbers stay the rulebook order, which INSIGHT and the reason picker use).
   const out: Line[] = c.deals.map((d) => ({ t: `DEAL: ${d}`, c: 'bad' as const }));
@@ -57,10 +55,10 @@ function users(c: DocCtx): Line[] {
 
 function uptime(c: DocCtx): Line[] {
   const w = c.world;
-  const out: Line[] = [{ t: 'SOURCE     STATUS TODAY', c: 'key' }];
+  const out: Line[] = [];
   for (const s of w.sources) {
     const o = w.outages.find((x) => x.source === s);
-    out.push({ t: pad(s, 10) + (o ? `DOWN ${hhmm(o.from)}-${hhmm(o.to)}` : 'OK all day'), c: o ? 'bad' : 'ok' });
+    out.push({ t: `${s}: ${o ? `DOWN TODAY ${hhmm(o.from)}-${hhmm(o.to)}` : 'OK all day'}`, c: o ? 'bad' : 'ok' });
   }
   out.push({ t: 'Events sent while DOWN are junk.', c: 'key' });
   return out;

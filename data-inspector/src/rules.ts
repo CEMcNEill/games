@@ -42,6 +42,7 @@ export interface Rec {
   dupe: boolean;          // id was shown earlier today
   props: [string, string][];
   final?: boolean;
+  pattern?: boolean;      // part of the hidden 3-record story (breaks no rule)
 }
 
 export interface Outage { source: string; from: number; to: number }
@@ -312,7 +313,7 @@ export class World {
     return r.pick(p.values);
   }
 
-  private setTime(rec: Rec, day: number, mins: number) {
+  setTime(rec: Rec, day: number, mins: number) {
     rec.day = day; rec.mins = mins; rec.future = day > 0; rec.time = timeLabel(day, mins);
   }
 
