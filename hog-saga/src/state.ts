@@ -13,7 +13,7 @@ export type SkillId = 'error_tracking' | 'experiments' | 'feature_flags' | 'web_
 export type Target = 'enemy' | 'enemies' | 'ally' | 'party';
 export type ItemId = 'potion' | 'ether' | 'hotfix';
 export type Arch = 'swarm' | 'fast' | 'brute' | 'tank' | 'caster';
-export type Mode = 'standard' | 'ngplus' | 'solo' | 'noitems' | 'speedrun';
+export type Mode = 'standard' | 'ngplus' | 'solo' | 'noitems' | 'speedrun' | 'daily';
 
 export const DIFF = {
   easy: { hp: 0.72, dmg: 0.7 },
@@ -182,7 +182,7 @@ export function freshParty(): Member[] {
   ];
 }
 
-const MODES: Mode[] = ['standard', 'ngplus', 'solo', 'noitems', 'speedrun'];
+const MODES: Mode[] = ['standard', 'ngplus', 'solo', 'noitems', 'speedrun', 'daily'];
 
 export function resetRun() {
   const g = K.theme.game;

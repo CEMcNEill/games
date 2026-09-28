@@ -267,6 +267,7 @@ export class ExploreScene extends Phaser.Scene {
     if (R.mode === 'ngplus') t.push(`NG+${R.ng > 1 ? R.ng : ''}`);
     if (R.mode === 'solo') t.push('SOLO');
     if (R.mode === 'noitems') t.push('NO ITEMS');
+    if (R.mode === 'daily') t.push('DAILY');
     if (R.heat) t.push(`HEAT ${R.heat}`);
     if (R.mode === 'speedrun') t.push(fmtTime(hooks.elapsed));
     return t.join('  ');
@@ -938,6 +939,8 @@ export class ExploreScene extends Phaser.Scene {
       },
       // Load test (tests/accept.py): the showcase fight with a combo every turn, forever (use with god).
       flood: () => { R.flood = true; if (!battleOn()) (hooks.debug.showcase as () => void)(); },
+      // Jump straight into battle n: 0-7 map encounters, 8 boss, 9 Wyrm, 10 mimic.
+      fight: (n: number) => { if (!battleOn()) { this.skipDialogue(); if (n === MIMIC) this.mimicAt = 0; this.startBattle(Math.max(0, Math.min(10, Math.floor(n)))); } },
       wyrm: () => { if (!battleOn()) { this.skipDialogue(); this.startBattle(WYRM); } },
       secrets: () => [...R.secrets],
       botGoal: () => this.bot.goal,

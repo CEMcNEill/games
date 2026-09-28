@@ -49,8 +49,20 @@ Flags matter; phase 2 at 50%; phase 3 (ROLLBACK, heals once, acts twice) only at
 WEAK!/RESIST/BREAK! pops, a battle swirl transition, a victory jingle and level-up fanfare (ZzFX
 note sequences), battle + boss music (ACE-Step via music.py, fixed kit audio in public/assets/kit).
 
-## Numbers
-(filled in as the bot runs come in)
+## Numbers (bot runs, see tools/bot.py)
+- Before tonight: normal 5/5, boss 11-13 rounds, party ~50% HP; hard ~2/3.
+- First P0 build: normal 3/3 but boss 7-9 rounds and 7 combos a run: meter gains cut (hit 3->2, weak
+  6->3, break 12->6, damage taken 30->18) and boss HP 1250->1450. Then normal 6/6 (boss 9-11 rounds,
+  34-56% HP left), hard 5/6, easy 6/6.
+- With gear, shop and back row the smart bot won hard 10/10, and a newcomer bot (old AI: no scan, no
+  weakness, no DEFEND) only won normal 6/8, dying to MASS OUTAGE. Fixes: outage x2.0 -> x1.7, boss
+  1450 -> 1400 HP, the newcomer bot presses the flashing SHIP IT! (as people do); hard HP x1.2 -> 1.25,
+  damage x0.98 -> 1.06. Now newcomer normal 9/10, newcomer hard 7/8 (close calls), smart 10/10 on all.
+- SOLO HOG was 0/4 (dead in fight 1): the hedgehog gets x2.2 HP, x2 MP, +4 ATK, +3 DEF, Session
+  Replay and double HP/MP growth, and solo monsters have HP x0.55 and damage x0.65: now 7/8.
+- NG+ from a real win: LV 6 -> 8, boss 11 rounds, 52% HP left (monsters +5 tiers, boss +60% HP and
+  +25% power per cycle).
+- Final table: KIT.md "Balance".
 
 ## M2 (P1): world, loot, replay
 **Gold and gear.** Every fight drops gold (by archetype and tier). Each member has weapon, armour
@@ -86,3 +98,15 @@ Enter still starts NEW GAME at heat 0 at once.
   breaks across runs), Pair Programming, Treasure Hunter, Off The Roadmap, Lost And Found, Debt Paid
   (hidden), Lean Team (win at LV 4 or lower), No Crutches, Solo Founder, Under Pressure (heat 3+),
   Sequel (NG+ win).
+
+## M3 (P2): events and formation
+- **Overworld events** (`world.ts rollEvents`, seeded by `K.run.seed`): six fixed spots off the route;
+  each run a travelling Merchant stands on one (3 random rare pieces at 80% plus Potion/Ether) and two
+  stray chests on two others. Each stray chest is 50/50 supplies (gold + Potion) or a Mimic Chest (a
+  fast foe drawn with the chest sprite at 4x, chomping; loot + 40 gold). Not counted in the HUD chests.
+  `tools/reach.mjs` checks that every goal stays reachable with all six spots occupied (it caught one
+  real bug: the grove wall had closed the north woods' east exit, so a merchant on the other gap cut
+  off the Lucky Keyboard; one tree at (29,8) was removed to reopen it).
+- **Formation**: ESC party screen, LEFT/RIGHT sets FRONT/BACK. Back row takes and deals x0.7 physical
+  damage; spells and heals are unaffected, so it suits the analyst and support. Default is everyone
+  front (first run unchanged); the autopilot moves the casters back.

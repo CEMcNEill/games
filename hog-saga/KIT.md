@@ -111,7 +111,24 @@ skills, combos, weaknesses, statuses, items, gear, the shop, the Old Dev, the Me
 Wyrm, the Mimic, the hedgehog, tiles, the battle and boss music (`public/assets/kit/*.ogg`).
 
 ## Balance
-BALANCE_TABLE
+Autopilot at speed 8, default theme, 10 runs per row unless noted (2026-09-28). "Game s" is
+`__game.elapsed` (explore + battle time at 1x, no reading time), so a human first run is ~6-8 min.
+
+| Setting | Wins | Game s (median, range) | Boss rounds | Party HP left after boss (median) | Breaks / combos / scans per run |
+|---|---|---|---|---|---|
+| easy | 10/10 | 303 (288-328) | 5-8 | 60% | 11.5 / 2.8 / 4.5 |
+| normal | 10/10 | 338 (297-366) | 8-10 | 56% | 15.9 / 4.0 / 5.1 |
+| hard | 10/10 | 385 (356-420) | 9-12 | 48% | 20.0 / 4.8 / 5.3 |
+| normal, newcomer bot (`naive`: no scan, weakness, DEFEND or rows; does press SHIP IT!) | 9/10 | 322 (301-343) | 8-12 | 49% | 9.5 / 3.7 / 0 |
+| hard, newcomer bot (8 runs) | 7/8 | ~373 | 10-19 | ~27%, several near-wipes | 12 / 5.2 / 0 |
+| normal + optional content (`optional`, 4 runs) | 4/4 | 487 | 5-8 | 63% | all 7 chests, 4/4 secrets, Wyrm beaten, LV 7 |
+| heat 3 / heat 5 (4 runs each, before the last heat bump) | 3/4 / 4/4 | 431 / 540 | - | - | heat 5: 46 rounds a run, 0 potions |
+| SOLO HOG (8 runs) | 7/8 | 407 | 17-26 | 9-34% | - |
+| NEW GAME+ after a real win (2 chains) | 2/2 | - | 11 | 52% | party LV 6 -> 8 |
+
+Everyone ends around LV 6 (7 with the Wyrm). Gold per run ~165-180 (enough for 2-3 shop pieces).
+Tuning notes: boss 1400 HP (x diff x heat x NG), MASS OUTAGE x1.7 (was x2.0: the newcomer bot lost
+2/8), hard = HP x1.25 / damage x1.06, solo monsters HP x0.55 / damage x0.65.
 
 ## Test hooks
 `__game.debug`: autopilot (walks the route: talks, shops for empty gear slots and potions, chests,

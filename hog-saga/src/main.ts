@@ -32,6 +32,7 @@ startKit({
     'ARROWS or WASD to walk. ENTER to talk, open chests and rest. ESC shows your party.',
     'Walk into a monster to fight. SCAN finds its weak spot: hit it with the right kind (STRIKE, MAGIC, DATA) to BREAK it.',
     'Every SKILL is a PostHog product. Beat an area\'s monsters to bring down its firewall.',
+    'Hits fill the SHIP IT meter for a team combo. A red ! means a big attack is coming: DEFEND!',
   ],
   titleArt: (scene: Phaser.Scene) => {
     // A soft glow so dark generated sprites don't vanish into a dark brand background.

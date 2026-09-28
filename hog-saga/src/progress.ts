@@ -32,6 +32,7 @@ export function titleMenu(): TitleRow[] {
     { label: 'SOLO HOG', value: 'solo', locked: !won },
     { label: 'NO ITEMS', value: 'noitems', locked: !won },
     { label: 'SPEEDRUN', value: 'speedrun', locked: !won },
+    { label: 'DAILY', value: 'daily', locked: !won },
   ] }];
   if (won) rows.push(heatRow(5));
   return rows;
@@ -61,7 +62,8 @@ export function onWin() {
 export function endSummary(): string[] {
   const out: string[] = [];
   const tags = [R.mode === 'ngplus' ? `NG+${R.ng > 1 ? R.ng : ''}` : '', R.mode === 'solo' ? 'SOLO' : '', R.mode === 'noitems' ? 'NO ITEMS' : '',
-    R.mode === 'speedrun' ? 'SPEEDRUN' : '', R.heat ? `HEAT ${R.heat}` : ''].filter(Boolean);
+    R.mode === 'speedrun' ? 'SPEEDRUN' : '', R.mode === 'daily' ? `DAILY ${new Date().toISOString().slice(0, 10)}` : '',
+    R.heat ? `HEAT ${R.heat}` : ''].filter(Boolean);
   if (tags.length) out.push(tags.join('  '));
   out.push(`BREAKS ${R.breaks}   COMBOS ${R.combos}   GOLD ${R.gold}`);
   const s = saga();

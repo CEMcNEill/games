@@ -180,7 +180,7 @@ export class BattleScene extends Phaser.Scene {
       this.perform(m, partyMove(this.view(), m));
     }
     if (this.ui.mode === 'foe') this.drawCursor();
-    for (const fo of this.foes) if (fo.alert) fo.alert.y = fo.y - fo.s.displayHeight - 8 + (Math.floor(this.time.now / 250) % 2) * 2;
+    for (const fo of this.foes) if (fo.alert) fo.alert.y = this.alertY(fo) + (Math.floor(this.time.now / 250) % 2) * 2;
   }
 
   view(): BattleView {
@@ -303,9 +303,13 @@ export class BattleScene extends Phaser.Scene {
     const x0 = Math.round(f.x - 26) - 2;
     plate.fillStyle(0x000000, 0.55).fillRect(x0, iy - 5, ix - x0, 10);
     const warn = f.windup || f.telegraph;
-    if (warn && !f.alert) f.alert = this.add.image(f.x, f.y - f.s.displayHeight - 8, spr('saga_icons'), ICON.alert).setScale(2).setDepth(13);
+    if (warn && !f.alert) f.alert = this.add.image(this.alertX(f), this.alertY(f), spr('saga_icons'), ICON.alert).setScale(2).setDepth(13);
     if (!warn && f.alert) { f.alert.destroy(); f.alert = null; }
   }
+
+  /** Where the red "!" goes: above small foes, beside big ones (the top boxes would hide it). */
+  private alertX(f: Foe) { return isBossLike(f) ? f.x + f.s.displayWidth / 2 + 10 : f.x; }
+  private alertY(f: Foe) { return Math.max(50, f.y - f.s.displayHeight - 8); }
 
   private refreshRows() {
     const ui = K.ui;
@@ -783,7 +787,7 @@ export class BattleScene extends Phaser.Scene {
     hitstop(this, 90);
     shake(this, 4, 180);
     burst(this, f.x, f.y - f.s.displayHeight / 2, 0xf8b800, 18, { colours: [0xfcfcfc, 0xf83800] });
-    this.time.delayedCall(120, () => pop(this, f.x, f.y - f.s.displayHeight - 6, 'BREAK!', 0xf83800, true));
+    this.time.delayedCall(120, () => pop(this, f.x, Math.max(56, f.y - f.s.displayHeight - 6), 'BREAK!', 0xf83800, true));
     hooks.events.push({ event: 'break', props: { arch: f.arch }, t: Math.round(performance.now()) });
   }
 
