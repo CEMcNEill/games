@@ -504,6 +504,10 @@ export class GameScene extends Phaser.Scene {
     this.clock = Math.max(15, this.dayLen + this.adj.clock);
     this.lastTick = Math.ceil(this.clock);
     const kit = this.world.days[this.day].find((r) => r.kit);
+    // A document that arrived today opens on top of the stack.
+    const before = new Set(this.day > 0 ? this.world.docs(this.day - 1) : ['rules', 'plan']);
+    const fresh = this.world.docs(this.day).find((d) => !before.has(d));
+    if (fresh) this.desk.switchTab(fresh);
     this.say(kit ? `New: ${kit.text}` : this.world.days[this.day][0]?.text ? `Today: ${this.world.days[this.day][0].text}` : 'Here they come.');
     this.newRecord();
   }
@@ -997,6 +1001,30 @@ export class GameScene extends Phaser.Scene {
         s.endings = ENDINGS.map((e) => e.id);
         s.bestGrade = { 0: 'A', 1: 'B', 2: 'B', 3: 'C', 4: 'C', 5: 'D' };
         return sharedDebug.unlockAll?.();
+      },
+      /** Rule-engine self check on a private World with every desk rule: baselines that break a rule, and breaks
+       * that don't show up in violations() (both should be ~0). */
+      selfTest: (n = 150) => {
+        const issues: string[] = [];
+        const w = new World(K.theme, issues, { rng: rng(1234), desk: [...DESK_TYPES] });
+        const baseBad: Record<string, number> = {}, breakMiss: Record<string, number> = {}, breakFail: Record<string, number> = {};
+        let records = 0;
+        for (let d = 0; d < DAYS; d++) {
+          w.newDay(d);
+          const active = w.active(d);
+          for (let i = 0; i < n; i++) {
+            const rec = w.baseline();
+            records++;
+            for (const v of w.violations(rec, active)) baseBad[v.type] = (baseBad[v.type] ?? 0) + 1;
+            w.shown(rec);
+          }
+          for (const rule of active) for (let i = 0; i < 20; i++) {
+            const rec = w.baseline();
+            if (!w.breakRule(rec, rule, i % 2 === 0)) { breakFail[rule.type] = (breakFail[rule.type] ?? 0) + 1; continue; }
+            if (!w.violations(rec, active).includes(rule)) breakMiss[rule.type] = (breakMiss[rule.type] ?? 0) + 1;
+          }
+        }
+        return { records, rules: w.all.map((r) => `${r.day + 1}:${r.type}`), baseBad, breakMiss, breakFail, issues };
       },
       // Load test (tests/accept.py): the busiest desk (day 5, every document) at top bot speed.
       flood: () => {

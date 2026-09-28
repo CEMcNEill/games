@@ -158,14 +158,23 @@ export class World {
     });
     while (this.days.length < 5) this.days.push([]);
     // Desk rules: one kit rule (with its document) per day from day 2, if the theme can support it.
+    // A kind the theme already uses is swapped for an unused one, so every day still brings something new.
+    const planned = new Set(opts.desk.filter(Boolean));
+    const spare = DESK_TYPES.filter((t) => !planned.has(t) && !usedTypes.has(t));
+    opts.desk = opts.desk.map((t) => (t && usedTypes.has(t) ? spare.shift() ?? null : t));
     opts.desk.forEach((type, i) => {
       const d = Math.min(i + 1, this.days.length - 1); // extras (endless) pile onto the last day
       if (!type || d < 1) return;
-      const r: Rule = { type, text: '', day: d, kit: true };
-      const why = this.check(r, usedProps, usedTypes);
-      if (why) { issues.push(`desk rule ${type}: ${why}, skipped`); return; }
-      this.days[d].push(r);
-      accept(r);
+      // If this theme can't support the kind (e.g. no numeric property for money), try a spare kind.
+      for (const t of [type, ...spare]) {
+        const r: Rule = { type: t, text: '', day: d, kit: true };
+        const why = this.check(r, usedProps, usedTypes);
+        if (why) { issues.push(`desk rule ${t}: ${why}, skipped`); continue; }
+        this.days[d].push(r);
+        accept(r);
+        if (spare.includes(t)) spare.splice(spare.indexOf(t), 1);
+        return;
+      }
     });
     this.all = this.days.flat();
     // Legit sources must never be blocked by any rule; keep at least one.
@@ -333,6 +342,13 @@ export class World {
     if (kv) kv[1] = v; else rec.props.push([name, v]);
   }
 
+  /** With the currency rule active, any record carrying the money property also carries its currency. */
+  private addCurrency(rec: Rec) {
+    const m = this.money;
+    if (!m || !this.activeHas('currency_mismatch')) return;
+    if (rec.props.some((p) => p[0] === m.prop) && !rec.props.some((p) => p[0] === m.curProp)) rec.props.push([m.curProp, m.cur]);
+  }
+
   /** A record that obeys every rule of the week (as far as today's documents allow). */
   baseline(forEvent?: EventDef): Rec {
     const r = this.r;
@@ -350,9 +366,7 @@ export class World {
       if (before(rec.day, rec.mins, rel.day, rel.mins)) this.setTime(rec, rel.day, r.int(rel.mins, 1079));
     }
     if (this.activeHas('pii_in_text') && this.textKit && r.chance(0.45)) rec.props.push([this.textProp, r.pick(COMMENTS)]);
-    if (this.activeHas('currency_mismatch') && this.money?.curKit && rec.props.some((p) => p[0] === this.money!.prop)) {
-      rec.props.push([this.money.curProp, this.money.cur]);
-    }
+    this.addCurrency(rec);
     if (this.activeHas('source_outage')) {
       for (const o of this.outages) {
         if (rec.source !== o.source || rec.day !== 0 || rec.mins < o.from || rec.mins > o.to) continue;
@@ -381,8 +395,7 @@ export class World {
         const kit = rec.props.filter(([k]) => !own.has(k) && k !== this.money?.curProp);
         rec.event = ev.name;
         rec.props = [...ev.props.map((p) => [p.name, this.legalValue(p)] as [string, string]), ...kit];
-        const m = this.money;
-        if (m?.curKit && this.activeHas('currency_mismatch') && ev.props.some((p) => p.name === m.prop)) rec.props.push([m.curProp, m.cur]);
+        this.addCurrency(rec);
       }
       return true;
     };

@@ -29,7 +29,7 @@ function plan(c: DocCtx): Line[] {
     out.push({ t: e.name, c: 'ink' });
     const props = e.props.map((p) => (req.has(p.name) ? `${p.name}*` : p.name));
     const m = w.money;
-    if (m && c.rules.some((r) => r.type === 'currency_mismatch') && e.props.some((p) => p.name === m.prop) && m.curKit) props.push(m.curProp);
+    if (m && c.rules.some((r) => r.type === 'currency_mismatch') && e.props.some((p) => p.name === m.prop) && !props.includes(m.curProp)) props.push(m.curProp);
     out.push({ t: props.length ? props.join(', ') : '(no properties)', c: 'key', indent: 2 });
   }
   if (req.size) out.push({ t: '* required', c: 'key' });

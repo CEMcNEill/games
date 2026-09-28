@@ -242,7 +242,7 @@ export class Desk {
     s.time.delayedCall(150, () => this.hog.play(anim('inspector')));
   }
 
-  float(msg: string, col: number) { floatText(this.s, CARD.x + 118, CARD.y + 118, msg, col); }
+  float(msg: string, col: number) { floatText(this.s, CARD.x + 118, CARD.y + 172, msg, col); }
 
   highlight(field: string) {
     const y = this.cardLines.get(field);
