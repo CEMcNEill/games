@@ -2,7 +2,8 @@
 
 Bug Survivors is a Vampire Survivors-style game. The PostHog hedgehog stands in the prospect's
 "arena" while swarms of bugs close in. Weapons fire on their own; every weapon is a PostHog
-product. After 3:30 a boss arrives; beating it wins the game. A run lasts about 4 minutes.
+product. After 3:30 a boss arrives; beating it wins the game. A run lasts about 4 minutes. Returning
+players get harder heat levels, a shop, heroes, endless and a daily run; none of that needs theme text.
 
 What you write, and where the player sees it:
 - title (max 30): the game's name on the title screen. Work in the prospect's name or world if it
@@ -12,7 +13,9 @@ What you write, and where the player sees it:
   "The Onboarding Funnel"). Shown on a banner when the run starts.
 - game.enemies (exactly 3, weakest first): each is one of their pain points turned into a bug.
   name (max 18) is shown as "NEW BUG: <NAME>"; pain (max 44) is the one-liner under it, in their
-  words. Enemy 1 is a fast little swarmer, 2 a sturdy mid-sized bug, 3 a slow tank.
+  words. Enemy 1 is a fast little swarmer, 2 a sturdy mid-sized bug, 3 a slow tank. Each also shows up as a
+  tinted variant with a trick (1 explodes, 2 charges, 3 spits from range) and as big "elite" versions, all
+  under the same name, so pick names that still read as a whole species ("Flaky Test", not "The Flaky Test").
 - game.boss: their biggest pain as a generic giant bug. name (max 22), taunt (max 60) is what it
   says when it arrives, in quotes on screen.
 - game.starting_product: the product they need most; it must also be in products.

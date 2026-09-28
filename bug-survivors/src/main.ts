@@ -67,7 +67,7 @@ startKit({
       heatRow(5),
     ];
   },
-  endSummary: () => lastRun.lines.slice(0, 3),
+  endSummary: () => lastRun.lines.slice(0, 2),
   achievements: ACHIEVEMENTS,
   postSanitize: (t, issues) => {
     // The starting weapon must be one of the featured products.

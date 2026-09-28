@@ -1691,15 +1691,17 @@ export class GameScene extends Phaser.Scene {
     if (won && this.heat >= 5) achieve('heat5');
     const newHeroes = HEROES.filter((h) => heroUnlocked(h.id) && !heroesBefore.includes(h.id));
     // End-screen lines: damage split, gold, unlocks.
-    const total = Object.values(this.dmgBy).reduce((a, b) => a + b, 0) || 1;
+    const total = Object.entries(this.dmgBy).filter(([k]) => k !== 'debug').reduce((a, [, b]) => a + b, 0) || 1;
     const label = (k: string) => (WEAPONS as Record<string, { short: string }>)[k]?.short ?? (k === 'super' ? 'Nova' : k.charAt(0).toUpperCase() + k.slice(1));
-    const top = Object.entries(this.dmgBy).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    const top = Object.entries(this.dmgBy).filter(([k]) => k !== 'debug').sort((a, b) => b[1] - a[1]).slice(0, 4)
       .map(([k, v]) => `${label(k)} ${Math.round((v / total) * 100)}%`);
+    // Two lines at most so the shared HEAT UNLOCKED / NEW achievement lines still fit.
     lastRun.lines = [];
     if (top.length) lastRun.lines.push(`DAMAGE  ${top.join('  ')}`);
-    if (this.run.evolutions.length || this.superNova) lastRun.lines.push(`EVOLVED  ${[...this.run.evolutions, ...(this.superNova ? [SUPER.name] : [])].join(', ')}`);
-    for (const h of newHeroes) lastRun.lines.push(`NEW HERO: ${h.name.toUpperCase()} (pick in the SHOP)`);
-    if (this.mode === 'daily') lastRun.lines.push(`DAILY BEST TODAY ${sv.daily.best}`);
+    const evos = [...this.run.evolutions, ...(this.superNova ? [SUPER.name] : [])];
+    if (newHeroes.length) lastRun.lines.push(`NEW HERO: ${newHeroes.map((h) => h.name.toUpperCase()).join(', ')} (pick one in the SHOP)`);
+    else if (this.mode === 'daily') lastRun.lines.push(`DAILY BEST TODAY ${sv.daily.best}`);
+    else if (evos.length) lastRun.lines.push(`EVOLVED  ${evos.join(', ')}`);
     const products = [...this.weapons.keys()];
     finishRun({ won, score, stats: { kills: this.kills, level: this.level } });
     this.time.delayedCall(won ? 200 : 900, () => this.scene.start('End', {
@@ -1763,6 +1765,9 @@ export class GameScene extends Phaser.Scene {
       // For the gameplay GIF: a mid-game swarm with evolved weapons going.
       showcase: () => {
         this.elapsed = 150;
+        // Level 15 so level-up cards interrupt the GIF less often.
+        this.level = 15;
+        this.xpNext = Math.floor(3 + this.level * 2.2 + this.level ** 1.3);
         this.evQueue = this.evQueue.filter((e) => e.at > 150);
         this.eliteQueue = [];
         prods().slice(0, 4).forEach((id) => this.addWeapon(id));
