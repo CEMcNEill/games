@@ -46,5 +46,7 @@
   {"id": "autopilot", "w": 16, "h": 16, "frames": 1},
   {"id": "freeze", "w": 16, "h": 16, "frames": 1},
   {"id": "shipit", "w": 16, "h": 16, "frames": 1},
-  {"id": "rewind", "w": 16, "h": 16, "frames": 1}
+  {"id": "rewind", "w": 16, "h": 16, "frames": 1},
+  {"id": "merch", "w": 16, "h": 16, "frames": 1},
+  {"id": "page", "w": 16, "h": 16, "frames": 1}
 ]

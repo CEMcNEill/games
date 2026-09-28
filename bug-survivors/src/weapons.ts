@@ -23,10 +23,17 @@ export interface WState {
   nova: number; // super evolution timer (heatmaps: damage tick timer)
   spots: Spot[];                          // heatmaps: hot tiles on the floor
   drone: Phaser.GameObjects.Sprite | null; // posthog_ai: the Max AI drone
+  patch: number;                          // v1.x patches after LV 5 / evolution (x1.12 damage each)
+  major: boolean;                         // v2.0 major release
+  items: any[];                           // tools: pipes, scanners, turrets, log lines...
+  cnt: number;                            // tools: a counter (scout flags, export hits...)
 }
 
 export const newWeapon = (id: WeaponId): WState => ({ id, level: 1, evo: false, timer: 0.3, angle: 0, flags: [], orbs: [], rings: [], nova: 1,
-  spots: [], drone: null });
+  spots: [], drone: null, patch: 0, major: false, items: [], cnt: 0 });
+
+/** "v0.3", "v1.0", "v1.4", "v2.1": the weapon's version for cards, HUD and pause. */
+export const semver = (w: WState) => (w.major ? `v2.${w.patch}` : w.evo ? `v1.${w.patch}` : w.level >= 5 && w.patch ? `v0.5.${w.patch}` : `v0.${w.level}`);
 
 const GOLD = 0xf8d878;
 
@@ -213,8 +220,8 @@ const surveys: Fn = (g, w, dt) => {
 
 /** Beam geometry for Web Analytics (also used by the drawing). */
 export function beams(w: WState, s: Stats) {
-  const n = Math.min(4, (w.level >= 4 ? 2 : 1) + s.amount);
-  const len = (70 + 10 * w.level) * s.area;
+  const n = w.evo ? 6 + Math.min(2, s.amount) : Math.min(4, (w.level >= 4 ? 2 : 1) + s.amount);
+  const len = (w.evo ? 110 : 70 + 10 * w.level) * s.area;
   return { n, len, angles: Array.from({ length: n }, (_, b) => w.angle + (b * Math.PI * 2) / n) };
 }
 
@@ -226,7 +233,7 @@ const webAnalytics: Fn = (g, w, dt) => {
   if (w.timer > 0) return;
   w.timer = 0.06;
   const { len, angles } = beams(w, s);
-  const dmg = 6 + 3 * L;
+  const dmg = w.evo ? 30 : 6 + 3 * L;
   for (const a of angles) {
     const cx = Math.cos(a), cy = Math.sin(a);
     for (const e of g.near(p.x + (cx * len) / 2, p.y + (cy * len) / 2, len / 2 + 4)) {
@@ -311,7 +318,7 @@ const dataWarehouse: Fn = (g, w) => {
   while (w.orbs.length > n) w.orbs.pop()!.destroy();
   const rad = (56 + 4 * L) * s.area;
   const spin = -g.elapsed * 1.15;
-  const dmg = 20 + 8 * L;
+  const dmg = w.evo ? 70 : 20 + 8 * L;
   w.orbs.forEach((o, i) => {
     const a = spin + (i / n) * Math.PI * 2;
     o.setPosition(p.x + Math.cos(a) * rad, p.y + Math.sin(a) * rad).setRotation(Math.sin(g.elapsed * 2 + i) * 0.15);
@@ -320,6 +327,13 @@ const dataWarehouse: Fn = (g, w) => {
       e.hitAt.vault = g.elapsed + 0.7;
       const dx = e.s.x - p.x, dy = e.s.y - p.y, d = Math.hypot(dx, dy) || 1;
       g.damage(e, dmg, (dx / d) * 260, (dy / d) * 260, 'data_warehouse');
+      if (w.evo && g.projs.length < 240) {
+        // Managed Warehouse: the drum shatters the bug into shards that fly on.
+        for (let k = 0; k < 3; k++) {
+          const a = Math.atan2(dy, dx) + (k - 1) * 0.5;
+          g.shoot('shot', e.s.x, e.s.y, Math.cos(a) * 200, Math.sin(a) * 200, 18, 0.5, 2, 'data_warehouse').s.setTintFill(0x3cbcfc);
+        }
+      }
     }
   });
 };
@@ -331,7 +345,7 @@ const workflows: Fn = (g, w, dt) => {
   let t = g.nearest(p.x, p.y, 150 * s.area);
   if (!t) { w.timer = 0.2; return; }
   w.timer = (1.7 - 0.15 * L) * s.cd;
-  const hops = 2 + L + s.amount, dmg = 12 + 5 * L, reach = 90 * s.area;
+  const hops = (w.evo ? 8 : 2 + L) + s.amount, dmg = w.evo ? 40 : 12 + 5 * L, reach = 90 * s.area;
   const hit = new Set<Enemy>();
   let lx = p.x, ly = p.y;
   for (let k = 0; k < hops && t; k++) {
@@ -339,6 +353,11 @@ const workflows: Fn = (g, w, dt) => {
     hit.add(t);
     lx = t.s.x; ly = t.s.y;
     g.damage(t, dmg, 0, 0, 'workflows');
+    if (w.evo) {
+      // Multi-Channel Blast: every hop forks a side zap to the next-nearest bug.
+      const side = g.near(lx, ly, reach).find((e) => !hit.has(e) && e.arch !== 'crate');
+      if (side) { hit.add(side); g.zapLine(lx, ly, side.s.x, side.s.y, 0xf8d878); g.damage(side, dmg * 0.7, 0, 0, 'workflows'); }
+    }
     let next: Enemy | null = null, nd = reach * reach;
     for (const e of g.near(lx, ly, reach)) {
       if (hit.has(e) || e.arch === 'crate') continue;
@@ -350,7 +369,7 @@ const workflows: Fn = (g, w, dt) => {
   g.sfx('zap', 0.35, 90);
 };
 
-export const WEAPON_FNS: Record<WeaponId, Fn> = {
+export const WEAPON_FNS: Partial<Record<WeaponId, Fn>> = {
   experiments, error_tracking: errorTracking, session_replay: sessionReplay, feature_flags: featureFlags,
   product_analytics: productAnalytics, surveys,
   web_analytics: webAnalytics, heatmaps, posthog_ai: posthogAi, data_warehouse: dataWarehouse, workflows,
