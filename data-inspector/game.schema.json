@@ -1,0 +1,274 @@
+{
+  "type": "object",
+  "required": [
+    "difficulty",
+    "desk",
+    "manager",
+    "sources",
+    "events",
+    "personas",
+    "days",
+    "final_record"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "normal",
+        "hard"
+      ],
+      "description": "easy for execs and non-gamers, normal for most, hard for gamer champions"
+    },
+    "desk": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 28,
+          "description": "The player's workplace, e.g. 'Mission Control Data Desk'"
+        },
+        "sprite_prompt": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Desk-top texture seen from above, for a 32x32 tile"
+        }
+      }
+    },
+    "manager": {
+      "type": "object",
+      "required": [
+        "name",
+        "title",
+        "sprite_prompt"
+      ],
+      "additionalProperties": false,
+      "description": "The boss character who briefs the player each morning. Generic unless the brief names someone.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 14
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "sprite_prompt": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 160,
+          "description": "What the manager looks like: one person or animal, head and shoulders"
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "Legit places their events come from, e.g. web, ios, android, server",
+      "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 10
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "description": "Their real-looking tracking plan: event names and properties with example values",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "props"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 24,
+            "pattern": "^[A-Za-z0-9_$.:-]+$",
+            "description": "snake_case event name, no spaces"
+          },
+          "props": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "values"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16,
+                  "pattern": "^[A-Za-z0-9_$.:-]+$"
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "description": "Example values; all-numeric values make a numeric property"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "personas": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "Four of their customers whose events arrive at the desk",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "sprite_prompt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 12,
+            "description": "First name only"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 18,
+            "description": "Who they are to the prospect, e.g. 'Satellite operator'"
+          },
+          "sprite_prompt": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "days": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "description": "Five working days. Rules pile up: day N checks every rule from days 1..N.",
+      "items": {
+        "type": "object",
+        "required": [
+          "intro",
+          "rules"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "intro": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 110,
+            "description": "The manager's morning line"
+          },
+          "rules": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "unknown_event",
+                    "required_property",
+                    "property_in_set",
+                    "value_in_range",
+                    "property_equals",
+                    "future_timestamp",
+                    "duplicate_id",
+                    "blocked_source",
+                    "internal_user"
+                  ]
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 5,
+                  "maxLength": 56,
+                  "description": "The rule as the player reads it in the rulebook"
+                },
+                "property": {
+                  "type": "string",
+                  "maxLength": 16,
+                  "description": "required_property, property_in_set, value_in_range, property_equals: a property from events"
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 16,
+                  "description": "property_equals: the forbidden value"
+                },
+                "values": {
+                  "type": "array",
+                  "maxItems": 6,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "description": "property_in_set: allowed values; blocked_source: forbidden sources"
+                },
+                "min": {
+                  "type": "number",
+                  "description": "value_in_range: lowest allowed"
+                },
+                "max": {
+                  "type": "number",
+                  "description": "value_in_range: highest allowed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "final_record": {
+      "type": "object",
+      "required": [
+        "intro"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "intro": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 90,
+          "description": "Manager's line before the last, trickiest record of the week"
+        }
+      }
+    }
+  }
+}

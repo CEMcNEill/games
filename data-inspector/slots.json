@@ -1,0 +1,23 @@
+[
+  { "id": "inspector", "w": 24, "h": 24, "frames": 2, "fps": 2 },
+  { "id": "manager", "w": 32, "h": 32, "frames": 2, "fps": 6,
+    "prompt": "{game.manager.sprite_prompt}", "kind": "portrait" },
+  { "id": "persona_1", "w": 32, "h": 32, "frames": 1,
+    "prompt": "{game.personas[0].sprite_prompt}", "kind": "portrait" },
+  { "id": "persona_2", "w": 32, "h": 32, "frames": 1,
+    "prompt": "{game.personas[1].sprite_prompt}", "kind": "portrait" },
+  { "id": "persona_3", "w": 32, "h": 32, "frames": 1,
+    "prompt": "{game.personas[2].sprite_prompt}", "kind": "portrait" },
+  { "id": "persona_4", "w": 32, "h": 32, "frames": 1,
+    "prompt": "{game.personas[3].sprite_prompt}", "kind": "portrait" },
+  { "id": "desk", "w": 32, "h": 32, "frames": 1, "kind": "tile",
+    "prompt": "{game.desk.sprite_prompt}" },
+  { "id": "stamp_ok", "w": 16, "h": 16, "frames": 1 },
+  { "id": "stamp_flag", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_session_replay", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_feature_flags", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_experiments", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_error_tracking", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_product_analytics", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_surveys", "w": 16, "h": 16, "frames": 1 }
+]

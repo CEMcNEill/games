@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "required": ["difficulty", "intro", "town", "regions", "party", "npcs", "enemies", "boss"],
+  "additionalProperties": false,
+  "properties": {
+    "difficulty": { "type": "string", "enum": ["easy", "normal", "hard"], "description": "easy for execs and non-gamers, normal for most, hard for gamer champions" },
+    "intro": { "type": "string", "minLength": 10, "maxLength": 120, "description": "Opening narration: what threatens the prospect's world" },
+    "town": {
+      "type": "object", "required": ["name", "inn_line"], "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 3, "maxLength": 18, "description": "The starting town, from their world (their HQ, product, city)" },
+        "inn_line": { "type": "string", "minLength": 3, "maxLength": 70, "description": "What the innkeeper says; resting heals the party" }
+      }
+    },
+    "regions": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "description": "Three areas walked in order: 1 meadow around the town, 2 forest with a cave, 3 desert with the boss lair",
+      "items": {
+        "type": "object", "required": ["name", "blurb"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 3, "maxLength": 18 },
+          "blurb": { "type": "string", "minLength": 3, "maxLength": 56, "description": "One line shown when entering" }
+        }
+      }
+    },
+    "party": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "description": "Two companions who join the hedgehog: [0] an analyst (magic), [1] a support (healer). Generic roles unless the brief names people",
+      "items": {
+        "type": "object", "required": ["name", "role", "sprite_prompt"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 8, "description": "Short name shown in battle" },
+          "role": { "type": "string", "minLength": 3, "maxLength": 20, "description": "Their job, e.g. 'Data Analyst'" },
+          "sprite_prompt": { "type": "string", "minLength": 10, "maxLength": 160 }
+        }
+      }
+    },
+    "npcs": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "description": "Three townsfolk with one line each about the prospect's world or problems",
+      "items": {
+        "type": "object", "required": ["name", "line", "sprite_prompt"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 14 },
+          "line": { "type": "string", "minLength": 3, "maxLength": 100 },
+          "sprite_prompt": { "type": "string", "minLength": 10, "maxLength": 160 }
+        }
+      }
+    },
+    "enemies": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "description": "Five monsters from their pain points, met in this order (1-2 near town, 3-4 in the forest and cave, 5 in the desert)",
+      "items": {
+        "type": "object", "required": ["name", "pain", "archetype", "sprite_prompt"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 3, "maxLength": 14 },
+          "pain": { "type": "string", "minLength": 3, "maxLength": 50, "description": "One line shown when it appears" },
+          "archetype": { "type": "string", "enum": ["swarm", "fast", "brute", "tank", "caster"], "description": "swarm: weak, comes in groups; fast: acts often; brute: hits hard; tank: shrugs off attacks; caster: hits the whole party" },
+          "sprite_prompt": { "type": "string", "minLength": 10, "maxLength": 160 }
+        }
+      }
+    },
+    "boss": {
+      "type": "object", "required": ["name", "taunt", "phase2", "sprite_prompt"], "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 3, "maxLength": 20, "description": "Their biggest generic problem, never a competitor" },
+        "taunt": { "type": "string", "minLength": 3, "maxLength": 60, "description": "Said when the battle starts" },
+        "phase2": { "type": "string", "minLength": 3, "maxLength": 60, "description": "Said at half health, when it gets angry" },
+        "sprite_prompt": { "type": "string", "minLength": 10, "maxLength": 160 }
+      }
+    },
+    "product_lines": {
+      "type": "object",
+      "description": "Optional skill descriptions tailored to them, by product id (max 40 chars)",
+      "additionalProperties": { "type": "string", "maxLength": 40 }
+    }
+  }
+}

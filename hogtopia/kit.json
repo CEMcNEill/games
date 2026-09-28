@@ -1,0 +1,33 @@
+{
+  "id": "hogtopia",
+  "name": "Hogtopia",
+  "genre": "simple 4X strategy (The Battle of Polytopia)",
+  "buyer": [
+    "executive",
+    "exec",
+    "ceo",
+    "coo",
+    "vp",
+    "leadership",
+    "strategy"
+  ],
+  "summary": "A 24-turn Polytopia-style 4X on a small map: the prospect's company expands city by city, researches PostHog products as its tech tree, and races its biggest problem (an AI rival) to take the other capital.",
+  "products": [
+    "product_analytics",
+    "session_replay",
+    "feature_flags",
+    "experiments",
+    "error_tracking",
+    "surveys",
+    "data_warehouse"
+  ],
+  "products_min": 4,
+  "tests": {
+    "bot_patch": {
+      "game.difficulty": "easy"
+    },
+    "bot_expect": "win",
+    "bot_speed": 6,
+    "bot_timeout_s": 170
+  }
+}

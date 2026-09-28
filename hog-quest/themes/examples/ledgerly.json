@@ -1,0 +1,52 @@
+{
+  "prospect": { "name": "Ledgerly", "short": "Ledgerly", "domain": "ledgerly.io" },
+  "title": "Hog Quest: Balanced",
+  "tagline": "Made for Ledgerly by PostHog",
+  "palette": { "primary": "#0a7d5a", "secondary": "#0b1f33", "accent": "#ffd166" },
+  "products": ["product_analytics", "session_replay", "surveys", "feature_flags", "experiments"],
+  "music": { "mood": "calm, warm, gently jazzy, friendly afternoon", "bpm": 100 },
+  "text": {
+    "win": "Every freelancer got paid on time, and every problem left feeling heard. Books: balanced.",
+    "lose": "The numbers didn't add up this time. Take a breath and try again.",
+    "credits": "With thanks to the Ledgerly team, from PostHog"
+  },
+  "game": {
+    "difficulty": "easy",
+    "intro": [
+      "You arrive at Ledgerly HQ. Everything is neatly filed, except four problems.",
+      "No need to fight. Most problems just want to be understood."
+    ],
+    "rooms": [
+      { "layout": "lobby", "name": "Welcome Desk", "description": "Calm plants. A very tidy couch." },
+      { "layout": "kitchen", "name": "The Kitchen", "description": "Oat milk, invoices, and gossip." },
+      { "layout": "meeting_room", "name": "The Ledger Room", "description": "Where the churn numbers are discussed. Quietly." }
+    ],
+    "npcs": [
+      { "name": "Penny", "role": "Support Lead", "room": 0, "lines": ["Hi! Most of our tickets start with 'I tried to connect my bank...'", "Then they stop replying. It's a bit sad."], "sprite_prompt": "a friendly support lead with a green cardigan and a headset" },
+      { "name": "Audit", "role": "Compliance Manager", "room": 0, "lines": ["Every release needs my sign-off. All of it. At once.", "If we could release to a few users first, I'd sign so much faster."], "sprite_prompt": "a compliance manager with round glasses and a stack of folders" },
+      { "name": "Margin", "role": "Head of Product", "room": 1, "lines": ["People send one invoice and then... vanish.", "I'd love to just ask them why. Nicely."], "sprite_prompt": "a head of product holding a mug that says 'ship it'" },
+      { "name": "Tally", "role": "Growth Engineer", "room": 1, "lines": ["I have eleven theories about onboarding.", "Zero of them are tested."], "sprite_prompt": "a growth engineer in a navy hoodie with a sticky-note covered laptop" },
+      { "name": "Ledger", "role": "Office Cat", "room": 2, "lines": ["Mrrp.", "(The cat seems to know where the churn is hiding.)"], "sprite_prompt": "a round grey office cat wearing a tiny green tie" }
+    ],
+    "enemies": [
+      { "name": "Bank Link Bug", "pain": "Users bail at 'connect your bank'.", "intro": "Bank Link Bug appears, holding a broken chain.", "talk": ["You ask what goes wrong. It says 'step 3'. Every time, step 3.", "You say you'd like to see step 3 for yourself. It nods slowly."], "solved_by": "session_replay", "solve_line": "You watch a real session. The bank picker hides behind the keyboard on mobile. Easy fix.", "patterns": ["rain"], "sprite_prompt": "a small green blob bug holding a broken chain link" },
+      { "name": "All-or-Nothing", "pain": "Compliance makes every rollout all at once.", "intro": "All-or-Nothing blocks the kitchen door. It only knows two settings.", "talk": ["You ask if there's a setting between 0 and 100. It looks confused.", "You mention 'gradual rollout'. It considers this very seriously."], "solved_by": "feature_flags", "solve_line": "Behind a flag, the release goes to 5% first. Compliance signs off with a smile.", "patterns": ["sweep", "wall"], "sprite_prompt": "a square navy bug with a big on-off switch on its back" },
+      { "name": "First Invoice Fog", "pain": "Why do they leave after invoice number one?", "intro": "First Invoice Fog drifts in. Nobody knows what it wants.", "talk": ["You ask the fog what it's thinking. It gets foggier.", "You suggest asking the users directly. The fog thins a little."], "solved_by": "surveys", "solve_line": "One short survey later: people didn't know they could schedule invoices. The fog lifts.", "patterns": ["bounce", "spiral"], "sprite_prompt": "a soft grey fog cloud with question-mark shaped antennae" }
+    ],
+    "boss": {
+      "name": "The Churn Beetle",
+      "pain": "Customers quietly leave after their first month.",
+      "intro": "The Churn Beetle scuttles out from behind the quarterly report.",
+      "talk": ["You ask where everyone goes. It points vaguely at 'elsewhere'.", "You say you'd rather understand than guess. The beetle stops spinning.", "You thank it for pointing out the problem. It seems oddly touched."],
+      "solved_by": "product_analytics",
+      "solve_line": "A retention chart shows exactly where people drift off. Now it's just a to-do list.",
+      "patterns": ["orbit", "rain", "sweep"],
+      "sprite_prompt": "a giant dark green beetle with a shell shaped like a revolving door",
+      "taunt": "One invoice and they're gone. You can't balance THAT."
+    },
+    "ending": [
+      "The Churn Beetle curls up for a nap. The Ledger Room exhales.",
+      "Now Ledgerly knows where users drop off, and what to do about it."
+    ]
+  }
+}

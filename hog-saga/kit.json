@@ -1,0 +1,30 @@
+{
+  "id": "hog-saga",
+  "name": "Hog Saga",
+  "genre": "JRPG (Dragon Quest, early Final Fantasy)",
+  "buyer": [
+    "marketing",
+    "growth",
+    "founder",
+    "sales"
+  ],
+  "summary": "A short classic JRPG: the PostHog hedgehog and two companions cross three regions of the prospect's world, fight their pain points in turn-based battles with PostHog products as skills, and topple the boss.",
+  "products": [
+    "session_replay",
+    "feature_flags",
+    "experiments",
+    "error_tracking",
+    "product_analytics",
+    "surveys",
+    "web_analytics",
+    "data_warehouse"
+  ],
+  "tests": {
+    "bot_patch": {
+      "game.difficulty": "normal"
+    },
+    "bot_expect": "win",
+    "bot_speed": 6,
+    "bot_timeout_s": 240
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "prospect": { "name": "Ledgerly", "short": "Ledgerly", "domain": "ledgerly.io" },
+  "title": "Ledgerly Empire",
+  "tagline": "Made for Ledgerly by PostHog",
+  "palette": { "primary": "#0a7d5a", "secondary": "#0b1f33", "accent": "#ffd166" },
+  "products": ["product_analytics", "session_replay", "surveys", "feature_flags", "data_warehouse"],
+  "music": { "mood": "calm, warm, thoughtful, a little jazzy", "bpm": 96 },
+  "text": {
+    "win": "Every freelancer is onboarded and paid on time. The books balance, and so does the map.",
+    "lose": "The churn got the better of you this round. Take a breath and send the next invoice.",
+    "credits": "With thanks to the Ledgerly team, from PostHog"
+  },
+  "game": {
+    "difficulty": "easy",
+    "biome": "meadow",
+    "faction": { "name": "Ledgerly", "capital": "Ledger Hall" },
+    "cities": ["Invoice Bay", "Bank Link", "Tax Town", "Freelance Fair", "Payday Point"],
+    "rival": {
+      "name": "The Churn Beast",
+      "capital": "Drop-off Den",
+      "taunts": ["One invoice, then they are mine.", "Another town forgot to connect its bank.", "Hey! That freelancer was about to leave!", "Your numbers are looking a little red."],
+      "defeat": "The Churn Beast shrinks to a rounding error.",
+      "sprite_prompt": "a shaggy dark green beast with a revolving door for a mouth and tiny coin eyes"
+    },
+    "tips": [
+      "Bank Link is the town everyone drops at. Take it first.",
+      "Product Analytics shows the whole map, like a funnel with no blind spots.",
+      "Surveys win villages on the day you arrive. Ask, don't fight.",
+      "Invest spare stars in Ledger Hall. Calm, steady growth wins."
+    ],
+    "tech_lines": {
+      "product_analytics": "Find the step where freelancers bail",
+      "session_replay": "Watch the bank-connect step live",
+      "surveys": "Ask churners why, in their own words",
+      "feature_flags": "Gradual rollouts keep compliance calm"
+    },
+    "units": { "scout": "Onboarder", "warrior": "Bookkeeper", "archer": "Analyst", "defender": "Auditor", "catcher": "Fixer" },
+    "hq_prompt": "a friendly green brick bank building with a big golden ledger book above the door"
+  }
+}

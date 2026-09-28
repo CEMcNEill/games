@@ -1,0 +1,53 @@
+{
+  "prospect": { "name": "Acme Rockets", "short": "Acme", "domain": "acmerockets.com" },
+  "title": "Hog Quest: Launch Day",
+  "tagline": "Made for Acme Rockets by PostHog",
+  "palette": { "primary": "#e0402a", "secondary": "#1c2a4a", "accent": "#f7c948" },
+  "products": ["feature_flags", "session_replay", "error_tracking", "product_analytics", "experiments"],
+  "music": { "mood": "curious, space-age, gentle countdown, starry night", "bpm": 118 },
+  "text": {
+    "win": "All systems go. Acme launches on time, and not one satellite notices a bug.",
+    "lose": "Launch scrubbed. Check the telemetry, refuel, and try again.",
+    "credits": "Made for the Acme Rockets crew by PostHog"
+  },
+  "game": {
+    "difficulty": "normal",
+    "intro": [
+      "T-minus one day. You arrive at Acme Rockets mission HQ.",
+      "Four problems stand between Acme and a clean launch. Let's go find them."
+    ],
+    "rooms": [
+      { "layout": "lobby", "name": "Mission Lobby", "description": "Model rockets everywhere. One of them is humming." },
+      { "layout": "open_office", "name": "Flight Software", "description": "Where the telemetry UI gets built. And broken." },
+      { "layout": "server_room", "name": "Telemetry Vault", "description": "Racks of satellite data. Toasty." },
+      { "layout": "meeting_room", "name": "Mission Control", "description": "The big screen. The big decisions." }
+    ],
+    "npcs": [
+      { "name": "Countdown", "role": "Front Desk", "room": 0, "lines": ["Welcome to Acme! Badge, lanyard, tiny astronaut ice cream.", "Careful, a test has been flaking in the hallway all week."], "sprite_prompt": "a cheerful receptionist in an orange flight jacket with a headset" },
+      { "name": "Vector", "role": "Flight Software Lead", "room": 1, "lines": ["We only ship on Fridays because nobody trusts Thursday's tests.", "If I could roll out to one satellite first, I'd sleep again."], "sprite_prompt": "an engineer in a navy jumpsuit with a patch-covered laptop" },
+      { "name": "Apogee", "role": "Product Manager", "room": 1, "lines": ["Our roadmap is decided by whoever shouts 'rockets' loudest.", "Data would be nice. Any data. A graph. A dot."], "sprite_prompt": "a product manager holding a clipboard shaped like a rocket" },
+      { "name": "Telemetry", "role": "Data Engineer", "room": 2, "lines": ["Customers find launch bugs before we do. Every time.", "They email screenshots. Blurry ones. From space."], "sprite_prompt": "a data engineer with goggles and a striped scarf" },
+      { "name": "Flight Dir", "role": "CTO", "room": 3, "lines": ["The Scrub Monster lives behind that screen.", "It has cancelled more launches than weather has."], "sprite_prompt": "a calm flight director with a vest and a big red button badge" }
+    ],
+    "enemies": [
+      { "name": "Flaky Test", "pain": "Green on Tuesday, red on launch day.", "intro": "Flaky Test blocks the airlock! It passed yesterday. Probably.", "talk": ["You ask why it fails. It says 'timing'. You ask what timing. It shrugs.", "You suggest pinning the clock in tests. It stops jittering a little."], "solved_by": "error_tracking", "solve_line": "The stack trace shows a race in the countdown timer. Flaky Test finally feels understood.", "patterns": ["rain", "sweep"], "sprite_prompt": "a jittery grey fly-like blob with a flickering checkmark on its belly" },
+      { "name": "Big Bang Deploy", "pain": "Every release goes to every satellite at once.", "intro": "Big Bang Deploy rolls in! It wants to ship everything, everywhere, now.", "talk": ["You ask if it could ship to one customer first. It has never considered this.", "You describe a 1% rollout. It gets very quiet, then very excited."], "solved_by": "feature_flags", "solve_line": "One flag later, the release goes to 1% first. Big Bang Deploy becomes a gentle fizz.", "patterns": ["wall", "aimed"], "sprite_prompt": "a round red bomb-shaped bug with a short sparking fuse and tiny legs" },
+      { "name": "Opinion Moth", "pain": "Roadmap by loudest voice in the room.", "intro": "Opinion Moth flutters over! It is VERY sure about everything.", "talk": ["You ask for its evidence. It flaps louder.", "You ask what users actually do. It admits it doesn't know."], "solved_by": "product_analytics", "solve_line": "One funnel shows what users actually do. Opinion Moth lands, humbled and a bit relieved.", "patterns": ["spiral", "bounce"], "sprite_prompt": "a big fluffy yellow moth with a megaphone-shaped mouth" }
+    ],
+    "boss": {
+      "name": "The Scrub Monster",
+      "pain": "Launches break in production and customers find out first.",
+      "intro": "The Scrub Monster rises from the launch logs. Warning lights everywhere.",
+      "talk": ["You ask what scares it. It says 'surprises in production'.", "You tell it you can watch exactly what users see. Its lights flicker.", "You promise no more mystery bugs. It powers down its alarms."],
+      "solved_by": "session_replay",
+      "solve_line": "You replay the failed launch session. Every click, every error. No more surprises.",
+      "patterns": ["orbit", "aimed", "spiral"],
+      "sprite_prompt": "a hulking navy server-rack monster shaped like a rocket fuel tank with red warning lights",
+      "taunt": "T-minus never! This launch is SCRUBBED!"
+    },
+    "ending": [
+      "The Scrub Monster clears the pad. Mission Control cheers.",
+      "Liftoff. And for once, nobody finds out about a bug from a customer."
+    ]
+  }
+}

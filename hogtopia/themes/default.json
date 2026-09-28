@@ -1,0 +1,34 @@
+{
+  "prospect": { "name": "Your Company", "short": "You", "domain": "posthog.com" },
+  "title": "Hogtopia",
+  "tagline": "A tiny strategy game about growth, by PostHog",
+  "palette": { "primary": "#f54e00", "secondary": "#1d1f27", "accent": "#f9bd2b" },
+  "products": ["product_analytics", "experiments", "feature_flags", "error_tracking", "data_warehouse", "session_replay"],
+  "music": { "mood": "thoughtful, steady, strategic, hopeful", "bpm": 104 },
+  "text": {
+    "win": "The map is yours. Every city ships, every metric points up.",
+    "lose": "The rival held on this time. Regroup, rethink, and try another strategy.",
+    "credits": "Made with PostHog. Music and art generated locally."
+  },
+  "game": {
+    "difficulty": "normal",
+    "biome": "meadow",
+    "faction": { "name": "Your Company", "capital": "HQ" },
+    "cities": ["Growth Town", "Feature Falls", "Data Lake", "Launch Point", "Metric Hill"],
+    "rival": {
+      "name": "Legacy Monolith",
+      "capital": "Old Server",
+      "taunts": ["Nobody has touched me since 2009. Nobody will.", "Another city under my maintenance window!", "You broke my build!", "Rewrites always fail. Always."],
+      "defeat": "The monolith is decomposed into tidy little services.",
+      "sprite_prompt": "a looming grey stone slab monster with glowing red eyes and dusty server lights"
+    },
+    "tips": [
+      "Grab villages early: every city means more stars each turn.",
+      "Harvest resources in your land to level up cities.",
+      "Data Warehouse pays for itself within a few turns.",
+      "Forests and your own cities make units harder to hit."
+    ],
+    "tech_lines": {},
+    "hq_prompt": "a friendly modern office building with a big hedgehog flag on the roof"
+  }
+}

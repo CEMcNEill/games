@@ -1,0 +1,54 @@
+{
+  "prospect": { "name": "Pawprint", "short": "Pawprint", "domain": "pawprint.app" },
+  "title": "Pawprint Data Patrol",
+  "tagline": "A pawsitively tiny game from PostHog",
+  "palette": { "primary": "#7b3fe4", "secondary": "#ffffff", "accent": "#ff8a3d" },
+  "products": ["error_tracking", "session_replay", "experiments", "product_analytics", "feature_flags", "surveys"],
+  "music": { "mood": "playful, bouncy, a bit sneaky, cartoon office", "bpm": 124 },
+  "text": {
+    "win": "Every walk logged, every booking counted, no crashes swept under the rug. Good dev. Very good dev.",
+    "lose": "Some muddy data got through the dog flap. Have a treat and try again.",
+    "credits": "Made with love (and dog puns) for Pawprint by PostHog"
+  },
+  "game": {
+    "difficulty": "hard",
+    "desk": { "name": "The Kennel Desk", "sprite_prompt": "a purple desk top with little paw print patterns, seen from above" },
+    "manager": { "name": "Biscuit", "title": "Chief Data Dog", "sprite_prompt": "a cheerful corgi wearing glasses and a purple bandana" },
+    "sources": ["ios", "android", "web", "api"],
+    "events": [
+      { "name": "booking_started", "props": [
+        { "name": "service", "values": ["walk", "sitting", "daycare"] },
+        { "name": "dogs", "values": ["1", "2", "3"] } ] },
+      { "name": "booking_completed", "props": [
+        { "name": "service", "values": ["walk", "sitting", "daycare"] },
+        { "name": "price_usd", "values": ["18", "25", "45", "90"] } ] },
+      { "name": "app_crashed", "props": [
+        { "name": "screen", "values": ["checkout", "map", "chat"] },
+        { "name": "os", "values": ["android", "ios"] } ] },
+      { "name": "walker_rated", "props": [
+        { "name": "stars", "values": ["3", "4", "5"] } ] }
+    ],
+    "personas": [
+      { "name": "Nina", "role": "Busy dog owner", "sprite_prompt": "a busy dog owner with a messy bun and a purple raincoat" },
+      { "name": "Leo", "role": "Dog walker", "sprite_prompt": "a dog walker with a green cap and lots of leashes over his shoulder" },
+      { "name": "Grace", "role": "Pet sitter", "sprite_prompt": "a pet sitter with grey curly hair and an orange scarf" },
+      { "name": "Sid", "role": "New puppy parent", "sprite_prompt": "a young man with spiky hair holding a tiny puppy" }
+    ],
+    "days": [
+      { "intro": "Welcome to the pack! Only events from our tracking plan get a treat. Sniff out the typos.",
+        "rules": [ { "type": "unknown_event", "text": "Flag events that aren't in the tracking plan" } ] },
+      { "intro": "The QA team walks fake dogs on the beta build. Those bookings aren't real.",
+        "rules": [ { "type": "blocked_source", "text": "Flag events from beta or the emulator", "values": ["beta", "emulator"] } ] },
+      { "intro": "Walkers rate from 1 to 5 stars. Someone gave 11. We love the enthusiasm, but no.",
+        "rules": [ { "type": "value_in_range", "text": "stars must be between 1 and 5", "property": "stars", "min": 1, "max": 5 },
+                   { "type": "internal_user", "text": "Flag events from @pawprint.app emails" } ] },
+      { "intro": "Crash reports without a screen are useless. And bookings need a service. Obviously.",
+        "rules": [ { "type": "required_property", "text": "Every crash needs its screen", "property": "screen" },
+                   { "type": "property_in_set", "text": "service must be walk, sitting or daycare", "property": "service", "values": ["walk", "sitting", "daycare"] } ] },
+      { "intro": "Board meeting tomorrow. No double-counted bookings, no time-travelling dogs.",
+        "rules": [ { "type": "duplicate_id", "text": "Flag IDs you've already seen today" },
+                   { "type": "future_timestamp", "text": "Flag events stamped in the future" } ] }
+    ],
+    "final_record": { "intro": "One last booking before the board meeting. It wags its tail. Suspiciously." }
+  }
+}

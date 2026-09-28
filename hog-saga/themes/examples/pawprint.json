@@ -1,0 +1,51 @@
+{
+  "prospect": { "name": "Pawprint", "short": "Pawprint", "domain": "pawprint.app" },
+  "title": "Hog Saga: The Good Boy",
+  "tagline": "A pawsitively tiny RPG from PostHog",
+  "palette": { "primary": "#7b3fe4", "secondary": "#ffffff", "accent": "#ff8a3d" },
+  "products": ["error_tracking", "session_replay", "experiments", "product_analytics", "data_warehouse"],
+  "music": { "mood": "playful, bouncy, cheeky, walkies adventure", "bpm": 136 },
+  "text": {
+    "win": "The Crashhound rolls over. Every walk gets booked and every sitter gets paid. Good dev!",
+    "lose": "The bugs chewed up the booking flow. Have a treat at the inn and try again.",
+    "credits": "Made with love (and dog puns) for Pawprint by PostHog"
+  },
+  "game": {
+    "difficulty": "hard",
+    "intro": "Walks are going unbooked across Pawprint. Something is chewing through the app.",
+    "town": { "name": "Barkside", "inn_line": "Paws up and rest. Biscuits are in the jar by the door." },
+    "regions": [
+      { "name": "Puppy Park", "blurb": "Sniff around. Something smells buggy." },
+      { "name": "Walkies Woods", "blurb": "Half the walks that start here never finish." },
+      { "name": "Query Canyon", "blurb": "Dry, dusty and full of SQL requests." }
+    ],
+    "party": [
+      { "name": "Pixel", "role": "Data Retriever", "sprite_prompt": "a data analyst with glasses and a purple hoodie with a paw print" },
+      { "name": "Biscuit", "role": "Sitter Support", "sprite_prompt": "a cheerful pet sitter with an orange vest and a leash" }
+    ],
+    "npcs": [
+      { "name": "Dog Walker", "line": "The app crashed mid-booking again. On Android. Again.", "sprite_prompt": "a dog walker holding three leashes and a phone" },
+      { "name": "Pet Parent", "line": "I started booking a sitter, then got lost. Did it even go through?", "sprite_prompt": "a pet parent carrying a small fluffy dog" },
+      { "name": "Data Team", "line": "Can you just pull me one quick query? Said everyone. Every day.", "sprite_prompt": "a tired data engineer surrounded by sticky notes" }
+    ],
+    "enemies": [
+      { "name": "Android Flea", "pain": "Crashes mid-booking, no stack trace.", "archetype": "swarm", "sprite_prompt": "a tiny green flea with a cracked phone for a shell" },
+      { "name": "Cart Dropper", "pain": "Half of bookings never finish.", "archetype": "fast", "sprite_prompt": "a purple beetle running off with a tiny empty basket" },
+      { "name": "Chew Toy Bug", "pain": "It breaks everything it touches.", "archetype": "brute", "sprite_prompt": "a big orange bug chewing a squeaky bone" },
+      { "name": "SQL Tick", "pain": "Just one more quick query, please.", "archetype": "tank", "sprite_prompt": "a fat orange tick covered in sticky notes" },
+      { "name": "Mystery Mutt", "pain": "Nobody knows why users left.", "archetype": "caster", "sprite_prompt": "a ghostly grey dog made of question marks" }
+    ],
+    "boss": {
+      "name": "The Crashhound",
+      "taunt": "Who's a bad app? YOU'RE a bad app!",
+      "phase2": "GRRR! I'll crash every booking in town!",
+      "sprite_prompt": "a giant purple bulldog monster with a spiked collar and glowing eyes"
+    },
+    "product_lines": {
+      "error_tracking": "Fetch the Android crash, with stack",
+      "session_replay": "See where bookings get abandoned",
+      "experiments": "Test a shorter booking flow",
+      "data_warehouse": "Self-serve SQL, fewer quick queries"
+    }
+  }
+}

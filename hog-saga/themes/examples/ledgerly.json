@@ -1,0 +1,51 @@
+{
+  "prospect": { "name": "Ledgerly", "short": "Ledgerly", "domain": "ledgerly.io" },
+  "title": "Ledgerly Saga",
+  "tagline": "Made for Ledgerly by PostHog",
+  "palette": { "primary": "#0a7d5a", "secondary": "#0b1f33", "accent": "#ffd166" },
+  "products": ["product_analytics", "session_replay", "surveys", "feature_flags", "experiments"],
+  "music": { "mood": "calm, warm, gentle adventure, a little jazzy", "bpm": 112 },
+  "text": {
+    "win": "The Churn Beetle is balanced out. Every freelancer gets paid, and they stay past invoice number one.",
+    "lose": "The books didn't balance this time. Take a breath at the inn and try again.",
+    "credits": "With thanks to the Ledgerly team, from PostHog"
+  },
+  "game": {
+    "difficulty": "easy",
+    "intro": "Freelancers are leaving Ledgerly after their first invoice, and nobody can see why.",
+    "town": { "name": "Ledger Town", "inn_line": "Invoices can wait. Rest up, the tea is on the house." },
+    "regions": [
+      { "name": "Signup Fields", "blurb": "Where every freelancer's journey begins." },
+      { "name": "Bank Link Woods", "blurb": "Many enter. Few connect their bank." },
+      { "name": "Compliance Dunes", "blurb": "Every step here needs three approvals." }
+    ],
+    "party": [
+      { "name": "Mira", "role": "Product Analyst", "sprite_prompt": "a calm product analyst with glasses and a green cardigan" },
+      { "name": "Theo", "role": "Customer Success", "sprite_prompt": "a friendly customer success rep with a headset and a yellow sweater" }
+    ],
+    "npcs": [
+      { "name": "Freelancer", "line": "I got stuck connecting my bank and just... gave up. Sorry!", "sprite_prompt": "a freelance designer with a laptop bag and a beanie" },
+      { "name": "Compliance", "line": "Every rollout goes to everyone at once. That makes me nervous.", "sprite_prompt": "a compliance officer in a grey suit holding a stamp" },
+      { "name": "Head of PM", "line": "They send one invoice and leave. I would love to know why.", "sprite_prompt": "a head of product with a notebook and a green scarf" }
+    ],
+    "enemies": [
+      { "name": "Signup Snag", "pain": "Tiny form bugs that add up.", "archetype": "swarm", "sprite_prompt": "a small green bug tangled in a paper form" },
+      { "name": "Bank Link Bug", "pain": "Users bail at 'connect your bank'.", "archetype": "fast", "sprite_prompt": "a quick green fly holding a broken chain link" },
+      { "name": "Big Bang", "pain": "Ship to everyone or no one.", "archetype": "brute", "sprite_prompt": "a round navy beetle with a lit fuse on its back" },
+      { "name": "Audit Shell", "pain": "Every change waits on a review.", "archetype": "tank", "sprite_prompt": "an armoured grey tortoise with a stamp-shaped shell" },
+      { "name": "Invoice Fog", "pain": "Why do they leave after invoice #1?", "archetype": "caster", "sprite_prompt": "a floating fog ghost with question-mark eyes" }
+    ],
+    "boss": {
+      "name": "The Churn Beetle",
+      "taunt": "One invoice and they're gone. Heh.",
+      "phase2": "You'll never find out why they left!",
+      "sprite_prompt": "a giant dark green beetle with a spinning revolving-door shell"
+    },
+    "product_lines": {
+      "product_analytics": "Find the step where freelancers bail",
+      "session_replay": "Watch the bank-connect step live",
+      "surveys": "Ask churners why, in their words",
+      "feature_flags": "Roll out gradually, keep compliance calm"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "prospect": { "name": "Pawprint", "short": "Pawprint", "domain": "pawprint.app" },
+  "title": "Pawprint: Top Dog",
+  "tagline": "A pawsitively tiny strategy game from PostHog",
+  "palette": { "primary": "#7b3fe4", "secondary": "#ffffff", "accent": "#ff8a3d" },
+  "products": ["error_tracking", "session_replay", "experiments", "product_analytics", "feature_flags", "data_warehouse"],
+  "music": { "mood": "playful, bouncy, clever, walkies energy", "bpm": 116 },
+  "text": {
+    "win": "Every park, every walk, every booking: yours. Good dev. Very good dev.",
+    "lose": "The Crashhound buried your bookings. Have a treat and try again.",
+    "credits": "Made with love (and dog puns) for Pawprint by PostHog"
+  },
+  "game": {
+    "difficulty": "hard",
+    "biome": "meadow",
+    "faction": { "name": "Pawprint", "capital": "The Kennel" },
+    "cities": ["Dog Park", "Walker Alley", "Sitter Square", "Treat Market", "Fetch Field", "Vet Corner"],
+    "rival": {
+      "name": "The Crashhound",
+      "capital": "Bug Burrow",
+      "taunts": ["Who is a bad app? YOU are a bad app!", "I just crashed another booking. Woof.", "Hey! Drop it! That was my bug!", "Sit. Stay. Crash."],
+      "defeat": "The Crashhound rolls over. Crash-free walks for everyone.",
+      "sprite_prompt": "a snarling purple bulldog made of cracked phone screens with a spiked collar"
+    },
+    "tips": [
+      "Walker Alley pays out fast. Fetch it early.",
+      "Error Tracking trains Bug Hunters that bite nearby bugs too.",
+      "Half your bookings stop halfway. Harvest to grow before you roam.",
+      "Hold the Kennel with a shield unit when the Crashhound comes sniffing."
+    ],
+    "tech_lines": {
+      "error_tracking": "Fetch the Android crash, with stack",
+      "session_replay": "See where bookings get abandoned",
+      "experiments": "Test a shorter booking flow",
+      "data_warehouse": "Answer the data team's SQL, self-serve"
+    },
+    "units": { "scout": "Puppy", "warrior": "Dog Walker", "archer": "Ball Thrower", "defender": "Guard Dog", "catcher": "Bug Hunter" },
+    "hq_prompt": "a cosy purple dog house office with an orange paw print sign"
+  }
+}

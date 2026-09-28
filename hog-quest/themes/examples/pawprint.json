@@ -1,0 +1,53 @@
+{
+  "prospect": { "name": "Pawprint", "short": "Pawprint", "domain": "pawprint.app" },
+  "title": "Hog Quest: Good Boy",
+  "tagline": "A pawsitively tiny RPG from PostHog",
+  "palette": { "primary": "#7b3fe4", "secondary": "#ffffff", "accent": "#ff8a3d" },
+  "products": ["error_tracking", "session_replay", "experiments", "product_analytics", "data_warehouse", "feature_flags"],
+  "music": { "mood": "playful, bouncy, cheeky, walk in the park", "bpm": 128 },
+  "text": {
+    "win": "Every walk booked, every crash fetched, every problem sent home happy. Very good dev.",
+    "lose": "The bugs chewed up the booking flow. Have a treat and try again.",
+    "credits": "Made with love (and dog puns) for Pawprint by PostHog"
+  },
+  "game": {
+    "difficulty": "hard",
+    "intro": [
+      "You trot into Pawprint HQ. It smells like dog treats and hotfixes.",
+      "Four problems are loose in the office. Time to take them for a walk."
+    ],
+    "rooms": [
+      { "layout": "lobby", "name": "The Front Porch", "description": "Leashes on hooks. A water bowl labelled 'CI'." },
+      { "layout": "open_office", "name": "The Kennel", "description": "Where the app gets built. Mostly fur-free." },
+      { "layout": "server_room", "name": "The Doghouse", "description": "Nobody is allowed in here. You are in here." },
+      { "layout": "kitchen", "name": "The Treat Room", "description": "Snacks for humans. Snacks for dogs. Same shelf." }
+    ],
+    "npcs": [
+      { "name": "Biscuit", "role": "Office Dog", "room": 0, "lines": ["Woof! (Biscuit has seen the Android app crash. Biscuit is worried.)", "Woof woof. (Also, Biscuit would like a walk.)"], "sprite_prompt": "a small corgi wearing a purple Pawprint bandana" },
+      { "name": "Leash", "role": "Mobile Engineer", "room": 1, "lines": ["The Android app crashes mid-booking. No stack trace. Just vibes.", "I've been reading tea leaves. And logcat. Mostly tea leaves."], "sprite_prompt": "a mobile engineer with an orange beanie and two phones" },
+      { "name": "Fetch", "role": "Growth PM", "room": 1, "lines": ["Half of started bookings never finish.", "Is it the price step? The calendar? The dog photo upload? Who knows!"], "sprite_prompt": "a product manager in a purple hoodie holding a tennis ball" },
+      { "name": "Query", "role": "Data Analyst", "room": 2, "lines": ["Every day someone asks for 'just one quick SQL query'.", "I have written that quick query four hundred times."], "sprite_prompt": "a data analyst with a headlamp surrounded by sticky notes" },
+      { "name": "Alpha", "role": "CTO", "room": 3, "lines": ["I used to make games. This office is basically a boss rush.", "The Crashhound is the final boss. Obviously."], "sprite_prompt": "a CTO in a retro game t-shirt holding a controller" }
+    ],
+    "enemies": [
+      { "name": "Android Flea", "pain": "Crashes mid-booking, no stack trace.", "intro": "Android Flea hops out! It's small. It's everywhere.", "talk": ["You ask where it bites. It says 'somewhere in the booking screen'.", "You promise to find the exact spot. It stops hopping for a second."], "solved_by": "error_tracking", "solve_line": "The stack trace points to one null pet photo. Android Flea is finally flea-ed.", "patterns": ["rain", "aimed"], "sprite_prompt": "a tiny green flea with a cracked phone for a shell" },
+      { "name": "Cart Abandoner", "pain": "Half of bookings never finish.", "intro": "Cart Abandoner wanders in pushing an empty basket.", "talk": ["You ask why it stopped. It says the calendar was confusing.", "You ask if a shorter flow would help. It wags hopefully."], "solved_by": "experiments", "solve_line": "A two-step booking beats the five-step one by 23%. Cart Abandoner books a walk.", "patterns": ["sweep", "bounce"], "sprite_prompt": "a purple beetle pushing a tiny empty shopping basket" },
+      { "name": "SQL Request Tick", "pain": "Can you just pull me one quick query?", "intro": "SQL Request Tick latches on. It has 'just one quick question'.", "talk": ["You ask what it needs. It needs nine things. By lunch.", "You suggest letting people answer their own questions. It loosens its grip."], "solved_by": "data_warehouse", "solve_line": "Bookings, payments and walkers, all queryable in one place. The tick drops off, satisfied.", "patterns": ["wall", "spiral"], "sprite_prompt": "a fat orange tick covered in sticky notes" }
+    ],
+    "boss": {
+      "name": "The Crashhound",
+      "pain": "Nobody knows why the app crashes, or who it hits.",
+      "intro": "The Crashhound bursts out of the treat cupboard, growling in stack traces.",
+      "talk": ["You ask who's a good app. It growls. It is not a good app yet.", "You offer to watch what really happens before a crash. Its ears perk up.", "You scratch behind its ears. It rolls over. Belly up, bugs out."],
+      "solved_by": "session_replay",
+      "solve_line": "You replay the crash: a double-tap on 'Book'. One debounce later, the Crashhound sits.",
+      "patterns": ["orbit", "aimed", "wall"],
+      "sprite_prompt": "a giant purple bug shaped like a snarling bulldog with a spiked collar",
+      "taunt": "Who's a bad app? YOU'RE a bad app! GRRR!"
+    },
+    "ending": [
+      "The Crashhound curls up on the office couch and starts snoring.",
+      "Bookings flow, walkers walk, and Biscuit finally gets that walk."
+    ]
+  }
+}

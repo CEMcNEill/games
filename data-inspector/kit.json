@@ -1,0 +1,33 @@
+{
+  "id": "data-inspector",
+  "name": "Data Inspector",
+  "genre": "document-inspection sim (Papers, Please)",
+  "buyer": [
+    "data",
+    "analytics",
+    "product"
+  ],
+  "summary": "The PostHog hedgehog works the prospect's data desk for 5 days, approving or flagging their own events against a rulebook that grows every day, with PostHog products as once-a-day tools.",
+  "products": [
+    "session_replay",
+    "product_analytics",
+    "feature_flags",
+    "error_tracking",
+    "surveys",
+    "experiments"
+  ],
+  "tests": {
+    "bot_patch": {
+      "game.difficulty": "normal"
+    },
+    "bot_expect": "win",
+    "bot_speed": 6,
+    "bot_timeout_s": 150,
+    "play_keys": [
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowLeft"
+    ]
+  }
+}

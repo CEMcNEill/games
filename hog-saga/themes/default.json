@@ -1,0 +1,46 @@
+{
+  "prospect": { "name": "Your Company", "short": "You", "domain": "posthog.com" },
+  "title": "Hog Saga",
+  "tagline": "A tiny RPG about shipping, by PostHog",
+  "palette": { "primary": "#f54e00", "secondary": "#1d1f27", "accent": "#f9bd2b" },
+  "products": ["product_analytics", "session_replay", "feature_flags", "experiments", "error_tracking", "surveys"],
+  "music": { "mood": "adventurous, hopeful, overworld journey, heroic", "bpm": 128 },
+  "text": {
+    "win": "The monolith is unplugged. Peace returns to the land, and the dashboards are green again.",
+    "lose": "The party wiped. Rest at the inn, grab a coffee and try the quest again.",
+    "credits": "Made with PostHog. Music and art generated locally."
+  },
+  "game": {
+    "difficulty": "normal",
+    "intro": "Bugs have overrun the land. Rumour says the Legacy Monolith is behind it all.",
+    "town": { "name": "Shipville", "inn_line": "Rough sprint? Rest here, the coffee is free." },
+    "regions": [
+      { "name": "Staging Meadows", "blurb": "Grass, flowers and the odd flaky test." },
+      { "name": "Backlog Woods", "blurb": "Tickets pile up like leaves. Watch your step." },
+      { "name": "Prod Desert", "blurb": "Hot, dry and everything is on fire." }
+    ],
+    "party": [
+      { "name": "Ada", "role": "Data Analyst", "sprite_prompt": "a friendly data analyst with glasses and a purple hoodie" },
+      { "name": "Sam", "role": "Support Lead", "sprite_prompt": "a cheerful support lead with a headset and a green shirt" }
+    ],
+    "npcs": [
+      { "name": "Old Dev", "line": "Back in my day we deployed on Fridays. Never again.", "sprite_prompt": "an old developer with a grey beard and a mug" },
+      { "name": "PM Pat", "line": "The roadmap says we win. The data says... nobody checked the data.", "sprite_prompt": "a product manager holding a clipboard" },
+      { "name": "Intern", "line": "I found a bug! Wait, it found me. There are more in the woods.", "sprite_prompt": "a young intern with a backpack and a laptop" }
+    ],
+    "enemies": [
+      { "name": "Flaky Test", "pain": "Passes locally, fails in CI.", "archetype": "swarm", "sprite_prompt": "a small buzzing fly with glassy wings" },
+      { "name": "Silent Error", "pain": "Breaks checkout and logs nothing.", "archetype": "fast", "sprite_prompt": "a sneaky red beetle with a ninja mask" },
+      { "name": "Scope Creep", "pain": "Just one more tiny feature...", "archetype": "brute", "sprite_prompt": "a big fluffy yellow moth carrying a long list" },
+      { "name": "Tech Debt", "pain": "It works. Nobody knows why.", "archetype": "tank", "sprite_prompt": "a rusty armoured snail with cables for a shell" },
+      { "name": "Dashboard Fog", "pain": "Forty dashboards, zero answers.", "archetype": "caster", "sprite_prompt": "a floating grey fog ghost made of charts" }
+    ],
+    "boss": {
+      "name": "Legacy Monolith",
+      "taunt": "I have been in production since 2009!",
+      "phase2": "You cannot refactor ME! Deploying on a Friday!",
+      "sprite_prompt": "a giant crowned mainframe computer monster with glowing eyes"
+    },
+    "product_lines": {}
+  }
+}

@@ -1,0 +1,17 @@
+[
+  { "id": "terrain", "w": 16, "h": 16, "frames": 32, "kind": "sheet" },
+  { "id": "res", "w": 16, "h": 16, "frames": 3, "kind": "sheet" },
+  { "id": "city", "w": 16, "h": 16, "frames": 8, "kind": "sheet" },
+  { "id": "units", "w": 16, "h": 16, "frames": 10, "kind": "sheet" },
+  { "id": "advisor", "w": 24, "h": 24, "frames": 1 },
+  { "id": "star", "w": 8, "h": 8, "frames": 1 },
+  { "id": "rival", "w": 32, "h": 32, "frames": 1, "kind": "portrait", "prompt": "{game.rival.sprite_prompt}" },
+  { "id": "hq", "w": 32, "h": 32, "frames": 1, "prompt": "{game.hq_prompt}" },
+  { "id": "icon_session_replay", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_feature_flags", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_experiments", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_error_tracking", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_product_analytics", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_surveys", "w": 16, "h": 16, "frames": 1 },
+  { "id": "icon_data_warehouse", "w": 16, "h": 16, "frames": 1 }
+]

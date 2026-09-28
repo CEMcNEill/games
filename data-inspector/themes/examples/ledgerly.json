@@ -1,0 +1,54 @@
+{
+  "prospect": { "name": "Ledgerly", "short": "Ledgerly", "domain": "ledgerly.io" },
+  "title": "Ledgerly: Books in Order",
+  "tagline": "Made for Ledgerly by PostHog",
+  "palette": { "primary": "#0a7d5a", "secondary": "#0b1f33", "accent": "#ffd166" },
+  "products": ["product_analytics", "session_replay", "surveys", "feature_flags"],
+  "music": { "mood": "calm, gentle, tidy, a little jazzy", "bpm": 104 },
+  "text": {
+    "win": "Every invoice counted once, every freelancer counted right. The churn report finally makes sense.",
+    "lose": "A few bad records balanced the books the wrong way. Deep breath, and try again.",
+    "credits": "With thanks to the Ledgerly team, from PostHog"
+  },
+  "game": {
+    "difficulty": "easy",
+    "desk": { "name": "The Ledger Desk", "sprite_prompt": "a light green desk with faint ledger grid lines, seen from above" },
+    "manager": { "name": "Robin", "title": "Head of Product", "sprite_prompt": "a friendly product lead with short dark hair and a green cardigan" },
+    "sources": ["web", "ios", "android", "api"],
+    "events": [
+      { "name": "bank_connected", "props": [
+        { "name": "bank", "values": ["Chase", "Monzo", "Revolut", "Wise"] },
+        { "name": "step", "values": ["1", "2", "3"] } ] },
+      { "name": "invoice_sent", "props": [
+        { "name": "amount_usd", "values": ["80", "250", "1200", "3400"] },
+        { "name": "currency", "values": ["USD", "EUR", "GBP"] } ] },
+      { "name": "invoice_paid", "props": [
+        { "name": "amount_usd", "values": ["80", "250", "1200"] },
+        { "name": "method", "values": ["card", "ach", "sepa"] } ] },
+      { "name": "onboarding_step", "props": [
+        { "name": "stage", "values": ["profile", "bank", "first_invoice"] } ] }
+    ],
+    "personas": [
+      { "name": "Jo", "role": "Freelance designer", "sprite_prompt": "a freelance designer with a pink bob haircut and a striped shirt" },
+      { "name": "Marco", "role": "Photographer", "sprite_prompt": "a photographer with a camera strap, dark stubble and a beanie" },
+      { "name": "Ines", "role": "Copywriter", "sprite_prompt": "a copywriter with long brown hair and a yellow sweater" },
+      { "name": "Dev", "role": "Web developer", "sprite_prompt": "a web developer with glasses and a green hoodie" }
+    ],
+    "days": [
+      { "intro": "Welcome! Our funnel reports only work if every event is one we planned. Spot the strays.",
+        "rules": [ { "type": "unknown_event", "text": "Flag events that aren't in the tracking plan" } ] },
+      { "intro": "Compliance wants to know: the bank step only has three parts. Anything else is broken.",
+        "rules": [ { "type": "value_in_range", "text": "step must be between 1 and 3", "property": "step", "min": 1, "max": 3 } ] },
+      { "intro": "We test on the live app a lot. Our own accounts must not count as freelancers.",
+        "rules": [ { "type": "internal_user", "text": "Flag events from @ledgerly.io emails" },
+                   { "type": "required_property", "text": "Every invoice needs an amount_usd", "property": "amount_usd" } ] },
+      { "intro": "Finance only supports three currencies. And the sandbox is back online. Sigh.",
+        "rules": [ { "type": "property_in_set", "text": "currency must be USD, EUR or GBP", "property": "currency", "values": ["USD", "EUR", "GBP"] },
+                   { "type": "blocked_source", "text": "Flag events from the sandbox", "values": ["sandbox"] } ] },
+      { "intro": "Churn review day. Paid invoices counted twice would hide the real problem.",
+        "rules": [ { "type": "duplicate_id", "text": "Flag IDs you've already seen today" },
+                   { "type": "future_timestamp", "text": "Flag invoices dated in the future" } ] }
+    ],
+    "final_record": { "intro": "One last invoice before the churn review. It looks tidy. Is it?" }
+  }
+}

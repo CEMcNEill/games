@@ -1,0 +1,53 @@
+{
+  "prospect": { "name": "Your Company", "short": "You", "domain": "posthog.com" },
+  "title": "Hog Quest",
+  "tagline": "A tiny office RPG, by PostHog",
+  "palette": { "primary": "#f54e00", "secondary": "#1d1f27", "accent": "#f9bd2b" },
+  "products": ["session_replay", "error_tracking", "feature_flags", "product_analytics", "experiments", "surveys"],
+  "music": { "mood": "cosy, curious, gentle exploration, warm office afternoon", "bpm": 110 },
+  "text": {
+    "win": "Every problem solved, and not a single user harmed. The team goes home early.",
+    "lose": "The problems won this round. Grab a coffee and stay determined.",
+    "credits": "Made with PostHog. Music and art generated locally."
+  },
+  "game": {
+    "difficulty": "normal",
+    "intro": [
+      "You arrive at Your Company HQ. It smells like coffee and unresolved tickets.",
+      "Somewhere in this office, four problems are hiding. Time to go say hi."
+    ],
+    "rooms": [
+      { "layout": "lobby", "name": "Reception", "description": "Plants, a couch, and a suspicious hum." },
+      { "layout": "open_office", "name": "The Open Plan", "description": "Forty monitors, one flaky build." },
+      { "layout": "server_room", "name": "Server Closet", "description": "It is warm in here. Too warm." },
+      { "layout": "meeting_room", "name": "Big Meeting Room", "description": "The roadmap lives here. So does the boss." }
+    ],
+    "npcs": [
+      { "name": "Sam", "role": "Receptionist", "room": 0, "lines": ["Welcome! Sign in, grab a badge, mind the bug by the door.", "It's been blocking the hallway since the last release."], "sprite_prompt": "a friendly receptionist with a headset and a cardigan" },
+      { "name": "Priya", "role": "Frontend Engineer", "room": 1, "lines": ["The error only happens in production. Only on Tuesdays.", "If only we could SEE what users actually did..."], "sprite_prompt": "a software engineer with round glasses and a hoodie" },
+      { "name": "Leo", "role": "Product Manager", "room": 1, "lines": ["We shipped the feature. Did anyone use it? Nobody knows.", "I have a spreadsheet. It has feelings now."], "sprite_prompt": "a product manager holding a coffee mug and a notebook" },
+      { "name": "Dana", "role": "Data Engineer", "room": 2, "lines": ["Every day: 'can you just pull one quick number?'", "One quick number. Forty SQL queries."], "sprite_prompt": "a data engineer with headphones and a striped shirt" },
+      { "name": "Max", "role": "CTO", "room": 3, "lines": ["The Monolith has been here longer than I have.", "Be gentle. It holds up the whole company."], "sprite_prompt": "a tired CTO in a blazer holding a laptop" }
+    ],
+    "enemies": [
+      { "name": "Flaky Test", "pain": "Passes locally, fails in CI. Every time.", "intro": "Flaky Test blocks the doorway! It passed yesterday.", "talk": ["You ask what it needs. It says 'more retries'. You say no.", "You tell it about deterministic seeds. It looks interested."], "solved_by": "error_tracking", "solve_line": "The stack trace shows the race condition. Flaky Test finally feels seen.", "patterns": ["rain", "sweep"], "sprite_prompt": "a jittery one-eyed bug blob with a red checkmark on its belly" },
+      { "name": "Silent Error", "pain": "Breaks checkout, logs nothing.", "intro": "Silent Error appears! It says nothing. That's the problem.", "talk": ["You ask what went wrong. It shrugs in 500 status codes.", "You promise not to blame it. It whispers a stack trace."], "solved_by": "session_replay", "solve_line": "You replay the checkout. There it is: the button that does nothing.", "patterns": ["aimed", "bounce"], "sprite_prompt": "an angry little error dialog window with X eyes and stubby legs" },
+      { "name": "Scope Creep", "pain": "Just one more tiny feature...", "intro": "Scope Creep drifts in with 'one small request'.", "talk": ["You ask what it really wants. It lists nine things.", "You suggest shipping one thing first. It sighs, relieved."], "solved_by": "feature_flags", "solve_line": "Ship the small version behind a flag. Scope Creep shrinks to a sensible size.", "patterns": ["wall", "spiral"], "sprite_prompt": "a sleepy fog cloud surrounded by floating question marks" }
+    ],
+    "boss": {
+      "name": "Legacy Monolith",
+      "pain": "Nobody knows what it does. Everybody depends on it.",
+      "intro": "The Legacy Monolith boots up. Its fans spin like jet engines.",
+      "talk": ["You ask how it is doing. It replies in COBOL.", "You say it did a great job for fifteen years. It hums softly.", "You promise it a well-earned retirement. It dims its lights."],
+      "solved_by": "product_analytics",
+      "solve_line": "The dashboard shows which parts people actually use. Most of it can rest now.",
+      "patterns": ["orbit", "spiral", "wall"],
+      "sprite_prompt": "a hulking old server rack monster with glowing yellow eyes and cable legs",
+      "taunt": "I have been in production since 2009. You cannot refactor me!"
+    },
+    "ending": [
+      "The Monolith powers down, peacefully. The office goes quiet.",
+      "Then someone opens a dashboard, and everyone can finally see what's going on."
+    ]
+  }
+}

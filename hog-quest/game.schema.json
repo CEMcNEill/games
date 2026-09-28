@@ -1,0 +1,304 @@
+{
+  "type": "object",
+  "required": [
+    "difficulty",
+    "intro",
+    "rooms",
+    "npcs",
+    "enemies",
+    "boss",
+    "ending"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "normal",
+        "hard"
+      ],
+      "description": "easy for execs and non-gamers, normal for most, hard for gamer champions"
+    },
+    "intro": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 90
+      },
+      "description": "Narration when the game starts, one box each"
+    },
+    "rooms": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 4,
+      "description": "The office, walked left to right. 4 rooms = a longer game",
+      "items": {
+        "type": "object",
+        "required": [
+          "layout",
+          "name",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "type": "string",
+            "enum": [
+              "lobby",
+              "open_office",
+              "server_room",
+              "meeting_room",
+              "kitchen"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 22
+          },
+          "description": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60
+          }
+        }
+      }
+    },
+    "npcs": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "room",
+          "lines",
+          "sprite_prompt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 14
+          },
+          "role": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 22
+          },
+          "room": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Index into rooms"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 90
+            }
+          },
+          "sprite_prompt": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "enemies": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "pain",
+          "intro",
+          "talk",
+          "solved_by",
+          "solve_line",
+          "patterns",
+          "sprite_prompt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 18,
+            "description": "Their problem as a monster name"
+          },
+          "pain": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "description": "One line on the pain, in their words"
+          },
+          "intro": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80,
+            "description": "Battle opening line, e.g. 'Flaky Test blocks the way! It passed yesterday.'"
+          },
+          "talk": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 90
+            },
+            "description": "What happens when you TALK, one per turn"
+          },
+          "solved_by": {
+            "type": "string",
+            "enum": [],
+            "description": "The PostHog product that solves this problem; must be in products"
+          },
+          "solve_line": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 90,
+            "description": "What the product reveals or fixes, shown after 'You use <Product>!'"
+          },
+          "patterns": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "rain",
+                "sweep",
+                "spiral",
+                "bounce",
+                "aimed",
+                "wall",
+                "orbit"
+              ]
+            },
+            "description": "Bullet patterns for its turns, cycled"
+          },
+          "sprite_prompt": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "boss": {
+      "type": "object",
+      "required": [
+        "name",
+        "pain",
+        "intro",
+        "talk",
+        "solved_by",
+        "solve_line",
+        "patterns",
+        "sprite_prompt",
+        "taunt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 22,
+          "description": "Their problem as a monster name"
+        },
+        "pain": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 60,
+          "description": "One line on the pain, in their words"
+        },
+        "intro": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80,
+          "description": "Battle opening line, e.g. 'Flaky Test blocks the way! It passed yesterday.'"
+        },
+        "talk": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 90
+          },
+          "description": "What happens when you TALK, one per turn"
+        },
+        "solved_by": {
+          "type": "string",
+          "enum": [],
+          "description": "The PostHog product that solves this problem; must be in products"
+        },
+        "solve_line": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 90,
+          "description": "What the product reveals or fixes, shown after 'You use <Product>!'"
+        },
+        "patterns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "rain",
+              "sweep",
+              "spiral",
+              "bounce",
+              "aimed",
+              "wall",
+              "orbit"
+            ]
+          },
+          "description": "Bullet patterns for its turns, cycled"
+        },
+        "sprite_prompt": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 200
+        },
+        "taunt": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 70,
+          "description": "Said on the map before the final battle"
+        }
+      }
+    },
+    "ending": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 90
+      },
+      "description": "Narration after the boss, before the end screen"
+    }
+  }
+}

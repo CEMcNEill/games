@@ -1,0 +1,28 @@
+{
+  "id": "hog-quest",
+  "name": "Hog Quest",
+  "genre": "Undertale-lite RPG",
+  "buyer": [
+    "champion",
+    "top accounts"
+  ],
+  "summary": "The PostHog hedgehog visits the prospect's office, meets their team and settles four of their problems in Undertale-style battles, ideally by sparing them with the right PostHog product.",
+  "products": [
+    "session_replay",
+    "feature_flags",
+    "experiments",
+    "error_tracking",
+    "product_analytics",
+    "surveys",
+    "web_analytics",
+    "data_warehouse"
+  ],
+  "tests": {
+    "bot_patch": {
+      "game.difficulty": "easy"
+    },
+    "bot_expect": "win",
+    "bot_speed": 4,
+    "bot_timeout_s": 180
+  }
+}
