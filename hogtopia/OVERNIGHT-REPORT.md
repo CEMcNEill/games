@@ -44,7 +44,7 @@ existing theme (default, 3 examples, the real `ledgerly-hogtopia` prospect) load
 - Final commit: report and notes.
 
 ## Review fixes (5f7d508, bc9cb8a)
-Two independent code reviews ran during the night. The first of the diff found: losing a *non-home* capital (heat 4+, a rival retaking a capital
+Two independent code reviews ran during the night. The first found: losing a *non-home* capital (heat 4+, a rival retaking a capital
 you took) ended the game as a loss; your own attack could resolve during the rival turn if you pressed E
 during the lunge; the AI's target cost counted its *own* units instead of defenders; a Giant/Explorer
 could vanish with no free tile; Session Replay undo could stack two units; monuments were only checked
