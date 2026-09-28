@@ -74,6 +74,10 @@ without re-rendering.
 - Save: shared meta blob per slug + kit (`meta.data.kit`: shop, hero, lifetime kills/gold/chests, codex, daily best,
   damage-number setting). Blocked storage = first run, never a crash.
 
+## Analytics (optional PostHog capture, unchanged transport)
+Kit events: `product_picked` (product, level, player_level), `weapon_evolved` (product, evolution, t), `bug_event`
+(event, t), plus the shared `achievement`. `game_finished` props add gold, hero, evolutions, elites, boss_kills.
+
 ## Test hooks
 `__game.debug`: autopilot(on, style) (`'novice'` = first card, no rerolls, ignores pickups), speed, god, lose, win,
 showcase (evolved weapons for the GIF), warp(seconds), spawnBoss, hurtBoss(frac), giveAll, maxAll, xp(n), flood(n),
