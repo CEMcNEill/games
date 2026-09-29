@@ -7,7 +7,7 @@ import { deriveUi, snap, Ui } from './palette';
 import { hooks, sharedDebug } from './hooks';
 import { initAnalytics, capture } from './analytics';
 import { Sfx, ZzfxParams } from './zzfx';
-import { W, H } from './ui';
+import { W, H, TOUCH } from './ui';
 import { BootScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
 import { meta, initMeta, achieve, dailySeed, randomSeed, AchievementDef, RunResult } from './meta';
 import { OverlayScene, toast, burst, floatText, shake, hitstop } from './juice';
@@ -39,6 +39,8 @@ export interface KitDef {
   slots: Slot[];
   sfx: Record<string, ZzfxParams>;
   howTo: (theme: any) => string[];
+  /** The kit plays with touch (drag/tap); shared screens then show tap hints on phones. */
+  touch?: boolean;
   /** Queue extra kit-fixed assets in the Boot scene's preload (sheets that aren't theme slots). */
   preload?: (scene: Phaser.Scene) => void;
   /** Draw kit art on the title screen (sprites, lineup). */
@@ -155,7 +157,11 @@ export async function startKit(kit: KitDef) {
   initMeta(kit.id, K.manifest.slug ?? 'default', kit.achievements, (a) => toast(null, `ACHIEVEMENT: ${a.name}`));
   beginRun({});
 
-  const zoom = () => Math.max(1, Math.floor(Math.min(window.innerWidth / W, window.innerHeight / H)));
+  // Desktop: whole-number zoom for crisp pixels. Phones: fill the screen (a fractional zoom beats a tiny canvas).
+  const zoom = () => {
+    const z = Math.min(window.innerWidth / W, window.innerHeight / H);
+    return TOUCH ? Math.max(0.5, Math.floor(z * 8) / 8) : Math.max(1, Math.floor(z));
+  };
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',

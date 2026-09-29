@@ -5,8 +5,8 @@ import Phaser from 'phaser';
 import { K } from '@shared/kit';
 import { hooks } from '@shared/hooks';
 import { meta } from '@shared/meta';
-import { text, box, W, H, PixelText } from '@shared/ui';
-import { onKeys, starfield } from '@shared/scenes';
+import { text, box, W, H, PixelText, TOUCH } from '@shared/ui';
+import { onKeys, onTap, starfield } from '@shared/scenes';
 import { SHOP, WEAPONS, SUPER, PASSIVES, WeaponId, RELICS, RELIC_IDS, PAGES, capsulePrice } from './content';
 import { productName, HOG32, HOG64, CREST64 } from './game';
 import { save, persist, rollCapsule, unlockHog, hasCrest, syncCrestHogs } from './save';
@@ -24,6 +24,8 @@ export class ShopScene extends Phaser.Scene {
   private lorePage = 0;
   private flash = '';
   private objs: Phaser.GameObjects.GameObject[] = [];
+  private tabRects: { x0: number; x1: number; i: number }[] = [];
+  private downY = 0;
 
   constructor() { super('Shop'); }
 
@@ -44,6 +46,9 @@ export class ShopScene extends Phaser.Scene {
     onKeys(this, ['Digit1', 'Digit2', 'Digit3', 'Digit4'], (code) => this.setTab(Number(code.slice(-1)) - 1), 150);
     onKeys(this, ['Enter', 'Space', 'NumpadEnter'], () => this.act(), 250);
     onKeys(this, ['Escape', 'KeyQ'], () => { K.play('select'); this.scene.start('Title'); }, 150);
+    // Touch (and mouse): tap tabs, rows and grid cells; tap a selected item again to buy / play as; swipe the grid.
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { this.downY = p.y; });
+    onTap(this, (x, y) => this.tap(x, y), 250);
     // Only shop hooks here (the setter merges the shared ones); stale game hooks must not be callable.
     hooks.debug = {
       shopBuy: (id: string) => (id === 'capsule' ? this.buyCapsule() : this.buy(SHOP.findIndex((s) => s.id === id))),
@@ -51,6 +56,43 @@ export class ShopScene extends Phaser.Scene {
       hero: (id: string) => this.pickHog(HOGS.findIndex((h) => h.id === id)),
       tab: (i: number) => this.setTab(i | 0),
     };
+  }
+
+  private tap(x: number, y: number) {
+    const t = this.tabRects.find((r) => x >= r.x0 && x <= r.x1);
+    if (y >= 14 && y <= 30 && t) { this.setTab(t.i); return; }
+    if (TOUCH && x < 70 && y > H - 34) { K.play('select'); this.scene.start('Title'); return; }
+    if (this.tab === 0) {
+      for (let i = 0; i <= SHOP.length; i++) {
+        const ry = 38 + i * 22 - 3;
+        if (y < ry || y > ry + 21) continue;
+        if (this.row === i) this.act(); else { this.row = i; K.play('move', 0.5); this.draw(); }
+        return;
+      }
+    } else if (this.tab === 1) {
+      const swipe = y - this.downY;
+      if (Math.abs(swipe) > 24) { this.scrollHogs(-Math.round(swipe / 34)); return; }
+      if (x > W - 44) { this.scrollHogs(y < 110 ? -1 : 1); return; }
+      const c = Math.floor((x - 28) / 34), r = Math.floor((y - 46) / 34);
+      if (c < 0 || c >= HOG_COLS || r < 0 || r >= HOG_ROWS) return;
+      const i = (this.scroll + r) * HOG_COLS + c;
+      if (i >= HOGS.length) return;
+      if (i === this.sel) this.pickHog(i); else { this.sel = i; K.play('move', 0.5); this.draw(); }
+    } else if (this.tab === 2) {
+      const c = Math.floor((x - 36) / 37), r = Math.floor((y - 46) / 28);
+      const i = r * CREST_COLS + c;
+      if (c < 0 || c >= CREST_COLS || r < 0 || i >= CREST_LIST.length) return;
+      this.sel = i; K.play('move', 0.5); this.draw();
+    } else {
+      this.lorePage = 1 - this.lorePage; K.play('move', 0.5); this.draw();
+    }
+  }
+
+  private scrollHogs(d: number) {
+    const rows = Math.ceil(HOGS.length / HOG_COLS);
+    this.scroll = Phaser.Math.Clamp(this.scroll + d, 0, Math.max(0, rows - HOG_ROWS));
+    K.play('move', 0.5);
+    this.draw();
   }
 
   private setTab(i: number) {
@@ -139,18 +181,27 @@ export class ShopScene extends Phaser.Scene {
     T(24, 16, 'SHOP', { scale: 2, color: ui.accentInt });
     T(W - 24, 20, `GOLD ${meta.data.coins}`, { align: 'right', color: 0xf8d878 });
     let x = 84;
+    this.tabRects = [];
     TABS.forEach((t, i) => {
       const on = i === this.tab;
       const s = on ? `<${t}>` : ` ${t} `;
       T(x, 20, s, { color: on ? ui.accentInt : ui.dimInt });
+      this.tabRects.push({ x0: x, x1: x + s.length * 6, i });
       x += (s.length + 1) * 6;
     });
     if (this.tab === 0) this.drawUpgrades(T);
     else if (this.tab === 1) this.drawHogs(T);
     else if (this.tab === 2) this.drawCrests(T);
     else this.drawLore(T);
-    const help = ['UP/DOWN choose   ENTER buy', 'ARROWS choose   ENTER play as', 'ARROWS look', 'UP/DOWN page'][this.tab];
-    T(W / 2, H - 22, `${help}   TAB tabs   ESC back`, { align: 'center', color: ui.dimInt });
+    if (TOUCH) {
+      o.push(box(this, 18, H - 30, 46, 16, ui.bgInt, ui.textInt, ui.panelInt));
+      T(41, H - 26, 'BACK', { align: 'center', color: ui.textInt });
+      const help = ['Tap a row, tap again to buy', 'Tap a hoggie, again to play. Swipe to scroll', 'Tap a crest', 'Tap to turn the page'][this.tab];
+      T(W / 2 + 26, H - 26, help, { align: 'center', color: ui.dimInt });
+    } else {
+      const help = ['UP/DOWN choose   ENTER buy', 'ARROWS choose   ENTER play as', 'ARROWS look', 'UP/DOWN page'][this.tab];
+      T(W / 2, H - 22, `${help}   TAB tabs   ESC back`, { align: 'center', color: ui.dimInt });
+    }
   }
 
   private drawUpgrades(T: (x: number, y: number, s: string, o?: any) => PixelText) {
