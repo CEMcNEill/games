@@ -5,7 +5,10 @@ import { K, anim, makeSfx, beginRun, finishRun, runProps, TitleRow } from './kit
 import { meta } from './meta';
 import { hooks } from './hooks';
 import { capture } from './analytics';
-import { text, box, blink, fitScale, W, H, PixelText, CHAR_W } from './ui';
+import { text, box, blink, fitScale, W, H, PixelText, CHAR_W, TOUCH as TOUCH_DEVICE } from './ui';
+
+/** Touch hints and buttons: a phone or tablet, and a kit that plays with touch. */
+const touchUi = () => TOUCH_DEVICE && !!K.kit?.touch;
 
 function enter(scene: Phaser.Scene, name: string, state: string) {
   hooks.scene = name;
@@ -22,6 +25,21 @@ export function onKeys(scene: Phaser.Scene, codes: string[], fn: (code: string) 
   };
   scene.input.keyboard!.on('keydown', h);
   scene.events.once('shutdown', () => scene.input.keyboard?.off('keydown', h));
+}
+
+/** Tap (touch or click) once the screen has been up for `armMs`; `fn` gets the game-space point. */
+export function onTap(scene: Phaser.Scene, fn: (x: number, y: number) => void, armMs = 250) {
+  let armed = false;
+  scene.time.delayedCall(armMs, () => (armed = true));
+  const h = (p: Phaser.Input.Pointer) => { if (armed) fn(p.x, p.y); };
+  scene.input.on('pointerup', h);
+  scene.events.once('shutdown', () => scene.input.off('pointerup', h));
+}
+
+/** Touch devices: go fullscreen on the first tap where the browser allows it (not iPhone Safari). */
+function tryFullscreen(scene: Phaser.Scene) {
+  if (!touchUi() || scene.scale.isFullscreen || !scene.scale.fullscreen.available) return;
+  try { scene.scale.startFullscreen(); } catch { /* not allowed here */ }
 }
 
 export function startMusic(scene: Phaser.Scene) {
@@ -115,10 +133,11 @@ export class TitleScene extends Phaser.Scene {
     text(this, W / 2, 34 + t.textHeight + 8, theme.tagline, { align: 'center', color: ui.textInt,
       maxWidth: W - 60, maxLines: 2, depth: 10 });
     const rows = titleRows();
-    const press = text(this, W / 2, rows.length ? 204 : 214, 'PRESS ENTER', { scale: 2, align: 'center', color: ui.textInt, depth: 10 });
+    const press = text(this, W / 2, rows.length ? 204 : 214, touchUi() ? 'TAP TO START' : 'PRESS ENTER', { scale: 2, align: 'center', color: ui.textInt, depth: 10 });
     blink(this, press, 500);
-    text(this, W / 2, H - 14, rows.length ? 'Arrows choose   Enter start   M mute' : 'Arrows/WASD move   Enter select   M mute',
-      { align: 'center', color: ui.dimInt, depth: 10 });
+    const hint = touchUi() ? (rows.length ? 'Tap a choice, then tap anywhere to start' : 'Tap anywhere to start')
+      : rows.length ? 'Arrows choose   Enter start   M mute' : 'Arrows/WASD move   Enter select   M mute';
+    text(this, W / 2, H - 14, hint, { align: 'center', color: ui.dimInt, depth: 10 });
     // Returning players see their record; a first visit shows nothing extra.
     const m = meta.data;
     if (m.runs > 0) {
@@ -127,14 +146,16 @@ export class TitleScene extends Phaser.Scene {
       if (ach) parts.push(`ACHIEVEMENTS ${ach}`);
       text(this, W / 2, 5, parts.join('   '), { align: 'center', color: ui.dimInt, depth: 10 });
     }
-    const pick = titleMenu(this, rows, rows.length > 1 ? 229 : 234);
+    const menu = titleMenu(this, rows, rows.length > 1 ? 229 : 234);
     const go = () => {
       K.play('select');
       startMusic(this);
-      beginRun(pick());
+      beginRun(menu.pick());
       this.scene.start('HowTo');
     };
     onKeys(this, ['Enter', 'Space', 'NumpadEnter'], go, 150);
+    // Tap a choice to select it; tap anywhere else to start.
+    onTap(this, (x, y) => { startMusic(this); if (!menu.tap(x, y)) { tryFullscreen(this); go(); } }, 150);
     this.input.keyboard!.once('keydown', () => startMusic(this));
   }
 }
@@ -156,14 +177,16 @@ export class HowToScene extends Phaser.Scene {
       y += t.lineCount * 10 + 6;
       if (y > H - 50) break;
     }
-    const press = text(this, W / 2, H - 38, 'PRESS ENTER TO START', { align: 'center', color: ui.accentInt });
+    const press = text(this, W / 2, H - 38, touchUi() ? 'TAP TO START' : 'PRESS ENTER TO START', { align: 'center', color: ui.accentInt });
     blink(this, press, 500);
-    onKeys(this, ['Enter', 'Space', 'NumpadEnter'], () => {
+    const start = () => {
       K.play('select');
       startMusic(this);
       capture('game_started', runProps());
       this.scene.start(K.kit.gameScene);
-    });
+    };
+    onKeys(this, ['Enter', 'Space', 'NumpadEnter'], start);
+    onTap(this, start, 300);
     onKeys(this, ['Escape'], () => this.scene.start('Title'));
   }
 }
@@ -217,15 +240,22 @@ export class EndScene extends Phaser.Scene {
       const t = text(this, W / 2, y, l, { align: 'center', color: ui.accentInt, maxWidth: W - 60, maxLines: 1 });
       y += t.lineCount * 10 + 1;
     }
-    const press = text(this, W / 2, H - 50, 'ENTER: ONE MORE RUN   ESC: TITLE', { align: 'center', color: ui.textInt });
+    const press = text(this, W / 2, H - 50, touchUi() ? 'TAP: ONE MORE RUN' : 'ENTER: ONE MORE RUN   ESC: TITLE', { align: 'center', color: ui.textInt });
     blink(this, press, 500);
     text(this, W / 2, H - 22, theme.text.credits, { align: 'center', maxWidth: W - 40, maxLines: 2, color: ui.dimInt });
-    onKeys(this, ['Enter', 'Space', 'NumpadEnter', 'KeyR'], () => {
+    const again = () => {
       beginRun();
       capture('game_started', { replay: true, ...runProps() });
       this.scene.start(K.kit.gameScene);
-    }, 800);
+    };
+    onKeys(this, ['Enter', 'Space', 'NumpadEnter', 'KeyR'], again, 800);
     onKeys(this, ['Escape'], () => this.scene.start('Title'), 800);
+    if (touchUi()) {
+      // A TITLE button in the corner; a tap anywhere else is one more run.
+      box(this, W - 62, 6, 56, 18, ui.bgInt, ui.textInt, ui.panelInt);
+      text(this, W - 34, 11, 'TITLE', { align: 'center', color: ui.textInt });
+      onTap(this, (x, y) => { if (x > W - 70 && y < 30) this.scene.start('Title'); else again(); }, 800);
+    }
   }
 }
 
@@ -244,7 +274,8 @@ function titleRows(): TitleRow[] {
     .filter((r) => r.choices.length).slice(0, 2);
 }
 
-/** Draw rows of choices; LEFT/RIGHT change, UP/DOWN switch rows. Returns a getter for {key: value}. */
+/** Draw rows of choices; LEFT/RIGHT change, UP/DOWN switch rows, or tap a choice. Returns `pick` (a getter for
+ * {key: value}) and `tap(x, y)` (true if the tap landed on a choice and selected it). */
 function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
   const ui = K.ui;
   const firstOpen = (r: TitleRow) => Math.max(0, r.choices.findIndex((c) => !c.locked));
@@ -254,9 +285,11 @@ function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
   });
   let row = 0;
   let drawn: PixelText[] = [];
+  let cellsAt: { ri: number; ci: number; x0: number; x1: number; y: number }[] = [];
   const draw = () => {
     drawn.forEach((t) => t.destroy());
     drawn = [];
+    cellsAt = [];
     rows.forEach((r, ri) => {
       const cells: [string, number, number][] = [];
       if (r.label) cells.push([r.label.slice(0, 10).toUpperCase(), ui.dimInt, 1]);
@@ -268,10 +301,12 @@ function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
       });
       const total = cells.reduce((n, [s]) => n + s.length, 0) + (cells.length - 1);
       let x = Math.round(W / 2 - (total * CHAR_W) / 2);
-      for (const [s, col, alpha] of cells) {
+      const off = r.label ? 1 : 0;
+      cells.forEach(([s, col, alpha], k) => {
         drawn.push(text(scene, x, y0 + ri * 11, s, { color: col, depth: 10 }).setAlpha(alpha));
+        if (k >= off) cellsAt.push({ ri, ci: k - off, x0: x - 3, x1: x + s.length * CHAR_W + 3, y: y0 + ri * 11 + 3 });
         x += (s.length + 1) * CHAR_W;
-      }
+      });
     });
   };
   const move = (d: number) => {
@@ -290,9 +325,16 @@ function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
     onKeys(scene, ['ArrowRight', 'KeyD'], () => move(1), 150);
     onKeys(scene, ['ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'], () => { row = (row + 1) % rows.length; draw(); }, 150);
   }
-  return () => {
+  const pick = () => {
     const out: Record<string, string | number> = {};
     rows.forEach((r, i) => { out[r.key] = r.choices[sel[i]].value; });
     return out;
   };
+  const tap = (x: number, y: number) => {
+    const c = cellsAt.find((k) => x >= k.x0 && x <= k.x1 && Math.abs(y - k.y) <= 7);
+    if (!c) return false;
+    if (!rows[c.ri].choices[c.ci].locked) { row = c.ri; sel[c.ri] = c.ci; lastPick[rows[c.ri].key] = c.ci; K.play('move', 0.5); draw(); }
+    return true;
+  };
+  return { pick, tap };
 }

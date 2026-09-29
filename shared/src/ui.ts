@@ -6,6 +6,9 @@ import { hooks } from './hooks';
 export const W = 480;
 export const H = 270;
 
+/** A phone or tablet (no hover, coarse pointer): kits show tap hints and touch controls. */
+export const TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+
 export interface TextOpts {
   scale?: number;
   color?: number;

@@ -11,7 +11,7 @@ import { hooks, sharedDebug } from '@shared/hooks';
 import { capture } from '@shared/analytics';
 import { rng, Rng, meta } from '@shared/meta';
 import { shake, hitstop, hitstopped, burst, floatText, setJuiceSpeed } from '@shared/juice';
-import { text, box, bar, clock, PixelText, W, H } from '@shared/ui';
+import { text, box, bar, clock, PixelText, W, H, TOUCH } from '@shared/ui';
 import products from '../../shared/products.json';
 import {
   ProductId, PassiveId, ArchId, EliteMod, EventId, Stats, baseStats, WEAPONS, PASSIVES, ARCH, SPAWN_TABLE, ELITE_MODS, ELITE_BASIC,
@@ -107,7 +107,7 @@ const isPower = (k: string): k is PowerId => (POWER_IDS as string[]).includes(k)
 interface Item { s: Phaser.GameObjects.Image; kind: ItemKind; pull: boolean; big?: boolean; data?: string | number }
 interface Gem { s: Phaser.GameObjects.Image; v: number; pull: boolean; t: number }
 
-interface Modal { kind: 'levelup' | 'chest' | 'act' | 'release' | 'cmdk' | 'reveal'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number }
+interface Modal { kind: 'levelup' | 'chest' | 'act' | 'release' | 'cmdk' | 'reveal'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number; at?: number }
 
 export class GameScene extends Phaser.Scene {
   player!: Phaser.GameObjects.Sprite;
@@ -231,6 +231,13 @@ export class GameScene extends Phaser.Scene {
   skipReveal = false; // debug.lose(): straight to the end screen
   revealing = false;  // the NEW HOGGIES screen after the run
   pauseObjs: Phaser.GameObjects.GameObject[] = [];
+  // Touch: a floating joystick where the finger lands, taps for cards and menus, a pause button.
+  joy = { on: false, ox: 0, oy: 0, x: 0, y: 0 };
+  joyG!: Phaser.GameObjects.Graphics;
+  downAt = 0;
+  pausedAt = 0;
+  tapIgnore = false;
+  pauseBtns: { x: number; y: number; w: number; h: number; act: () => void }[] = [];
 
   constructor() { super('Game'); }
 
@@ -303,7 +310,17 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>;
     kb.on('keydown', this.onKey, this);
-    this.events.once('shutdown', () => kb.off('keydown', this.onKey, this));
+    this.input.on('pointerdown', this.onDown, this);
+    this.input.on('pointermove', this.onMove, this);
+    this.input.on('pointerup', this.onUp, this);
+    this.events.once('shutdown', () => {
+      kb.off('keydown', this.onKey, this);
+      this.input.off('pointerdown', this.onDown, this);
+      this.input.off('pointermove', this.onMove, this);
+      this.input.off('pointerup', this.onUp, this);
+    });
+    this.joy = { on: false, ox: 0, oy: 0, x: 0, y: 0 };
+    this.joyG = this.add.graphics().setScrollFactor(0).setDepth(UI + 70);
 
     this.buildHud();
     // Start weapon: daily = seeded pick; signature hoggies bring their own (theme products only if featured).
@@ -485,7 +502,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (m.kind === 'act') {
-        if (['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'].includes(e.code)) this.selectAct(1 - m.sel);
+        if (['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD', 'ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'].includes(e.code)) this.selectAct(m.sel === 0 ? 1 : 0);
         else if (['Digit1', 'Digit2'].includes(e.code) && m.armed) this.chooseAct(+e.code.slice(-1) - 1);
         else if (['Enter', 'Space', 'NumpadEnter'].includes(e.code) && !e.repeat && m.armed) this.chooseAct(m.sel);
         return;
@@ -512,17 +529,92 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.paused && (e.code === 'Enter' || e.code === 'Space')) this.resume();
-    if (this.paused && e.code === 'KeyQ') {
-      // Quitting keeps the safe gold (the run isn't recorded).
-      const keep = this.keptGold(false);
-      try { meta.bank(keep); const sv = save(); sv.gold += keep; sv.kills += this.kills; persist(); } catch { /* ignore */ }
-      this.over = true;
-      this.scene.start('Title');
+    if (this.paused && e.code === 'KeyQ') this.quitRun();
+  }
+
+  /** Quitting keeps the safe gold (the run isn't recorded). */
+  private quitRun() {
+    const keep = this.keptGold(false);
+    try { meta.bank(keep); const sv = save(); sv.gold += keep; sv.kills += this.kills; persist(); } catch { /* ignore */ }
+    this.over = true;
+    this.scene.start('Title');
+  }
+
+  // ---------------------------------------------------------------- touch
+  private pauseRect() { return { x: W / 2 - 66, y: 4, w: 26, h: 22 }; }
+
+  private onDown(p: Phaser.Input.Pointer) {
+    this.downAt = this.time.now;
+    if (this.over && !this.revealing) return;
+    if (this.modal || this.paused) return;
+    const r = this.pauseRect();
+    if (TOUCH && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) { this.tapIgnore = true; this.pause(); return; }
+    this.joy = { on: true, ox: p.x, oy: p.y, x: p.x, y: p.y };
+  }
+
+  private onMove(p: Phaser.Input.Pointer) {
+    const j = this.joy;
+    if (!j.on) return;
+    j.x = p.x; j.y = p.y;
+    // A finger that drags far pulls the stick's centre along, so turning around is instant.
+    const dx = j.x - j.ox, dy = j.y - j.oy, l = Math.hypot(dx, dy);
+    if (l > 30) { j.ox = j.x - (dx / l) * 30; j.oy = j.y - (dy / l) * 30; }
+  }
+
+  private onUp(p: Phaser.Input.Pointer) {
+    this.joy.on = false;
+    if (this.tapIgnore) { this.tapIgnore = false; return; }
+    if (this.over && !this.revealing) return;
+    if (this.paused) { if (this.downAt >= this.pausedAt) this.pauseTap(p.x, p.y); return; }
+    const m = this.modal;
+    if (m && m.armed && this.downAt >= (m.at ?? 0)) this.modalTap(m, p.x, p.y);
+  }
+
+  /** Taps on the open modal: select a card, tap it again to pick; buttons under the level-up cards. */
+  private modalTap(m: Modal, x: number, y: number) {
+    if (m.kind === 'chest' || m.kind === 'reveal') { this.closeModal(); return; }
+    if (m.kind === 'act') {
+      const cw = 200, gap = 16, x0 = (W - (cw * 2 + gap)) / 2;
+      for (let i = 0; i < 2; i++) {
+        if (x < x0 + i * (cw + gap) || x > x0 + i * (cw + gap) + cw || y < 72 || y > 206) continue;
+        if (m.sel === i) this.chooseAct(i); else this.selectAct(i);
+        return;
+      }
+      return;
     }
+    const n = m.cards.length, cw = 136, gap = 12, x0 = (W - (cw * n + gap * (n - 1))) / 2;
+    if (y >= 52 && y <= 214) {
+      for (let i = 0; i < n; i++) {
+        if (x < x0 + i * (cw + gap) || x > x0 + i * (cw + gap) + cw) continue;
+        if (m.sel === i) this.pickCard(); else this.selectCard(i);
+        return;
+      }
+    } else if (m.kind === 'levelup' && y > 214 && y <= 234) {
+      if (x >= W / 2 - 152 && x < W / 2 - 46) this.reroll();
+      else if (Math.abs(x - W / 2) <= 44) this.skip();
+      else if (x > W / 2 + 46 && x <= W / 2 + 152) this.banish();
+    }
+  }
+
+  private pauseTap(x: number, y: number) {
+    const b = this.pauseBtns.find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+    if (b) b.act(); else if (!TOUCH) this.resume();
+  }
+
+  /** The floating joystick: a ring where the finger landed and a knob under it. */
+  private drawJoy() {
+    const g = this.joyG, j = this.joy;
+    g.clear();
+    if (!j.on || this.modal || this.paused) return;
+    const dx = j.x - j.ox, dy = j.y - j.oy, l = Math.hypot(dx, dy), k = l > 24 ? 24 / l : 1;
+    g.lineStyle(2, 0xfcfcfc, 0.3).strokeCircle(j.ox, j.oy, 24);
+    g.fillStyle(0xfcfcfc, 0.35).fillCircle(j.ox + dx * k, j.oy + dy * k, 8);
   }
 
   private pause() {
     this.paused = true;
+    this.pausedAt = this.time.now;
+    this.pauseBtns = [];
     this.showBanner(false);
     hooks.state = 'paused';
     const ui = K.ui;
@@ -550,17 +642,35 @@ export class GameScene extends Phaser.Scene {
     if (rel) T(W / 2, yb, `RELEASES: ${rel}`, { align: 'center', color: 0x3cbcfc, maxWidth: 340, maxLines: 2 });
     const rl = [...this.relics].map((r) => RELICS[r].name).join(' ');
     if (rl) T(W / 2, yb + 18, `MERCH: ${rl}`, { align: 'center', color: 0xf8d878, maxWidth: 340, maxLines: 1 });
-    T(W / 2, yb + 32, 'ENTER resume   Q quit', { align: 'center' });
-    T(W / 2, yb + 43, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
+    if (TOUCH) {
+      // Buttons instead of keys: resume, damage numbers, sound, quit.
+      const btns: [string, () => void][] = [
+        ['RESUME', () => this.resume()],
+        [`NUMBERS ${this.numbers ? 'ON' : 'OFF'}`, () => { this.numbers = !this.numbers; save().numbers = this.numbers; persist(); this.resume(); this.pause(); }],
+        [this.sound.mute ? 'SOUND OFF' : 'SOUND ON', () => { this.sound.mute = !this.sound.mute; K.sfx.muted = this.sound.mute; this.resume(); this.pause(); }],
+        ['QUIT', () => this.quitRun()],
+      ];
+      const bw = 80, gap = 6, x0 = W / 2 - (btns.length * bw + (btns.length - 1) * gap) / 2, by = yb + 28;
+      btns.forEach(([label, act], i) => {
+        const bx = x0 + i * (bw + gap);
+        o.push(box(this, bx, by, bw, 18, ui.bgInt, i === 0 ? ui.accentInt : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+        T(bx + bw / 2, by + 5, label, { align: 'center', color: i === 0 ? ui.accentInt : ui.textInt });
+        this.pauseBtns.push({ x: bx, y: by - 2, w: bw, h: 22, act });
+      });
+    } else {
+      T(W / 2, yb + 32, 'ENTER resume   Q quit', { align: 'center' });
+      T(W / 2, yb + 43, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
+    }
     const info = [this.heat ? `HEAT ${this.heat}` : '', this.mode !== 'standard' ? this.mode.toUpperCase() : '', `WAVE ${this.wave}`,
       hogName(this.hog).toUpperCase(), this.funding ? `FUNDING +${Math.round(((1 + WAVE.funding) ** this.funding - 1) * 100)}%` : '']
       .filter(Boolean).join('   ');
-    T(W / 2, yb + 55, info, { align: 'center', color: ui.dimInt, maxWidth: 350, maxLines: 1 });
+    T(W / 2, yb + (TOUCH ? 51 : 55), info, { align: 'center', color: ui.dimInt, maxWidth: 350, maxLines: 1 });
     this.pauseObjs = o;
   }
 
   private resume() {
     this.paused = false;
+    this.pauseBtns = [];
     hooks.state = this.boss ? 'boss' : 'playing';
     this.pauseObjs.forEach((o) => o.destroy());
     this.pauseObjs = [];
@@ -587,6 +697,13 @@ export class GameScene extends Phaser.Scene {
     const arrow = this.add.image(0, 0, spr('boss_shot')).setScrollFactor(0).setDepth(UI + 95).setVisible(false).setScale(2);
     const chestArrow = this.add.image(0, 0, spr('chest')).setScrollFactor(0).setDepth(UI + 95).setVisible(false);
     const pu = text(this, W / 2, 68, '', { align: 'center', fixed: true, depth: UI + 90 }); // below the banner box
+    if (TOUCH) {
+      // Touch: a pause button left of the clock.
+      const r = this.pauseRect();
+      box(this, r.x + 3, r.y + 3, r.w - 6, r.h - 6, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 90);
+      this.add.rectangle(r.x + 10, r.y + 8, 2, 7, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
+      this.add.rectangle(r.x + 14, r.y + 8, 2, 7, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
+    }
     this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu };
   }
 
@@ -835,6 +952,13 @@ export class GameScene extends Phaser.Scene {
     let dx = (k.RIGHT.isDown || k.D.isDown ? 1 : 0) - (k.LEFT.isDown || k.A.isDown ? 1 : 0);
     let dy = (k.DOWN.isDown || k.S.isDown ? 1 : 0) - (k.UP.isDown || k.W.isDown ? 1 : 0);
     const driving = this.pu.autopilot > 0;
+    // Touch: the joystick, with a little analog range so small drags walk slowly.
+    let analog = 1;
+    const j = this.joy;
+    if (j.on && dx === 0 && dy === 0) {
+      const jx = j.x - j.ox, jy = j.y - j.oy, l = Math.hypot(jx, jy);
+      if (l > 4) { dx = jx; dy = jy; analog = Math.min(1, (l - 4) / 14); }
+    }
     // Self-Driving Mode: the keys are ignored and the hog steers itself toward gems and away from crowds.
     if (driving) [dx, dy] = this.autopilotDir(true);
     else if (this.autopilot && dx === 0 && dy === 0) [dx, dy] = this.autopilotDir();
@@ -847,6 +971,7 @@ export class GameScene extends Phaser.Scene {
     }
     let sp = this.st.speed * (driving ? 1.25 : this.trait === 'superhero' ? 1 : this.puddleSlow());
     if (this.pu.hogzilla > 0) sp *= 1.3;
+    if (!driving) sp *= analog;
     if (this.boss && this.bossAffixes.includes('backpressure')) sp *= Math.max(0.6, 1 - this.enemies.length / 500);
     if (this.waveMods.includes('freeze') && this.trait !== 'superhero' && !driving) {
       // Code Freeze: an icy floor, you keep sliding.
@@ -2060,7 +2185,15 @@ export class GameScene extends Phaser.Scene {
     });
     const sel = this.add.graphics().setScrollFactor(0).setDepth(UI + 103);
     objs.push(sel);
-    if (kind === 'levelup') {
+    if (kind === 'levelup' && TOUCH) {
+      // Touch: three buttons, with Drake on either side.
+      objs.push(this.add.image(W / 2 - 166, 224, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+      objs.push(this.add.image(W / 2 + 166, 224, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+      ([[`REROLL ${this.rerolls}`, -99], [`SKIP ${this.skips}`, 0], [`BANISH ${this.banishes}`, 99]] as [string, number][]).forEach(([label, dx]) => {
+        objs.push(box(this, W / 2 + dx - 44, 216, 88, 16, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+        objs.push(text(this, W / 2 + dx, 220, label, { align: 'center', color: ui.textInt, fixed: true, depth: UI + 102 }));
+      });
+    } else if (kind === 'levelup') {
       // Drake says nah to a reroll, yah to a banish.
       objs.push(this.add.image(W / 2 - 128, 226, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
       objs.push(this.add.image(W / 2 + 126, 226, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
@@ -2069,12 +2202,13 @@ export class GameScene extends Phaser.Scene {
     } else if (rel) {
       objs.push(text(this, W / 2, 222, `Funding round: +${Math.round(WAVE.funding * 100)}% damage, +${WAVE.fundingHp} max HP`, { align: 'center', color: 0x3cbcfc, fixed: true, depth: UI + 101 }));
     }
-    objs.push(text(this, W / 2, 238, 'LEFT/RIGHT choose   ENTER pick', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
+    objs.push(text(this, W / 2, 240, TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'LEFT/RIGHT choose   ENTER pick', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
     const m: Modal = { kind, cards, sel: 0, objs, armed: false };
+    m.at = this.time.now;
     this.modal = m;
     // Ignore Enter for a moment so a held key doesn't pick blindly.
     this.time.delayedCall(350, () => (m.armed = true));
-    this.selectCard(0, true);
+    if (TOUCH) m.sel = -1; else this.selectCard(0, true); // touch: nothing preselected, so one stray tap can't pick
   }
 
   private selectCard(i: number, silent = false) {
@@ -2108,6 +2242,7 @@ export class GameScene extends Phaser.Scene {
     const m = this.modal;
     if (!m || m.kind !== 'levelup' || !m.armed || this.banishes <= 0) { this.sfx('hurt', 0.3, 100); return; }
     const c = m.cards[m.sel];
+    if (!c) { this.banner('BANISH', TOUCH ? 'Tap a card first, then BANISH' : 'Choose a card first'); return; }
     if (c.kind !== 'weapon' && c.kind !== 'passive') { this.sfx('hurt', 0.3, 100); return; }
     this.banishes--;
     this.banished.add(c.id);
@@ -2117,7 +2252,7 @@ export class GameScene extends Phaser.Scene {
 
   private pickCard() {
     const m = this.modal;
-    if (!m || !['levelup', 'release', 'cmdk'].includes(m.kind) || !m.armed) return;
+    if (!m || !['levelup', 'release', 'cmdk'].includes(m.kind) || !m.armed || m.sel < 0) return;
     const c = m.cards[m.sel];
     this.sfx('select');
     this.closeModal();
@@ -2312,6 +2447,7 @@ export class GameScene extends Phaser.Scene {
     });
     hooks.state = 'chest';
     const m: Modal = { kind: 'chest', cards: [], sel: 0, objs, armed: false };
+    m.at = this.time.now;
     this.modal = m;
     this.time.delayedCall(this.autopilot ? 250 : 500, () => (m.armed = true));
     this.time.delayedCall(this.autopilot ? 400 : 2600, () => { if (this.modal === m) this.closeModal(); });
@@ -2889,12 +3025,13 @@ export class GameScene extends Phaser.Scene {
     objs.push(sel);
     const warn = risk > 0 && this.wave >= 2 ? `${risk} gold at risk: die later, lose half. Cash out keeps it all.` : 'Keep going? Later waves have the biggest scores.';
     objs.push(text(this, W / 2, 214, warn, { align: 'center', color: risk > 0 ? 0xf87858 : ui.textInt, fixed: true, depth: D, maxWidth: W - 20, maxLines: 1 }));
-    objs.push(text(this, W / 2, 238, 'LEFT/RIGHT choose   ENTER confirm', { align: 'center', color: ui.dimInt, fixed: true, depth: D }));
+    objs.push(text(this, W / 2, 238, TOUCH ? 'TAP a choice, TAP it again to confirm' : 'LEFT/RIGHT choose   ENTER confirm', { align: 'center', color: ui.dimInt, fixed: true, depth: D }));
     const m: Modal = { kind: 'act', cards: [], sel: 0, objs, armed: false };
+    m.at = this.time.now;
     this.modal = m;
     this.sfx('evolve', 0.8);
     this.time.delayedCall(this.autopilot ? 300 : 700, () => (m.armed = true));
-    this.selectAct(0, true);
+    if (TOUCH) m.sel = -1; else this.selectAct(0, true);
   }
 
   private selectAct(i: number, silent = false) {
@@ -2909,7 +3046,7 @@ export class GameScene extends Phaser.Scene {
 
   private chooseAct(i: number) {
     const m = this.modal;
-    if (!m || m.kind !== 'act' || !m.armed) return;
+    if (!m || m.kind !== 'act' || !m.armed || i < 0) return;
     this.sfx('select');
     this.closeModal();
     if (i === 1) {
@@ -3036,6 +3173,7 @@ export class GameScene extends Phaser.Scene {
     this.drawPowerFx();
     this.drawBlasts(hitstopped(this) ? 0 : 1 / 60);
     this.drawDark();
+    this.drawJoy();
     // The hoggie: one pose, animated in code (bob and squash while walking, blink when hit).
     const t = this.time.now, p = this.player;
     const walk = this.moving && !this.modal && !this.paused;
@@ -3164,9 +3302,10 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: nm, alpha: 1, duration: 200, delay: 250 * i + 200 });
     });
     if (ids.length > 8) objs.push(text(this, W / 2, 240, `+${ids.length - 8} more in the SHOP`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
-    objs.push(text(this, W / 2, 252, 'Pick one in SHOP > HOGGIES.   ENTER', { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
+    objs.push(text(this, W / 2, 252, `Pick one in SHOP > HOGGIES.   ${TOUCH ? 'TAP' : 'ENTER'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
     this.revealing = true; // onKey lets the reveal's ENTER through while the run is over
     const m: Modal = { kind: 'reveal', cards: [], sel: 0, objs, armed: false };
+    m.at = this.time.now;
     this.modal = m;
     hooks.state = 'reveal';
     this.time.delayedCall(700 + 250 * show.length, () => (m.armed = true));

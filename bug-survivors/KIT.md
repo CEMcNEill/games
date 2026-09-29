@@ -154,6 +154,16 @@ product crests, reaching waves 8/10 (Cloud Foundations/Platform), 100,000 bugs (
 Exports), 9 agents (PostHog Desktop), getting run over by Hogzilla (YouTube)... Each pops a badge in-game and unlocks
 a hoggie. Old achievement ids migrate to crests (`LEGACY` in crests.ts) and old heroes to hoggies.
 
+## Touch (phones and tablets)
+On a touch device (`(hover: none) and (pointer: coarse)`) the kit sets `touch: true` and everything plays by finger:
+drag anywhere to move (a floating joystick where the finger lands, with a little analog range), tap a card to select it
+and tap it again to pick (nothing starts selected, so a stray tap can't pick), REROLL / SKIP / BANISH buttons, tap
+twice to CONTINUE or CASH OUT, tap to close chests and the hoggie reveal, a pause button left of the clock (RESUME,
+NUMBERS, SOUND, QUIT), and a shop with tappable tabs, rows and grids (swipe the hoggie grid) plus a BACK button. The
+shared Title / How-to / End screens show tap hints and take taps (a tapped title choice selects; a tap elsewhere starts).
+Phones get a fractional zoom that fills the screen, the page blocks scrolling and pinch-zoom, portrait shows "Turn your
+phone sideways", and Android goes fullscreen on the first tap. The mouse drives the same joystick and taps on desktop.
+
 ## Title menu, meta and modes
 - Title rows: `RUN  DAILY  YOLO  SHOP` and `HEAT 0-5`. Enter = RUN heat 0. YOLO unlocks by reaching wave 6.
   Heat n unlocks by winning heat n-1 (a win = clearing wave 1). The title shows gold, best wave, hoggie count and

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { startKit, K, spr, anim, heatRow } from '@shared/kit';
 import { meta } from '@shared/meta';
-import { text, W } from '@shared/ui';
+import { text, W, TOUCH } from '@shared/ui';
 import schema from '../theme.schema.json';
 import defaultTheme from '../themes/default.json';
 import slots from '../slots.json';
@@ -29,6 +29,7 @@ startKit({
   sfx: sfx as Record<string, number[]>,
   scenes: [GameScene, ShopScene],
   gameScene: 'Game',
+  touch: true,
   // Kit-fixed PostHog brand art: every hoggie (player characters) and every team crest (achievements).
   preload: (scene) => {
     scene.load.spritesheet(HOG32, 'assets/kit/hoggies32.png', { frameWidth: 32, frameHeight: 32 });
@@ -40,8 +41,9 @@ startKit({
     const lines = [
       `Bugs are swarming ${t.prospect.name}. Survive until ${theName(t.game.boss.name)} shows up, then squash it.`,
       'Every boss is a release. After it: cash out, or keep going into the next wave for new PostHog tools.',
-      'Move with the ARROW KEYS or WASD. Your PostHog weapons fire on their own. Grab the blue gems to level up.',
-      `You start with ${productName(t.game.starting_product)}. Elites drop chests. ESC pauses.`,
+      TOUCH ? 'Drag a finger anywhere to move. Your PostHog weapons fire on their own. Grab the blue gems to level up.'
+        : 'Move with the ARROW KEYS or WASD. Your PostHog weapons fire on their own. Grab the blue gems to level up.',
+      `You start with ${productName(t.game.starting_product)}. Elites drop chests. ${TOUCH ? 'The || button pauses.' : 'ESC pauses.'}`,
     ];
     if (K.run.heat > 0) lines.push(`HEAT ${K.run.heat}: ${HEAT.slice(1, K.run.heat + 1).map((h) => h.desc).join(', ')}.`);
     else if (K.run.mode === 'yolo') lines.push('YOLO: --dangerously-skip-permissions. x3 everything, no pauses, Max picks your cards.');
