@@ -63,6 +63,10 @@ const UI = 1100;
 const DT = 1 / 60;
 /** A card left unpicked this long (ticks) is picked for the player, so an away phone can't hold the world forever. */
 const AUTO_PICK = 60 * 20;
+/** Seconds of "code review" shield per level-up card hand while its tray is open: safe to read, not to camp in. */
+const SHIELD_S = 8;
+/** How fast a hog walks while its card tray is open (and it's shielded). */
+const TRAY_SPEED = 0.7;
 /** Seconds a teammate stands on a downed hog to bring it back. */
 const REVIVE_S = 3;
 const REVIVE_R = 26;
@@ -187,7 +191,9 @@ export interface Hog {
   // co-op only
   move: number;                  // packed stick input this tick
   view: { w: number; h: number };// what this player's screen shows of the world
-  pick: Pick | null;             // a card choice the world waits on
+  pick: Pick | null;             // an open card choice (level-ups: a tray, the world keeps going; releases: the world waits)
+  trayOpen: boolean;             // the level-up tray is showing (not banked for later)
+  shieldT: number;               // code-review shield seconds left for the open hand
   down: boolean;                 // out of HP: waiting for a teammate (or the next wave)
   gone: boolean;                 // left the game
   reviveT: number;
@@ -333,6 +339,12 @@ export class CoopScene extends Phaser.Scene {
   crestQ: string[] = [];
   crestBusy = false;
   chestObjs: Phaser.GameObjects.GameObject[] = [];
+  /** This device's level-up tray (see drawTray). */
+  tray: { objs: Phaser.GameObjects.GameObject[]; rects: Rect[]; btns: (Rect & { act: () => void })[]; sel: number; key: string; open: boolean;
+    sent: boolean; banish: boolean; bar?: { g: Phaser.GameObjects.Graphics; t: PixelText; x: number; y: number; w: number } } | null = null;
+  trayAt = 0;
+  trayTouch = false;
+  trayLift = 0;           // HUD px the view shifts while the tray is open
   keys!: Record<string, Phaser.Input.Keyboard.Key>;
   diff = DIFF.normal;
   god = false;
@@ -433,7 +445,7 @@ export class CoopScene extends Phaser.Scene {
       numBudget: 10, numAvg: 0, mergeT: 0, wave: 1, waveAt: 0, waveMods: [], hpBase: 1, funding: 0,
       toolsOpen: false, interlude: false, cashedOut: false, actOpen: -1, releasing: false, spikeT: 0, incident: null, menuOpen: false,
       tickN: 0, turnIdx: 0, sub: 0, acc: 0, timers: [], uidN: 0, sentView: '', hashFrom: 0, catchingUp: false, god: false, autopilot: false,
-      pauseObjs: [], pauseBtns: [], reviewTags: [], failT: 0,
+      pauseObjs: [], pauseBtns: [], reviewTags: [], failT: 0, tray: null, trayAt: 0, trayTouch: false,
     });
     this.seen = new Set();
     this.grid = new Map();
@@ -544,7 +556,7 @@ export class CoopScene extends Phaser.Scene {
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {}, powerups: 0, gems: 0, hits: 0, hitsWave1: 0, aiKills: 0,
         unlocks: [], crests: [], kills: 0, downs: 0, revived: 0 },
       moat: { fill: 0, calm: 0, lv: 0 },
-      move: 0, view: { ...VIEW0 }, pick: null, down: false, gone: false, reviveT: 0, wfx: new Map(),
+      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, shieldT: 0, down: false, gone: false, reviveT: 0, wfx: new Map(),
     };
     this.as(h, () => {
       this.rerolls = 1 + this.shop('reroll');
@@ -710,6 +722,7 @@ export class CoopScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
   private onKey(e: KeyboardEvent) {
     if (this.over) return;
+    if (!this.modal && !this.menuOpen && this.trayKey(e)) return;
     const m = this.modal;
     if (m) {
       if (m.sent) return;
@@ -789,6 +802,7 @@ export class CoopScene extends Phaser.Scene {
     if (this.modal || this.menuOpen) return;
     const r = this.pauseRect(), [x, y] = this.toHud(p);
     if (TOUCH && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { this.tapIgnore = true; this.openMenu(); return; }
+    if (this.inTray(x, y)) { this.trayTouch = true; return; } // a card, not the stick
     if (this.chestObjs.length) this.closeChest();
     this.joy = { on: true, ox: x, oy: y, x, y };
   }
@@ -804,6 +818,7 @@ export class CoopScene extends Phaser.Scene {
 
   private onUp(p: Phaser.Input.Pointer) {
     this.joy.on = false;
+    if (this.trayTouch) { this.trayTouch = false; const [hx, hy] = this.toHud(p); this.trayTap(hx, hy); return; }
     if (this.tapIgnore) { this.tapIgnore = false; return; }
     if (this.over) return;
     const [x, y] = this.toModal(p);
@@ -962,6 +977,7 @@ export class CoopScene extends Phaser.Scene {
     }
     if (this.menuOpen) { this.closeMenu(); this.openMenu(); }
     if (this.chestObjs.length) this.closeChest();
+    if (this.tray) this.showPick();
   }
 
   // ---------------------------------------------------------------- HUD
@@ -1097,7 +1113,7 @@ export class CoopScene extends Phaser.Scene {
     if (this.me.down && !this.over) wait = 'YOU ARE DOWN. A TEAMMATE CAN REVIEW YOU BACK IN';
     else if (this.held() && !this.modal) {
       if (this.actOpen >= 0) wait = `P${this.decider().id + 1} ${this.decider().name.toUpperCase()} IS DECIDING: SHIP OR CASH OUT`;
-      else wait = `WAITING FOR ${this.hogs.filter((h) => h.pick && !h.gone && !h.down).map((h) => `P${h.id + 1}`).join(', ')} TO PICK`;
+      else wait = `WAITING FOR ${this.hogs.filter((h) => h.pick?.kind === 'release' && !h.gone && !h.down).map((h) => `P${h.id + 1}`).join(', ')} TO PICK`;
     }
     this.hud.wait.setText(wait);
     const backlog = net.turns.length - this.turnIdx;
@@ -1177,6 +1193,10 @@ export class CoopScene extends Phaser.Scene {
     this.runTicks(dtMs);
     if (this.over) return;
     if (this.autopilot && this.modal?.armed && !this.modal.sent) this.botModal();
+    if (this.autopilot && this.tray && !this.modal) this.botTray();
+    this.drawShieldBar();
+    const lift = this.trayLift / worldZoom(), fo = this.cameras.main.followOffset;
+    if (Math.abs(fo.y + lift) > 0.5) this.cameras.main.setFollowOffset(0, fo.y + (-lift - fo.y) * 0.15);
     this.as(this.me, () => { this.draw(); this.updateHud(); });
     hooks.elapsed = this.elapsed;
     hooks.score = this.score();
@@ -1265,11 +1285,14 @@ export class CoopScene extends Phaser.Scene {
       case 'banish': this.as(h, () => this.simBanish(e.i | 0, e.k)); break;
       case 'act': if (h === this.decider() && this.actOpen >= 0) this.simAct(e.i | 0); break;
       case 'dbg': this.as(h, () => this.simDebug(e.c, e.a ?? [])); break;
+      case 'tray': if (h.pick && h.pick.kind !== 'release') { h.trayOpen = !!e.open; if (h.local) this.showPick(); } break;
     }
   }
 
-  /** The world waits while anyone is choosing a card, and while the SHIPPED call is open. */
-  held() { return this.actOpen >= 0 || this.hogs.some((h) => !h.gone && !h.down && !!h.pick); }
+  /** The world waits only between waves: the SHIPPED call and the release picks. Level-up cards never stop it. */
+  held() { return this.actOpen >= 0 || this.hogs.some((h) => !h.gone && !h.down && h.pick?.kind === 'release'); }
+  /** A hog reading its level-up cards: can't be hurt, walks slower, for SHIELD_S per hand. */
+  shielded(h: Hog = this.cur) { return !!h.pick && h.pick.kind !== 'release' && h.trayOpen && h.shieldT > 0 && !h.down; }
 
   /** One fixed step of the shared world. */
   private tick() {
@@ -1283,13 +1306,7 @@ export class CoopScene extends Phaser.Scene {
         for (const t of due) { t.fn(); if (this.over) return; }
       }
     }
-    let dt = DT;
-    if (this.slowmo > 0) {
-      // Level-up fanfare: a beat of slow motion, then everyone's cards.
-      this.slowmo -= dt;
-      dt *= 0.25;
-      if (this.slowmo <= 0 && !this.won && !this.interlude) { this.openLevelUps(); if (this.held()) return; }
-    }
+    const dt = DT;
     this.elapsed += dt;
     this.numBudget = Math.min(14, this.numBudget + dt * 40);
     for (const h of this.present()) this.as(h, () => this.hogPre(dt));
@@ -1308,14 +1325,17 @@ export class CoopScene extends Phaser.Scene {
     this.runRevives(dt);
     this.runBoss(dt);
     for (const h of this.alive()) this.as(h, () => this.runWaveTimers(dt));
-    if (!this.over && !this.won && !this.interlude && this.slowmo <= 0 && !this.held()
-      && this.alive().some((h) => h.pendingLevels > 0)) this.levelFanfare();
+    if (this.over) return;
+    // Level-ups: a hand of cards in each hog's tray; the world keeps going.
+    if (!this.won && !this.interlude) this.openLevelUps();
+    this.autoPicks();
   }
 
   /** Per-hog upkeep: timers, powerups, stats, regen. */
   private hogPre(dt: number) {
     this.tickPowerups(dt);
     if (this.cur.down) return;
+    if (this.shielded()) this.cur.shieldT = Math.max(0, this.cur.shieldT - dt);
     this.invuln = Math.max(0, this.invuln - dt);
     this.hogqlFlash = Math.max(0, this.hogqlFlash - dt);
     this.tokenT += dt;
@@ -1408,6 +1428,7 @@ export class CoopScene extends Phaser.Scene {
     let sp = this.st.speed * (driving ? 1.25 : this.trait === 'superhero' ? 1 : this.puddleSlow());
     if (this.pu.hogzilla > 0) sp *= 1.3;
     if (!driving) sp *= analog;
+    if (this.shielded()) sp *= TRAY_SPEED; // reading cards: a slower walk
     if (this.boss && this.bossAffixes.includes('backpressure')) sp *= Math.max(0.6, 1 - this.enemies.length / 500);
     if (this.waveMods.includes('freeze') && this.trait !== 'superhero' && !driving) {
       // Code Freeze: an icy floor, you keep sliding.
@@ -1503,7 +1524,7 @@ export class CoopScene extends Phaser.Scene {
     // An open level-up waits: the level comes back as a card when they're back up.
     if (h.pick?.kind === 'levelup') h.pendingLevels++;
     if (h.pick?.kind !== 'release') h.pick = null;
-    if (h.local) { this.closeModal(); this.joy.on = false; }
+    if (h.local) { this.closeModal(); this.clearTray(); this.joy.on = false; }
     this.sfx('lose', 0.6, 300);
     shake(this, 4, 200);
     if (!this.alive().length) { this.finish(false); return; }
@@ -2706,21 +2727,21 @@ export class CoopScene extends Phaser.Scene {
     }
   }
 
-  /** Everyone levels at once (shared XP): a beat of slow motion, then everyone's cards. */
-  private levelFanfare() {
-    this.slowmo = 0.4;
-    this.sfx('levelup');
-    for (const h of this.alive()) {
-      if (h.pendingLevels <= 0) continue;
-      const p = h.player;
-      burst(this, p.x, p.y, K.ui.accentInt, h.local ? 26 : 12, { speed: 170, gravity: 0, colours: [0xfcfcfc, 0xf8d878] });
-      if (h.local) floatText(this, p.x, p.y - 22, 'LEVEL UP!', K.ui.accentInt, 0.9);
-    }
+  /** A hog's level-up: a burst and a chime (the world doesn't stop). */
+  private levelFanfare(h: Hog) {
+    const p = h.player;
+    this.as(h, () => this.sfx('levelup', 0.7, 200));
+    burst(this, p.x, p.y, K.ui.accentInt, h.local ? 26 : 12, { speed: 170, gravity: 0, colours: [0xfcfcfc, 0xf8d878] });
+    if (h.local) floatText(this, p.x, p.y - 22, 'LEVEL UP!', K.ui.accentInt, 0.9);
   }
 
-  /** Cards for every hog in the fight that has a level to spend. */
+  /** A fresh hand for every hog in the fight with a level to spend and no cards up. */
   private openLevelUps() {
-    for (const h of this.alive()) if (h.pendingLevels > 0 && !h.pick) this.openPick(h, 'levelup');
+    for (const h of this.alive()) {
+      if (h.pendingLevels <= 0 || h.pick) continue;
+      this.levelFanfare(h);
+      this.openPick(h, 'levelup');
+    }
   }
 
   /** A card choice for hog h (drawn with h's own dice, so every client draws the same hand). The world waits for it. */
@@ -2731,6 +2752,8 @@ export class CoopScene extends Phaser.Scene {
         cards = drawCards(this.build(), () => this.RC.next());
       }
       h.pick = { kind, cards, at: this.tickN };
+      // A new hand pops the tray open with a fresh shield. (While a hand is banked no new one opens; the levels queue.)
+      if (kind !== 'release') { h.shieldT = SHIELD_S; h.trayOpen = true; }
     });
     if (h.local) this.showPick();
   }
@@ -2752,7 +2775,9 @@ export class CoopScene extends Phaser.Scene {
   }
 
   /** This device's card picker for its hog's open choice (me.pick). */
-  showPick(keep?: Keep) { this.as(this.me, () => this.drawPick(keep)); }
+  showPick(keep?: Keep) {
+    this.as(this.me, () => (this.me.pick?.kind === 'release' ? this.drawPick(keep) : this.drawTray()));
+  }
 
   private drawPick(keep?: Keep) {
     const p = this.me.pick;
@@ -2978,7 +3003,7 @@ export class CoopScene extends Phaser.Scene {
     if (!p || k !== this.pickKey(p) || i < 0 || i >= p.cards.length) return;
     const c = p.cards[i];
     h.pick = null;
-    if (h.local) this.closeModal();
+    if (h.local) { this.closeModal(); this.clearTray(); }
     if (p.kind === 'cmdk') { this.activatePowerup(c.id as PowerId); return; }
     this.applyCard(c);
     if (p.kind === 'levelup') {
@@ -3001,7 +3026,7 @@ export class CoopScene extends Phaser.Scene {
     this.skips--;
     this.gold += 3;
     h.pick = null;
-    if (h.local) this.closeModal();
+    if (h.local) { this.closeModal(); this.clearTray(); }
     if (h.pendingLevels > 0 && !h.down) this.openPick(h, 'levelup');
   }
   private simBanish(i: number, k?: string) {
@@ -3111,6 +3136,210 @@ export class CoopScene extends Phaser.Scene {
       if (opts.length >= POWER_IDS.length - 1) break;
     }
     this.openPick(this.cur, 'cmdk', opts.map((id) => ({ kind: 'weapon', id })));
+  }
+
+  // ---------------------------------------------------------------- the level-up tray
+  // Co-op level-ups never stop the world. A hand of cards slides into a tray along the bottom of your screen and you
+  // keep playing: 1/2/3 (or tap a card, then tap it again) picks, R/X/B reroll/skip/banish, TAB hides the hand for a
+  // quieter moment (the levels queue up). While the tray is open your hog is shielded ("in code review") and walks a
+  // little slower, for SHIELD_S seconds per hand. Every choice is an event, like any other input.
+
+  private clearTray() {
+    this.tray?.objs.forEach((o) => o.destroy());
+    this.tray = null;
+    this.trayLift = 0;
+  }
+
+  private drawTray() {
+    const keep = this.tray?.key === (this.me.pick ? this.pickKey(this.me.pick) : '') ? this.tray : null;
+    this.clearTray();
+    const h = this.me, p = h.pick;
+    if (!p || p.kind === 'release' || h.down || this.over) return;
+    const ui = K.ui, narrow = NARROW(), D = UI + 92;
+    const objs: Phaser.GameObjects.GameObject[] = [];
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { objs.push(o); return o; };
+    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => add(text(this, x, y, str, { fixed: true, depth: D + 2, ...opts }));
+    const key = this.pickKey(p), count = h.pendingLevels + 1, cmd = p.kind === 'cmdk';
+    const bottom = H - (narrow ? 46 : 44);
+    const btns: (Rect & { act: () => void })[] = [];
+    if (!h.trayOpen) {
+      // Banked: a pill to bring the hand back.
+      const label = `${cmd ? 'CMD+K' : 'LEVEL UP'}${count > 1 && !cmd ? ` x${count}` : ''}${TOUCH ? '' : '   TAB'}`;
+      const bw = Math.min(W - 16, label.length * 6 + 24), bh = TOUCH ? TAP : 16;
+      const r = { x: Math.round(W / 2 - bw / 2), y: bottom - bh, w: bw, h: bh };
+      const pulse = Math.floor(this.time.now / 400) % 2 === 0;
+      add(box(this, r.x, r.y, r.w, r.h, ui.bgInt, pulse ? ui.accentInt : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
+      T(W / 2, r.y + Math.round((bh - 7) / 2), label, { align: 'center', color: ui.accentInt });
+      btns.push({ ...r, act: () => this.setTray(true) });
+      this.tray = { objs, rects: [], btns, sel: -1, key, open: false, sent: false, banish: false };
+      this.trayLift = 0;
+      return;
+    }
+    const partners = partnersOf(this.build());
+    const n = p.cards.length, gap = 4;
+    const cw = narrow ? Math.floor((W - 12 - gap * (n - 1)) / n) : Math.min(148, Math.floor((W - 24 - gap * (n - 1)) / n));
+    const ch = narrow ? 62 : TOUCH ? 38 : 46;
+    const oneRow = !narrow; // wide screens: the header shares the buttons' row
+    const x0 = Math.round(W / 2 - (n * cw + (n - 1) * gap) / 2);
+    const cy = bottom - ch;
+    const sel = keep?.sel ?? -1, banish = keep?.banish ?? false;
+    // Header: what this is, how much shield is left, and the buttons.
+    const bh = TOUCH ? TAP : 14, by = cy - bh - 3;
+    const defs: [string, () => void][] = cmd ? [] : [[`${TOUCH ? '' : 'R '}REROLL ${h.rerolls}`, () => this.trayReroll()],
+      [`${TOUCH ? '' : 'X '}SKIP ${h.skips}`, () => this.traySkip()], [`${TOUCH ? '' : 'B '}BANISH ${h.banishes}`, () => this.trayBanish()]];
+    defs.push([TOUCH ? 'LATER' : 'TAB LATER', () => this.setTray(false)]);
+    const bw = narrow ? Math.floor((W - 12 - 3 * gap) / 4) : 70;
+    const bxs = narrow ? x0 : x0 + n * cw + (n - 1) * gap - defs.length * (bw + gap) + gap;
+    defs.forEach(([label, act], i) => {
+      const r = { x: bxs + i * (bw + gap), y: by, w: bw, h: bh };
+      const on = label.includes('BANISH') && banish;
+      add(box(this, r.x, r.y, r.w, r.h, on ? ui.panelInt : ui.bgInt, on ? ui.accentInt : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
+      T(r.x + r.w / 2, r.y + Math.round((bh - 7) / 2), label, { align: 'center', color: i === defs.length - 1 ? ui.dimInt : ui.textInt, maxWidth: bw - 2, maxLines: 1 });
+      btns.push({ ...r, act });
+    });
+    const head = `${cmd ? 'CMD+K' : 'LEVEL UP'}${count > 1 && !cmd ? ` x${count}` : ''}`;
+    const hy = oneRow ? by + Math.round((bh - 7) / 2) : by - 12; // narrow: its own row above the buttons
+    T(x0, hy, head, { color: ui.accentInt });
+    // The shield: a bar that runs down while you read.
+    const sf = Math.max(0, h.shieldT / SHIELD_S), sx = x0 + head.length * 6 + 8, sw = 46;
+    const sg = add(this.add.graphics().setScrollFactor(0).setDepth(D + 1));
+    const st = T(sx + sw + 5, hy, '', { maxWidth: 90, maxLines: 1 }).setVisible(!oneRow);
+    const bar = { g: sg, t: st, x: sx, y: hy, w: sw };
+    // The cards.
+    const rects: Rect[] = [];
+    p.cards.forEach((c, i) => {
+      const ct = this.cardText(c, cmd, partners);
+      const x = x0 + i * (cw + gap);
+      const picked = i === sel;
+      add(box(this, x, cy, cw, ch, ui.bgInt, picked ? ui.accentInt : banish ? 0xf87858 : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
+      const icon = add(this.add.image(0, 0, ct.ik, ct.ifr).setScrollFactor(0).setDepth(D + 1));
+      icon.setDisplaySize(ct.ik === HOG32 ? 20 : 16, ct.ik === HOG32 ? 20 : 16);
+      if (narrow) {
+        icon.setPosition(x + cw / 2, cy + 11);
+        T(x + cw / 2, cy + 22, ct.name, { align: 'center', maxWidth: cw - 4, maxLines: 2 });
+        T(x + cw / 2, cy + ch - 10, ct.tag, { align: 'center', color: ct.tagCol, maxWidth: cw - 4, maxLines: 1 });
+      } else {
+        icon.setPosition(x + 12, cy + 12);
+        T(x + 24, cy + 4, ct.name, { maxWidth: cw - 38, maxLines: 1 });
+        T(x + 24, cy + 14, ct.line, { color: ui.dimInt, maxWidth: cw - 28, maxLines: TOUCH ? 1 : 2 });
+        T(x + 5, cy + ch - 10, ct.tag, { color: ct.tagCol, maxWidth: cw - 10, maxLines: 1 });
+        if (ct.hint) T(x + cw - 4, cy + ch - 10, 'EVO', { align: 'right', color: 0xf8d878 });
+        T(x + cw - 4, cy + 4, `${i + 1}`, { align: 'right', color: ui.accentInt });
+      }
+      rects.push({ x, y: cy, w: cw, h: ch });
+    });
+    // The chosen card's words (touch: first tap shows them; the second picks), or how to pick.
+    const c = sel >= 0 ? p.cards[sel] : null;
+    const help = banish ? (TOUCH ? 'Tap a card to banish it' : 'BANISH: press 1-3')
+      : c ? (() => { const ct = this.cardText(c, cmd, partners); return `${ct.name}: ${ct.line}${ct.hint ? `. ${ct.hint}` : ''}`; })()
+        : TOUCH ? 'Tap a card to read it, tap again to pick. You keep moving' : 'Press 1, 2 or 3 to pick. You keep moving';
+    const ty = (oneRow ? by : hy) - 11;
+    const helpT = T(W / 2, ty - (c && narrow ? 10 : 0), help, { align: 'center', color: c ? ui.textInt : ui.dimInt, maxWidth: W - 12, maxLines: c && narrow ? 2 : 1 });
+    // The how-to line only shows for a new hand's first few seconds; a chosen card's words stay.
+    if (!c && !banish) this.time.delayedCall(3500, () => { if (helpT.active) helpT.setVisible(false); });
+    // Keep your hog in view above the tray: the camera looks a little lower while it's open.
+    this.trayLift = Math.max(0, (H - (oneRow ? by : hy) + 8) / 2 - 10);
+    this.tray = { objs, rects, btns, sel, key, open: true, sent: false, banish, bar };
+    if (!keep) this.trayAt = this.time.now;
+    this.drawShieldBar();
+  }
+
+  /** The tray's shield bar, redrawn every frame. */
+  private drawShieldBar() {
+    const b = this.tray?.bar;
+    if (!b) return;
+    const sf = Math.max(0, this.me.shieldT / SHIELD_S);
+    b.g.clear().fillStyle(0x000000, 0.8).fillRect(b.x - 1, b.y + 1, b.w + 2, 5).fillStyle(sf > 0 ? 0x3cbcfc : 0x7c7c7c, 1).fillRect(b.x, b.y + 2, Math.round(b.w * sf), 3);
+    const label = sf > 0 ? 'REVIEW SHIELD' : 'SHIELD DOWN';
+    if (b.t.name !== label) { b.t.name = label; b.t.setText(label).setColor(sf > 0 ? 0x3cbcfc : K.ui.dimInt); }
+  }
+
+  /** A tap inside the tray (HUD coordinates). */
+  private trayTap(x: number, y: number) {
+    const t = this.tray;
+    if (!t || t.sent) return;
+    const b = t.btns.find((r) => inRect(r, x, y, 2));
+    if (b) { b.act(); return; }
+    const i = t.rects.findIndex((r) => inRect(r, x, y, 2));
+    if (i < 0) return;
+    if (t.banish) { this.trayBanish(i); return; }
+    if (!TOUCH || t.sel === i) { this.trayPick(i); return; }
+    t.sel = i;
+    this.sfx('move', 0.5);
+    this.showPick();
+  }
+  private inTray(x: number, y: number) {
+    const t = this.tray;
+    return !!t && [...t.rects, ...t.btns].some((r) => inRect(r, x, y, 3));
+  }
+
+  private trayPick(i: number) {
+    const t = this.tray, p = this.me.pick;
+    if (!t || !p || t.sent || i < 0 || i >= p.cards.length) return;
+    this.sfx('select');
+    t.sent = true;
+    t.objs.forEach((o) => (o as unknown as Phaser.GameObjects.Components.AlphaSingle).setAlpha?.(0.5));
+    net.ev({ t: 'pick', i, k: this.pickKey(p) });
+  }
+  private trayReroll() {
+    const t = this.tray, p = this.me.pick;
+    if (!t || !p || t.sent || p.kind !== 'levelup' || this.me.rerolls <= 0) { this.sfx('hurt', 0.3, 100); return; }
+    this.sfx('select');
+    t.sent = true;
+    net.ev({ t: 'reroll', k: this.pickKey(p) });
+  }
+  private traySkip() {
+    const t = this.tray, p = this.me.pick;
+    if (!t || !p || t.sent || p.kind !== 'levelup' || this.me.skips <= 0) { this.sfx('hurt', 0.3, 100); return; }
+    t.sent = true;
+    net.ev({ t: 'skip', k: this.pickKey(p) });
+  }
+  /** BANISH with no card: arm it (the next card chosen is banished); with a card: banish that one. */
+  private trayBanish(i = -1) {
+    const t = this.tray, p = this.me.pick;
+    if (!t || !p || t.sent || p.kind !== 'levelup' || this.me.banishes <= 0) { this.sfx('hurt', 0.3, 100); return; }
+    if (i < 0 && TOUCH && t.sel >= 0) i = t.sel;
+    if (i < 0) { t.banish = !t.banish; this.sfx('move', 0.5); this.showPick(); return; }
+    const c = p.cards[i];
+    if (!c || (c.kind !== 'weapon' && c.kind !== 'passive')) { this.sfx('hurt', 0.3, 100); return; }
+    this.sfx('explode', 0.3);
+    t.sent = true;
+    net.ev({ t: 'banish', i, k: this.pickKey(p) });
+  }
+  /** Show or hide (bank) the hand; the shield only runs while it's showing. */
+  private setTray(open: boolean) {
+    const p = this.me.pick;
+    if (!p || p.kind === 'release' || this.me.trayOpen === open) return;
+    this.sfx('move', 0.5);
+    net.ev({ t: 'tray', open });
+  }
+
+  /** Keys for the tray (movement keys are left alone: you keep walking). True when the key was the tray's. */
+  private trayKey(e: KeyboardEvent) {
+    const t = this.tray;
+    if (!t || e.repeat) return false;
+    if (e.code === 'Tab' || e.code === 'KeyE') { e.preventDefault?.(); this.setTray(!t.open); return true; }
+    if (!t.open) return false;
+    const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+    if (d >= 0) { if (t.banish) this.trayBanish(d % 3); else this.trayPick(d % 3); return true; }
+    if (e.code === 'KeyR') { this.trayReroll(); return true; }
+    if (e.code === 'KeyX') { this.traySkip(); return true; }
+    if (e.code === 'KeyB') { this.trayBanish(); return true; }
+    return false;
+  }
+
+  /** Test bot at the tray: after a short read, the best card (a weak hand gets one reroll). */
+  private botTray() {
+    const t = this.tray, p = this.me.pick;
+    if (!t || !p || t.sent) return;
+    if (!t.open) { this.setTray(true); return; }
+    if (this.time.now - this.trayAt < 700) return;
+    if (p.kind === 'cmdk') { this.trayPick(0); return; }
+    const b = this.as(this.me, () => this.build());
+    const ranks = p.cards.map((c) => botRank(c, b));
+    const best = Math.max(...ranks);
+    if (best < 5 && this.me.rerolls > 0) { this.trayReroll(); return; }
+    this.trayPick(ranks.indexOf(best));
   }
 
   // ---------------------------------------------------------------- chests + evolutions
@@ -3344,7 +3573,7 @@ export class CoopScene extends Phaser.Scene {
 
   /** Damage to the hog. One hit takes at most 35% of max HP (after armour) unless `uncapped`. */
   hurt(dmg: number, src = '', uncapped = false) {
-    if (this.invuln > 0 || this.over || this.won || this.interlude || this.pu.autopilot > 0 || this.cur.down || this.cur.gone) return;
+    if (this.invuln > 0 || this.over || this.won || this.interlude || this.pu.autopilot > 0 || this.cur.down || this.cur.gone || this.shielded()) return;
     this.invuln = 0.55;
     let d = dmg * Math.max(0.3, 1 - this.st.armour);
     if (!uncapped) d = Math.min(d, this.st.maxHp * WAVE.hitCap);
@@ -4090,6 +4319,12 @@ export class CoopScene extends Phaser.Scene {
     else if (p.tintTopLeft !== 0xf83800 && p.isTinted && !this.over) p.clearTint();
     if (h.invuln > 0 && h.pu.autopilot <= 0) p.setAlpha((Math.floor(t / 60) % 2 ? 0.4 : 1) * k);
     else p.setAlpha(k);
+    if (this.shielded(h)) {
+      // In code review: a shield bubble (it flickers in its last second).
+      const last = h.shieldT < 1 && Math.floor(t / 80) % 2 === 0;
+      if (!last) this.reviveG.lineStyle(2, 0x3cbcfc, 0.6 * k).strokeCircle(p.x, p.y - 2, 15 + Math.sin(t / 120))
+        .lineStyle(1, 0xfcfcfc, 0.4 * k).strokeCircle(p.x, p.y - 2, 17 + Math.sin(t / 120 + 1));
+    }
   }
 
   /** Downed hogs: a ring that fills while a teammate stands on them (a code review), and the call-out when one falls. */
@@ -4183,6 +4418,7 @@ export class CoopScene extends Phaser.Scene {
     if (this.over) return;
     this.over = true;
     this.closeModal();
+    this.clearTray();
     this.closeChest();
     this.pauseObjs.forEach((o) => o.destroy());
     this.pauseObjs = [];
