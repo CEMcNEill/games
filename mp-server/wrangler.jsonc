@@ -1,0 +1,11 @@
+// Bug Survivors co-op relay. Deploy: `wrangler deploy` from this folder (needs `wrangler login` once).
+// Local: `wrangler dev` -> ws://localhost:8787/mp/ws/ABCD
+{
+  "name": "bug-survivors-mp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "routes": [{ "pattern": "play.funglass.es/mp/*", "zone_name": "funglass.es" }],
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "observability": { "enabled": true }
+}

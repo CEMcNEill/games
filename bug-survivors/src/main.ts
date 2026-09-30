@@ -12,12 +12,15 @@ import { HEAT, YOLO } from './content';
 import { ACHIEVEMENTS } from './crests';
 import { HOGS, hogFrame, hogName } from './hoggies';
 import { dailyBest, currentHog, save, syncCrestHogs } from './save';
+import { CoopScene } from './coop/game';
+import { LobbyScene, CoopEndScene } from './coop/lobby';
 
-/** Runs once per how-to screen: the SHOP title choice skips straight to the shop. Module scope so off() matches. */
+/** Runs once per how-to screen: the SHOP title choice skips straight to the shop, CO-OP to its lobby. Module scope so
+ * off() matches. */
 function toShop(this: void) {
-  if (K.run.mode !== 'shop') return;
+  if (K.run.mode !== 'shop' && K.run.mode !== 'coop') return;
   const howto = (window as any).__phaser?.scene?.getScene('HowTo') as Phaser.Scene | undefined;
-  howto?.scene.start('Shop');
+  howto?.scene.start(K.run.mode === 'coop' ? 'Lobby' : 'Shop');
 }
 
 startKit({
@@ -27,7 +30,7 @@ startKit({
   defaultTheme,
   slots,
   sfx: sfx as Record<string, number[]>,
-  scenes: [GameScene, ShopScene],
+  scenes: [GameScene, ShopScene, LobbyScene, CoopScene, CoopEndScene],
   gameScene: 'Game',
   touch: true,
   resizable: true,
@@ -88,6 +91,7 @@ startKit({
         { label: 'DAILY', value: 'daily' },
         { label: 'YOLO', value: 'yolo', locked: !yolo },
         { label: 'SHOP', value: 'shop' },
+        { label: 'CO-OP', value: 'coop' },
       ] },
       heatRow(5),
     ];

@@ -19,6 +19,8 @@ dependencies: `bug-survivors/dist` goes into the APK as its assets and is served
 - **Back** pauses and resumes a run, or goes back to the title; on the title it exits. Leaving the app pauses
   the run and mutes it.
 - The page spots the app by `KitApp` in its user agent (`APP` in `shared/src/ui.ts`).
+- **CO-OP** needs the internet: it plays with web players through `wss://play.funglass.es/mp` (the app has the
+  INTERNET permission for that). The rest of the game runs offline. See `bug-survivors/COOP.md`.
 
 ## Build
 

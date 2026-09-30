@@ -14,5 +14,6 @@
     "paths": { "@shared/*": ["shared/src/*"] },
     "types": []
   },
-  "include": ["shared/src/**/*.ts", "*/src/**/*.ts"]
+  "include": ["shared/src/**/*.ts", "*/src/**/*.ts"],
+  "exclude": ["mp-server", "node_modules"]
 }
