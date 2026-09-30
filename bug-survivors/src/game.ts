@@ -240,6 +240,7 @@ export class GameScene extends Phaser.Scene {
   mergeT = 0;                             // next gem-merge pass
   moat = { fill: 0, calm: 0, lv: 0 };     // Data Moat: water left (blocks), seconds since it last blocked, level last seen
   moatG!: Phaser.GameObjects.Graphics;
+  shotG!: Phaser.GameObjects.Graphics;  // danger halos and trails under enemy shots
   auraG!: Phaser.GameObjects.Graphics;
   warnG!: Phaser.GameObjects.Graphics;
   popCols: number[][] = [];
@@ -342,6 +343,7 @@ export class GameScene extends Phaser.Scene {
     this.hazG = this.add.graphics().setDepth(-6);
     this.auraG = this.add.graphics().setDepth(-5);
     this.moatG = this.add.graphics().setDepth(OWN - 0.1);
+    this.shotG = this.add.graphics().setDepth(11.9); // above bugs and pickups, just under the shots themselves
     this.fx = this.add.graphics().setDepth(20);
     this.wfx = new Map();
     this.darkG = this.add.graphics().setDepth(UI - 20);
@@ -1547,9 +1549,12 @@ export class GameScene extends Phaser.Scene {
         case 'spitter':
           e.t -= dt;
           if (d < 100) { mx = -dx; my = -dy; sp *= 0.7; } else if (d < 150) { mx = -dy; my = dx; sp *= 0.5; }
+          // Wind-up: the spitter blinks white for 0.4 s before it fires, so you see the shot coming.
+          if (d < 230 && e.t > 0 && e.t < 0.4) { if (Math.floor(e.t * 20) % 2) e.s.setTintFill(0xfcfcfc); else this.restoreTint(e); }
           if (e.t <= 0 && d < 230) {
             e.t = Phaser.Math.FloatBetween(2.4, 3.2);
-            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.ease(this.diff.dmg) * this.dmgScale(), 4, 1, 'spit', true).s.setScale(0.75);
+            this.restoreTint(e);
+            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.ease(this.diff.dmg) * this.dmgScale(), 4, 1, 'spit', true);
             this.sfx('spit', 0.3, 120);
           }
           break;
@@ -2172,6 +2177,7 @@ export class GameScene extends Phaser.Scene {
     // Pickups draw above the bugs (below their shots), so a chest or powerup is never hidden under a swarm. Coins and snacks stay low.
     s.setDepth(kind === 'coin' || kind === 'food' ? 3 : 11.3);
     if (big) s.setScale(1.5).setTint(0xf8d878);
+    else if (kind === 'food') s.setScale(1.1);
     // A little hop so drops read as drops; powerups and lore keep bobbing so they stand out on the floor.
     this.tweens.add({ targets: s, y: s.y - 8, duration: 140, yoyo: true, ease: 'Quad.Out' });
     if (isPower(kind) || kind === 'relic' || kind === 'page') {
@@ -2778,6 +2784,7 @@ export class GameScene extends Phaser.Scene {
 
   shoot(key: string, x: number, y: number, vx: number, vy: number, dmg: number, life: number, pierce: number, src: string, hostile = false): Proj {
     const s = this.add.image(x, y, spr(key)).setDepth(hostile ? 12 : OWN + 0.1);
+    if (hostile) s.setScale(1.6); // enemy shots read at phone size (drawShots adds a halo and trail)
     const pr: Proj = { s, vx, vy, dmg, life, pierce, src, hit: new Set(), hostile };
     this.projs.push(pr);
     return pr;
@@ -3545,6 +3552,7 @@ export class GameScene extends Phaser.Scene {
     drawTools(this, gfx);
     drawSystems(this, this.fx); // the drive-by lane and Nohog's void are threats: never faded
     this.drawMoat();
+    this.drawShots();
     this.drawHazards();
     this.drawEnemyFx();
     this.drawBossFx();
@@ -3576,6 +3584,20 @@ export class GameScene extends Phaser.Scene {
     const calm = base * (w.evo ? 0.6 : 1) * (w.major ? 0.85 : 1);
     const age = this.elapsed - w.born;
     return age < SPOTLIGHT ? 1 : age < SPOTLIGHT + 3 ? 1 + (calm - 1) * ((age - SPOTLIGHT) / 3) : calm;
+  }
+
+  /** Enemy shots: a pulsing red halo and a short trail, so an incoming shot pops out of any swarm. */
+  private drawShots() {
+    const g = this.shotG;
+    g.clear();
+    const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 70);
+    for (const pr of this.projs) {
+      if (!pr.hostile) continue;
+      const x = pr.s.x, y = pr.s.y, sp = Math.hypot(pr.vx, pr.vy) || 1, tx = x - (pr.vx / sp) * 14, ty = y - (pr.vy / sp) * 14;
+      g.lineStyle(4, 0xf83800, 0.35).lineBetween(tx, ty, x, y).lineStyle(2, 0xfca044, 0.6).lineBetween(x - (pr.vx / sp) * 8, y - (pr.vy / sp) * 8, x, y);
+      g.fillStyle(0xf83800, 0.25 + 0.2 * pulse).fillCircle(x, y, 6 + 1.5 * pulse);
+      g.lineStyle(1, 0xfcfcfc, 0.5 + 0.4 * pulse).strokeCircle(x, y, 7 + 1.5 * pulse);
+    }
   }
 
   /** Outage: the lights go out beyond a circle around the hog. */
