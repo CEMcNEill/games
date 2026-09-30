@@ -5,7 +5,7 @@ import { hash32 } from '@shared/meta';
 import { K } from '@shared/kit';
 
 /** Bump when anything in the co-op sim changes: players on different versions can't share a room (they'd desync). */
-export const SIM_VERSION = 'coop-1';
+export const SIM_VERSION = 'coop-2';
 const PROTO = 1;
 
 export interface HogInfo {
@@ -25,6 +25,7 @@ export type SimEvent =
   | { t: 'act'; i: number }
   | { t: 'view'; w: number; h: number }
   | { t: 'leave' }
+  | { t: 'tray'; open: boolean }
   | { t: 'dbg'; c: string; a?: unknown[] };
 
 /** Where the relay lives: play.funglass.es/mp, or ?mp=ws://localhost:8787/mp for a local `wrangler dev`. */

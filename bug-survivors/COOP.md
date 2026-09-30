@@ -8,8 +8,12 @@ countdown runs and the game starts on every device at once.
 
 - Same arena and the same bugs for everyone. Bugs chase the nearest hog. Your hog is solid; the others are
   see-through, with their name tags.
-- **XP is shared**, so everyone levels together. The world holds while anyone is choosing a card ("WAITING FOR P2 TO
-  PICK"). A card left for 20 s is picked for that player.
+- **XP is shared**, so everyone levels together. **Level-ups never stop the game.** Your hand of 3 cards slides into
+  a tray along the bottom of your screen and you keep playing. Pick with 1/2/3 (or tap a card, then tap it again).
+  R/X/B reroll, skip and banish. TAB (LATER) banks the hand for a quieter moment, and levels queue up ("LEVEL UP x3").
+  While the tray is open your hog is in code review: a shield bubble means no damage, you walk at 70% speed, and it
+  lasts 8 s per hand. The camera shifts so your hog stays above the tray. A hand left for 20 s is picked for you.
+  Only the between-wave choices (the SHIPPED call and releases) hold the world.
 - **Nobody plays alone.** Out of HP (with no revives left), your hog goes down. "IT'S NOT OK TO LET YOUR TEAMMATE FAIL"
   flashes, and a teammate standing on you for 3 s reviews you back in. Downed hogs also come back at the next wave. The
   run ends when every hog is down at once.
