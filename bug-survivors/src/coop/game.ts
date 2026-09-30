@@ -331,7 +331,8 @@ export class CoopScene extends Phaser.Scene {
   popCols: number[][] = [];
   hud!: { xp: ReturnType<typeof bar>; hpBar: Phaser.GameObjects.Graphics; time: PixelText; lv: PixelText; kills: PixelText; gold: PixelText;
     risk: PixelText; waveTxt: PixelText; icons: Phaser.GameObjects.Container; bossBar: ReturnType<typeof bar> | null; bossName: PixelText | null;
-    arrow: Phaser.GameObjects.Image; chestArrow: Phaser.GameObjects.Image; pu: PixelText; team: PixelText[]; wait: PixelText; net: PixelText; fail: PixelText };
+    arrow: Phaser.GameObjects.Image; chestArrow: Phaser.GameObjects.Image; pu: PixelText; team: PixelText[]; wait: PixelText; net: PixelText; fail: PixelText;
+    mateG: Phaser.GameObjects.Graphics; mateTags: PixelText[] };
   banners: { title: string; body: string }[] = [];
   curBanner: { title: string; body: string } | null = null;
   bannerBusy = false;
@@ -345,6 +346,7 @@ export class CoopScene extends Phaser.Scene {
   trayAt = 0;
   trayTouch = false;
   trayLift = 0;           // HUD px the view shifts while the tray is open
+  trayTop = 0;            // HUD y of the tray's top edge (0 = no tray)
   keys!: Record<string, Phaser.Input.Keyboard.Key>;
   diff = DIFF.normal;
   god = false;
@@ -1012,6 +1014,9 @@ export class CoopScene extends Phaser.Scene {
     const team = [0, 1, 2].map((i) => text(this, 4, (NARROW() ? 44 : 42) + i * 10, '', { fixed: true, depth: UI + 90, maxWidth: 150, maxLines: 1 }));
     const wait = text(this, W / 2, Math.round(H / 2) + 40, '', { align: 'center', color: 0xf8d878, fixed: true, depth: UI + 99, maxWidth: W - 12, maxLines: 3 });
     const netT = text(this, W - 4, NARROW() ? 78 : 52, '', { align: 'right', color: 0xf87858, fixed: true, depth: UI + 90 });
+    // Teammates off your screen: a marker on the edge pointing at each one (drawn in drawMates).
+    const mateG = this.add.graphics().setScrollFactor(0).setDepth(UI + 93);
+    const mateTags = [0, 1, 2].map(() => text(this, 0, 0, '', { align: 'center', fixed: true, depth: UI + 94 }).setVisible(false));
     if (TOUCH) {
       // Touch: a pause button left of the clock.
       const r = this.pauseRect();
@@ -1021,7 +1026,7 @@ export class CoopScene extends Phaser.Scene {
     }
     const fail = text(this, W / 2, Math.round(H / 2) - 60, "IT'S NOT OK TO LET YOUR TEAMMATE FAIL", { scale: W >= 400 ? 2 : 1, align: 'center', color: 0xf83800,
       fixed: true, depth: UI + 98, maxWidth: W - 12, maxLines: 2 }).setVisible(false);
-    this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu, team, wait, net: netT, fail };
+    this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu, team, wait, net: netT, fail, mateG, mateTags };
   }
 
   /** [texture, frame] for a weapon / passive / release / powerup icon. */
@@ -1096,7 +1101,7 @@ export class CoopScene extends Phaser.Scene {
     const g = this.hud.hpBar.clear();
     for (const h of this.hogs) {
       if (h.gone || h.down) continue;
-      const frac = Math.max(0, h.hp / h.st.maxHp), a = h.local ? 1 : OTHER_ALPHA;
+      const frac = Math.max(0, h.hp / h.st.maxHp), a = h.local ? 1 : 0.85; // teammates' HP stays readable
       const x = Math.round(h.player.x - 10), y = Math.round(h.player.y + 11);
       g.fillStyle(0x000000, a).fillRect(x - 1, y - 1, 22, 4).fillStyle(0x7c7c7c, a).fillRect(x, y, 20, 2)
         .fillStyle(frac > 0.35 ? 0x58d854 : 0xf83800, a).fillRect(x, y, Math.max(0, Math.round(20 * frac)), 2);
@@ -1117,6 +1122,7 @@ export class CoopScene extends Phaser.Scene {
     }
     this.hud.wait.setText(wait);
     const backlog = net.turns.length - this.turnIdx;
+    this.drawMates();
     this.hud.net.setText(net.desync >= 0 ? 'OUT OF SYNC' : net.status === 'connecting' ? 'RECONNECTING...' : net.status === 'error' ? 'OFFLINE'
       : backlog > 30 ? 'CATCHING UP...' : '');
     if (this.boss && this.hud.bossBar) {
@@ -1148,6 +1154,55 @@ export class CoopScene extends Phaser.Scene {
     } else {
       ca.setVisible(false);
     }
+  }
+
+  /** Where your teammates are: each one off your screen gets a marker on the screen's edge, pointing their way, in
+   * their colour, with their seat and a little HP bar. A downed one flashes red ("P2 DOWN"): go and review them. */
+  private drawMates() {
+    const g = this.hud.mateG.clear(), cam = this.cameras.main, k = W / camW(cam), t = this.time.now;
+    const narrow = NARROW(), top = narrow ? 96 : 62;
+    const bottom = Math.max(top + 60, Math.min(H - 30, this.trayTop ? this.trayTop - 12 : H));
+    const left = 18, right = W - 18;
+    // Markers point from your own hog (not the screen's middle), so "that way" means that way from you.
+    const me = this.me.player;
+    const cx = Phaser.Math.Clamp((me.x - cam.worldView.x) * k, left + 1, right - 1), cy = Phaser.Math.Clamp((me.y - cam.worldView.y) * k, top + 1, bottom - 1);
+    let n = 0;
+    const placed: [number, number][] = [];
+    for (const h of this.hogs) {
+      if (h.local || h.gone) continue;
+      const sx = (h.player.x - cam.worldView.x) * k, sy = (h.player.y - cam.worldView.y) * k;
+      if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) continue; // on screen: its tag and HP bar are enough
+      const tag = this.hud.mateTags[n++];
+      if (!tag) break;
+      // Where the line from the middle of the screen to the teammate leaves the marker area.
+      const dx = sx - cx, dy = sy - cy;
+      const fx = dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity;
+      const fy = dy > 0 ? (bottom - 8 - cy) / dy : dy < 0 ? (top + 8 - cy) / dy : Infinity;
+      const f = Math.min(fx, fy);
+      let mx = cx + dx * f, my = cy + dy * f;
+      const a = Math.atan2(dy, dx);
+      // Two teammates the same way: slide this badge along the edge until it's clear of the others.
+      for (let tries = 0; tries < 4 && placed.some((q) => Math.abs(q[0] - mx) < 40 && Math.abs(q[1] - my) < 18); tries++) {
+        if (mx <= left + 1 || mx >= right - 1) my += my < (top + bottom) / 2 ? 18 : -18; else mx += mx < W / 2 ? 40 : -40;
+      }
+      placed.push([mx, my]);
+      const down = h.down, blink = Math.floor(t / 250) % 2 === 0;
+      const col = down ? (blink ? 0xf83800 : 0xfcfcfc) : P_COLS[h.id % 4];
+      // The pointer: a triangle just outside the badge, aimed at the teammate.
+      const px = mx + Math.cos(a) * 12, py = my + Math.sin(a) * 12;
+      g.fillStyle(0x000000, 0.8).fillTriangle(px + Math.cos(a) * 6, py + Math.sin(a) * 6, px + Math.cos(a + 2.2) * 6, py + Math.sin(a + 2.2) * 6,
+        px + Math.cos(a - 2.2) * 6, py + Math.sin(a - 2.2) * 6);
+      g.fillStyle(col, 1).fillTriangle(px + Math.cos(a) * 5, py + Math.sin(a) * 5, px + Math.cos(a + 2.2) * 4, py + Math.sin(a + 2.2) * 4,
+        px + Math.cos(a - 2.2) * 4, py + Math.sin(a - 2.2) * 4);
+      // The badge: seat (or DOWN), and HP under it.
+      const label = down ? `P${h.id + 1} DOWN` : `P${h.id + 1}`, bw = label.length * 6 + 6;
+      g.fillStyle(0x000000, 0.75).fillRect(mx - bw / 2, my - 7, bw, 14).lineStyle(1, col, 1).strokeRect(mx - bw / 2, my - 7, bw, 14);
+      const frac = down ? h.reviveT / REVIVE_S : Math.max(0, h.hp / h.st.maxHp);
+      g.fillStyle(0x3c3c3c, 1).fillRect(mx - bw / 2 + 2, my + 3, bw - 4, 2)
+        .fillStyle(down ? 0x58d854 : frac > 0.35 ? 0x58d854 : 0xf83800, 1).fillRect(mx - bw / 2 + 2, my + 3, Math.round((bw - 4) * frac), 2);
+      tag.setText(label).setColor(col).setPosition(mx, my - 5).setVisible(true);
+    }
+    for (let i = n; i < this.hud.mateTags.length; i++) this.hud.mateTags[i].setVisible(false);
   }
 
   /** Queue a two-line banner at the top of the screen (new bugs, events, boss). */
@@ -3148,6 +3203,7 @@ export class CoopScene extends Phaser.Scene {
     this.tray?.objs.forEach((o) => o.destroy());
     this.tray = null;
     this.trayLift = 0;
+    this.trayTop = 0;
   }
 
   private drawTray() {
@@ -3173,6 +3229,7 @@ export class CoopScene extends Phaser.Scene {
       btns.push({ ...r, act: () => this.setTray(true) });
       this.tray = { objs, rects: [], btns, sel: -1, key, open: false, sent: false, banish: false };
       this.trayLift = 0;
+      this.trayTop = r.y;
       return;
     }
     const partners = partnersOf(this.build());
@@ -3234,6 +3291,7 @@ export class CoopScene extends Phaser.Scene {
       : c ? (() => { const ct = this.cardText(c, cmd, partners); return `${ct.name}: ${ct.line}${ct.hint ? `. ${ct.hint}` : ''}`; })()
         : TOUCH ? 'Tap a card to read it, tap again to pick. You keep moving' : 'Press 1, 2 or 3 to pick. You keep moving';
     const ty = (oneRow ? by : hy) - 11;
+    this.trayTop = ty - 2;
     const helpT = T(W / 2, ty - (c && narrow ? 10 : 0), help, { align: 'center', color: c ? ui.textInt : ui.dimInt, maxWidth: W - 12, maxLines: c && narrow ? 2 : 1 });
     // The how-to line only shows for a new hand's first few seconds; a chosen card's words stay.
     if (!c && !banish) this.time.delayedCall(3500, () => { if (helpT.active) helpT.setVisible(false); });
@@ -4491,6 +4549,7 @@ export class CoopScene extends Phaser.Scene {
       case 'down': this.hp = 0; this.knockDown(); break;
       case 'powerup': this.dropItem((a[0] as PowerId) ?? 'autopilot', this.player.x + 20, this.player.y); break;
       case 'chest': this.dropItem('chest', this.player.x + 20, this.player.y); break;
+      case 'tp': this.player.setPosition(Phaser.Math.Clamp(Number(a[0]) || 0, 12, WORLD_W - 12), Phaser.Math.Clamp(Number(a[1]) || 0, 12, WORLD_H - 12)); break;
       case 'boss': this.elapsed = Math.max(this.elapsed, this.nextBossAt); break;
       case 'killBoss':
         this.elapsed = Math.max(this.elapsed, this.nextBossAt);
