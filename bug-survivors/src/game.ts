@@ -10,8 +10,9 @@ import { K, spr, anim, finishRun } from '@shared/kit';
 import { hooks, sharedDebug } from '@shared/hooks';
 import { capture } from '@shared/analytics';
 import { rng, Rng, meta } from '@shared/meta';
-import { shake, hitstop, hitstopped, burst, floatText, setJuiceSpeed } from '@shared/juice';
-import { text, box, bar, clock, PixelText, W, H, TOUCH } from '@shared/ui';
+import { shake, hitstop, hitstopped, burst, floatText, setJuiceSpeed , particleAlpha } from '@shared/juice';
+import { TAP } from '@shared/scenes';
+import { text, box, bar, clock, fitScale, PixelText, W, H, DW, DH, PX, TOUCH, NARROW, maxView, worldZoom, fitCam, camW, camH } from '@shared/ui';
 import products from '../../shared/products.json';
 import {
   ProductId, PassiveId, ArchId, EliteMod, EventId, Stats, baseStats, WEAPONS, PASSIVES, ARCH, SPAWN_TABLE, ELITE_MODS, ELITE_BASIC,
@@ -20,20 +21,28 @@ import {
   POWER_IDS, PowerId, WAVES, WAVE, WaveMod, SCALE_MODS, WAVE_MOD_TEXT, REAPER_WAVE, BOSS_AFFIX, ZERO_DAY, AFFIX_TEXT, BossAffix,
   RELEASES, ReleaseId, RELICS, RELIC_IDS, RelicId, PAGES, PATCH_MUL, MAJOR, YOLO, YOLO_SNARK,
 } from './content';
-import { WState, newWeapon, WEAPON_FNS, drawWeapons, aura, resetVisuals, semver } from './weapons';
-import { TOOL_FNS, drawTools, batchTag, pipeTransform } from './tools';
+import { WState, newWeapon, WEAPON_FNS, drawWeapons, aura, resetVisuals, semver, OWN } from './weapons';
+import { TOOL_FNS, drawTools, batchTag } from './tools';
 import { Card, Build, drawCards, drawRelease, botRank, partnersOf } from './cards';
 import { save, persist, shopLevel, today, currentHog, unlockHog, rollCapsule, earnCrest, hasCrest } from './save';
 import { hogFrame, hogName, sigOf, perkOf, PERKS, SigDef, Trait, Perk, EVOLVING_FORMS, HOGS, isSignature, SIGNATURE } from './hoggies';
 import { crestFrame, CREST_BY_ID } from './crests';
-import { SysState, newSys, tickSystems, drawSystems, onLevelUpSys, startDriveBy, allHands, spawnReaper, selfDrivingPr } from './systems';
+import { SysState, newSys, tickSystems, drawSystems, onLevelUpSys, startDriveBy, allHands, spawnReaper, selfDrivingPr, VOID } from './systems';
 
-const WORLD_W = 1280;
-const WORLD_H = 800;
+/** The arena: at least 1280x800, bigger when the view is (a phone in portrait), so the camera never sees past it.
+ * Set per run in create(); touch screens size for both orientations so a mid-run rotate still fits. */
+let WORLD_W = 1280;
+let WORLD_H = 800;
 const MAX_ENEMIES = 320;
 const MAX_GEMS = 350;
 const MAX_ITEMS = 44;
 const HEAL_AMOUNT = 25;
+/** A snack heals this share of max HP (at least HEAL_AMOUNT), so snacks stay worth grabbing as max HP grows. */
+const HEAL_FRAC = 0.2;
+/** Bugs on screen above which damage numbers show only crits and big hits. */
+const CROWD = 60;
+/** Seconds a newly picked weapon's effects stay at full brightness. */
+const SPOTLIGHT = 12;
 /** HUD, banners and modals sit above the shared juice layer (particles + float text at depth 1000). */
 const UI = 1100;
 /** Kit-fixed brand sheets (main.ts preload). */
@@ -107,7 +116,23 @@ const isPower = (k: string): k is PowerId => (POWER_IDS as string[]).includes(k)
 interface Item { s: Phaser.GameObjects.Image; kind: ItemKind; pull: boolean; big?: boolean; data?: string | number }
 interface Gem { s: Phaser.GameObjects.Image; v: number; pull: boolean; t: number }
 
-interface Modal { kind: 'levelup' | 'chest' | 'act' | 'release' | 'cmdk' | 'reveal'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number; at?: number }
+interface Rect { x: number; y: number; w: number; h: number }
+/** What a modal keeps when it is laid out again after a resize. */
+interface Keep { sel: number; armed: boolean; at?: number }
+interface Modal {
+  kind: 'levelup' | 'chest' | 'act' | 'release' | 'cmdk' | 'reveal'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number;
+  at?: number;
+  rects?: Rect[];                             // the cards / choices, as drawn (taps and the selection frame use them)
+  btns?: (Rect & { act: () => void })[];      // buttons under them
+  rebuild?: (keep: Keep) => void;             // lay the modal out again for a new screen size
+}
+const inRect = (r: Rect, x: number, y: number, pad = 0) => x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad;
+
+/** Modals are laid out for a DH-tall view; this drops them to the middle of a taller one (portrait). */
+const MY = () => Math.floor((H - DH) / 2);
+
+/** A full-view tint or dimmer: resized, not moved, when the view changes. */
+function isFill(o: Phaser.GameObjects.GameObject) { return o.name === 'fill'; }
 
 export class GameScene extends Phaser.Scene {
   player!: Phaser.GameObjects.Sprite;
@@ -209,7 +234,13 @@ export class GameScene extends Phaser.Scene {
     unlocks: [] as string[], crests: [] as string[] };
   numBudget = 10;
   numbers = true;
-  fx!: Phaser.GameObjects.Graphics;
+  fx!: Phaser.GameObjects.Graphics;       // bug, boss and hazard effects: always fully visible
+  wfx = new Map<string, Phaser.GameObjects.Graphics>(); // one layer per weapon, each with its own fade (wAlpha)
+  numAvg = 0;                             // running average damage number (what counts as a big hit)
+  mergeT = 0;                             // next gem-merge pass
+  moat = { fill: 0, calm: 0, lv: 0 };     // Data Moat: water left (blocks), seconds since it last blocked, level last seen
+  moatG!: Phaser.GameObjects.Graphics;
+  shotG!: Phaser.GameObjects.Graphics;  // danger halos and trails under enemy shots
   auraG!: Phaser.GameObjects.Graphics;
   warnG!: Phaser.GameObjects.Graphics;
   popCols: number[][] = [];
@@ -217,6 +248,7 @@ export class GameScene extends Phaser.Scene {
     risk: PixelText; waveTxt: PixelText; icons: Phaser.GameObjects.Container; bossBar: ReturnType<typeof bar> | null; bossName: PixelText | null;
     arrow: Phaser.GameObjects.Image; chestArrow: Phaser.GameObjects.Image; pu: PixelText };
   banners: { title: string; body: string }[] = [];
+  curBanner: { title: string; body: string } | null = null;
   bannerBusy = false;
   bannerObjs: Phaser.GameObjects.GameObject[] = [];
   crestQ: string[] = [];
@@ -231,6 +263,12 @@ export class GameScene extends Phaser.Scene {
   skipReveal = false; // debug.lose(): straight to the end screen
   revealing = false;  // the NEW HOGGIES screen after the run
   pauseObjs: Phaser.GameObjects.GameObject[] = [];
+  hudObjs: Phaser.GameObjects.GameObject[] = [];
+  crestObjs: Phaser.GameObjects.GameObject[] = [];
+  viewW = W; viewH = H; // the view the HUD and open modals were laid out for
+  // Three cameras: the world; the HUD (screen-fixed, 1:1); modals (screen-fixed, scaled to fit a view narrower than DW).
+  hudCam!: Phaser.Cameras.Scene2D.Camera;
+  modalCam!: Phaser.Cameras.Scene2D.Camera;
   // Touch: a floating joystick where the finger lands, taps for cards and menus, a pause button.
   joy = { on: false, ox: 0, oy: 0, x: 0, y: 0 };
   joyG!: Phaser.GameObjects.Graphics;
@@ -251,7 +289,7 @@ export class GameScene extends Phaser.Scene {
       won: false, over: false, paused: false, modal: null, pendingLevels: 0, slowmo: 0, banners: [], bannerBusy: false, bannerObjs: [],
       crestQ: [], crestBusy: false,
       simSpeed: 1, stampede: null, puddles: [], blasts: [], hazT: { crate: HAZARDS.crateFrom, puddle: HAZARDS.puddleFrom }, revivesUsed: 0,
-      superNova: false, dmgBy: {}, dmgWin: [], dmgAcc: 0, dmgT: 0, numBudget: 10, wave: 1, waveAt: 0, waveMods: [], hpBase: 1, funding: 0,
+      superNova: false, dmgBy: {}, dmgWin: [], dmgAcc: 0, dmgT: 0, numBudget: 10, numAvg: 0, mergeT: 0, moat: { fill: 0, calm: 0, lv: 0 }, wave: 1, waveAt: 0, waveMods: [], hpBase: 1, funding: 0,
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {}, powerups: 0, gems: 0, hits: 0, hitsWave1: 0, aiKills: 0,
         waves: [], unlocks: [], crests: [] },
       toolsOpen: false, interlude: false, cashedOut: false, forceWin: false, botCashAt: 2,
@@ -292,18 +330,34 @@ export class GameScene extends Phaser.Scene {
     hooks.elapsed = 0;
     hooks.score = 0;
 
+    const mv = TOUCH ? maxView() : { w: W, h: H }, wz = worldZoom();
+    WORLD_W = Math.max(1280, Math.ceil(mv.w / wz) + 300);
+    WORLD_H = Math.max(800, Math.ceil(mv.h / wz) + 300);
+    this.viewW = W; this.viewH = H;
+    this.crestObjs = [];
+    this.scale.on('resize', this.onResize, this);
+    this.events.once('shutdown', () => this.scale.off('resize', this.onResize, this));
     this.cameras.main.setBackgroundColor(K.ui.bg);
     this.add.tileSprite(0, 0, WORLD_W, WORLD_H, spr('tile')).setOrigin(0).setDepth(-10);
     this.add.graphics().setDepth(-9).lineStyle(4, K.ui.panelInt, 1).strokeRect(-2, -2, WORLD_W + 4, WORLD_H + 4);
     this.hazG = this.add.graphics().setDepth(-6);
     this.auraG = this.add.graphics().setDepth(-5);
+    this.moatG = this.add.graphics().setDepth(OWN - 0.1);
+    this.shotG = this.add.graphics().setDepth(11.9); // above bugs and pickups, just under the shots themselves
     this.fx = this.add.graphics().setDepth(20);
+    this.wfx = new Map();
     this.darkG = this.add.graphics().setDepth(UI - 20);
     this.warnG = this.add.graphics().setDepth(UI + 85).setScrollFactor(0);
     // Powerup screen tint (Self-Driving Mode, Feature Freeze, Ship It...).
-    this.puOverlay = this.add.rectangle(0, 0, W, H, 0x3cbcfc, 0).setOrigin(0).setScrollFactor(0).setDepth(UI + 60).setVisible(false);
+    this.puOverlay = this.add.rectangle(0, 0, W, H, 0x3cbcfc, 0).setName('fill').setOrigin(0).setScrollFactor(0).setDepth(UI + 60).setVisible(false);
     this.player = this.add.sprite(WORLD_W / 2, WORLD_H / 2, HOG32, this.hogArtFrame()).setDepth(10).setOrigin(0.5, 0.72);
-    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H).startFollow(this.player, true, 0.2, 0.2).setRoundPixels(true);
+    this.cameras.main.setZoom(this.worldCamZoom()).setBounds(0, 0, WORLD_W, WORLD_H).startFollow(this.player, true, 0.2, 0.2).setRoundPixels(true);
+    this.hudCam = this.cameras.add(0, 0, Math.round(W * PX), Math.round(H * PX)).setName('hud').setRoundPixels(true);
+    this.modalCam = this.cameras.add(0, 0, Math.round(W * PX), Math.round(H * PX)).setName('modal');
+    fitCam(this, this.hudCam);
+    fitCam(this, this.modalCam);
+    this.events.on('prerender', this.routeCams, this);
+    this.events.once('shutdown', () => this.events.off('prerender', this.routeCams, this));
     this.popCols = [0, 1, 2].map((i) => this.sampleColours(spr(`enemy_${i + 1}`)));
     this.popCols.push(this.sampleColours(spr('boss')));
 
@@ -443,6 +497,8 @@ export class GameScene extends Phaser.Scene {
     s.armour = Math.min(0.7, s.armour);
     s.cd = Math.max(0.3, s.cd);
     s.maxHp = Math.round(s.maxHp);
+    const rg = this.passives.get('regen');
+    if (rg) s.regen += s.maxHp * 0.008 * (rg + 0.5 * (this.ppatch.get('regen') ?? 0));
     s.revives = Math.max(0, s.revives - this.revivesUsed);
     const grow = s.maxHp - this.st.maxHp;
     this.st = s;
@@ -485,10 +541,11 @@ export class GameScene extends Phaser.Scene {
       this.add.image(x + 186, y + 34, HOG32, hogFrame('stamp-approved')).setScrollFactor(0).setDepth(D + 2).setScale(0.8),
     ];
     objs.forEach((o) => { const t = o as unknown as Phaser.GameObjects.Components.Transform; t.x += 160; });
+    this.crestObjs = objs;
     this.tweens.add({ targets: objs, x: '-=160', duration: 250, ease: 'Back.Out' });
     this.sfx('evolve', 0.5, 300);
     this.time.delayedCall(2600, () => {
-      this.tweens.add({ targets: objs, x: '+=160', duration: 200, onComplete: () => { objs.forEach((o) => o.destroy()); this.nextCrest(); } });
+      this.tweens.add({ targets: objs, x: '+=160', duration: 200, onComplete: () => { objs.forEach((o) => o.destroy()); this.crestObjs = []; this.nextCrest(); } });
     });
   }
 
@@ -541,21 +598,48 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- touch
-  private pauseRect() { return { x: W / 2 - 66, y: 4, w: 26, h: 22 }; }
+  // Left of the clock; a narrow (portrait) view has no room there, so it goes under the stats on the right.
+  private pauseRect() { return NARROW() ? { x: W - 32, y: 50, w: 28, h: TAP } : { x: W / 2 - 68, y: 3, w: 28, h: TAP }; }
+
+  /** The world camera's zoom: the screen's resolution (PX) times worldZoom, so the arena shows about as much as a
+   * DW x DH screen whatever the phone's size and shape (bugs, gems and effects scale up with the screen). Desktops keep
+   * a whole number for even pixels. */
+  private worldCamZoom() {
+    const z = PX * worldZoom();
+    return TOUCH ? z : Math.max(PX, Math.round(z));
+  }
+
+  /** Pointer (canvas pixels) -> HUD / modal layout coordinates. */
+  private toHud(p: Phaser.Input.Pointer): [number, number] { const q = this.hudCam.getWorldPoint(p.x, p.y); return [q.x, q.y]; }
+  private toModal(p: Phaser.Input.Pointer): [number, number] { const q = this.modalCam.getWorldPoint(p.x, p.y); return [q.x, q.y]; }
+
+  /** Before each render: world objects draw on the main camera, screen-fixed ones on the HUD camera, modals (depth
+   * UI+100 and up, except their full-view dimmers) on the modal camera. Screen-fixed objects (made with scrollFactor 0)
+   * are switched to scrollFactor 1 so the HUD and modal cameras' centring applies; `ui` remembers what they are.
+   * cameraFilter bits are the cameras that skip an object. */
+  private routeCams() {
+    const main = this.cameras.main.id, hud = this.hudCam.id, modal = this.modalCam.id;
+    for (const o of this.children.list) {
+      const g = o as Phaser.GameObjects.GameObject & { scrollFactorX?: number; depth?: number; ui?: boolean;
+        setScrollFactor?: (x: number, y?: number) => unknown };
+      if (g.scrollFactorX === 0) { g.ui = true; g.setScrollFactor?.(1, 1); }
+      g.cameraFilter = !g.ui ? hud | modal : (g.depth ?? 0) >= UI + 100 && !isFill(o) ? main | hud : main | modal;
+    }
+  }
 
   private onDown(p: Phaser.Input.Pointer) {
     this.downAt = this.time.now;
     if (this.over && !this.revealing) return;
     if (this.modal || this.paused) return;
-    const r = this.pauseRect();
-    if (TOUCH && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) { this.tapIgnore = true; this.pause(); return; }
-    this.joy = { on: true, ox: p.x, oy: p.y, x: p.x, y: p.y };
+    const r = this.pauseRect(), [x, y] = this.toHud(p);
+    if (TOUCH && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { this.tapIgnore = true; this.pause(); return; }
+    this.joy = { on: true, ox: x, oy: y, x, y };
   }
 
   private onMove(p: Phaser.Input.Pointer) {
     const j = this.joy;
     if (!j.on) return;
-    j.x = p.x; j.y = p.y;
+    [j.x, j.y] = this.toHud(p);
     // A finger that drags far pulls the stick's centre along, so turning around is instant.
     const dx = j.x - j.ox, dy = j.y - j.oy, l = Math.hypot(dx, dy);
     if (l > 30) { j.ox = j.x - (dx / l) * 30; j.oy = j.y - (dy / l) * 30; }
@@ -565,35 +649,22 @@ export class GameScene extends Phaser.Scene {
     this.joy.on = false;
     if (this.tapIgnore) { this.tapIgnore = false; return; }
     if (this.over && !this.revealing) return;
-    if (this.paused) { if (this.downAt >= this.pausedAt) this.pauseTap(p.x, p.y); return; }
+    const [x, y] = this.toModal(p);
+    if (this.paused) { if (this.downAt >= this.pausedAt) this.pauseTap(x, y); return; }
     const m = this.modal;
-    if (m && m.armed && this.downAt >= (m.at ?? 0)) this.modalTap(m, p.x, p.y);
+    if (m && m.armed && this.downAt >= (m.at ?? 0)) this.modalTap(m, x, y);
   }
 
   /** Taps on the open modal: select a card, tap it again to pick; buttons under the level-up cards. */
   private modalTap(m: Modal, x: number, y: number) {
     if (m.kind === 'chest' || m.kind === 'reveal') { this.closeModal(); return; }
-    if (m.kind === 'act') {
-      const cw = 200, gap = 16, x0 = (W - (cw * 2 + gap)) / 2;
-      for (let i = 0; i < 2; i++) {
-        if (x < x0 + i * (cw + gap) || x > x0 + i * (cw + gap) + cw || y < 72 || y > 206) continue;
-        if (m.sel === i) this.chooseAct(i); else this.selectAct(i);
-        return;
-      }
+    const i = (m.rects ?? []).findIndex((r) => inRect(r, x, y, 4));
+    if (i >= 0) {
+      if (m.kind === 'act') { if (m.sel === i) this.chooseAct(i); else this.selectAct(i); }
+      else if (m.sel === i) this.pickCard(); else this.selectCard(i);
       return;
     }
-    const n = m.cards.length, cw = 136, gap = 12, x0 = (W - (cw * n + gap * (n - 1))) / 2;
-    if (y >= 52 && y <= 214) {
-      for (let i = 0; i < n; i++) {
-        if (x < x0 + i * (cw + gap) || x > x0 + i * (cw + gap) + cw) continue;
-        if (m.sel === i) this.pickCard(); else this.selectCard(i);
-        return;
-      }
-    } else if (m.kind === 'levelup' && y > 214 && y <= 234) {
-      if (x >= W / 2 - 152 && x < W / 2 - 46) this.reroll();
-      else if (Math.abs(x - W / 2) <= 44) this.skip();
-      else if (x > W / 2 + 46 && x <= W / 2 + 152) this.banish();
-    }
+    m.btns?.find((b) => inRect(b, x, y, 2))?.act();
   }
 
   private pauseTap(x: number, y: number) {
@@ -618,30 +689,32 @@ export class GameScene extends Phaser.Scene {
     this.showBanner(false);
     hooks.state = 'paused';
     const ui = K.ui;
-    // Build overview: each weapon with its version and evolution status, so players can plan the next picks.
+    // Build overview: each weapon with its version and evolution status, so players can plan the next picks. A narrow
+    // screen puts the status under the name and the buttons in a 2x2 grid; either way the panel is centred.
+    const narrow = NARROW(), bw0 = narrow ? W - 12 : 360, bx0 = W / 2 - bw0 / 2, pad = narrow ? 10 : 12;
     const rows = [...this.weapons.values()];
-    const rowH = rows.length > 12 ? 9 : 11;
-    const h = 100 + rows.length * rowH;
-    const y0 = Math.max(4, Math.round(H / 2 - h / 2));
-    const g = box(this, W / 2 - 180, y0, 360, Math.min(H - 8, h), ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 100);
-    const o: Phaser.GameObjects.GameObject[] = [g];
-    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => o.push(text(this, x, y, str, { fixed: true, depth: UI + 101, ...opts }));
-    T(W / 2, y0 + 8, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt });
-    rows.forEach((w, i) => {
-      const y = y0 + 30 + i * rowH;
+    const rowH = narrow ? 20 : rows.length > 12 ? 9 : 11;
+    const o: Phaser.GameObjects.GameObject[] = [];
+    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => { const t = text(this, x, y, str, { fixed: true, depth: UI + 101, ...opts }); o.push(t); return t; };
+    let y = 8;
+    T(W / 2, y, 'PAUSED', { scale: 2, align: 'center', color: ui.accentInt });
+    y += 22;
+    rows.forEach((w) => {
       const evo = WEAPONS[w.id].evo;
-      T(W / 2 - 168, y, `${w.evo && evo ? evo.name : productName(w.id)} ${semver(w)}`, { color: w.evo ? 0xf8d878 : ui.textInt });
+      T(bx0 + pad, y, `${w.evo && evo ? evo.name : productName(w.id)} ${semver(w)}`, { color: w.evo ? 0xf8d878 : ui.textInt, maxWidth: narrow ? bw0 - pad * 2 : 200, maxLines: 1 });
       const pid = evo?.passive;
       const has = !!pid && this.passives.has(pid), max = w.level >= MAX_LEVEL;
       const status = !pid ? (max ? 'MAX: patches' : 'no evolution') : w.evo ? (w.major ? 'v2.0' : 'EVOLVED') : max && has ? 'READY: open a chest'
         : max ? `needs ${PASSIVES[pid].name}` : has ? 'needs LV 5' : `LV 5 + ${PASSIVES[pid].name}`;
-      T(W / 2 + 168, y, status, { align: 'right', color: w.evo ? 0xf8d878 : status.startsWith('READY') ? 0x58d854 : ui.dimInt });
+      T(bx0 + bw0 - pad, y + (narrow ? 9 : 0), status, { align: 'right', color: w.evo ? 0xf8d878 : status.startsWith('READY') ? 0x58d854 : ui.dimInt });
+      y += rowH;
     });
-    const yb = y0 + 34 + rows.length * rowH;
+    y += 4;
     const rel = [...this.releases.keys()].map((r) => RELEASES[r].name).join(', ');
-    if (rel) T(W / 2, yb, `RELEASES: ${rel}`, { align: 'center', color: 0x3cbcfc, maxWidth: 340, maxLines: 2 });
+    if (rel) y += T(W / 2, y, `RELEASES: ${rel}`, { align: 'center', color: 0x3cbcfc, maxWidth: bw0 - 20, maxLines: narrow ? 4 : 2 }).lineCount * 10 + 2;
     const rl = [...this.relics].map((r) => RELICS[r].name).join(' ');
-    if (rl) T(W / 2, yb + 18, `MERCH: ${rl}`, { align: 'center', color: 0xf8d878, maxWidth: 340, maxLines: 1 });
+    if (rl) y += T(W / 2, y, `MERCH: ${rl}`, { align: 'center', color: 0xf8d878, maxWidth: bw0 - 20, maxLines: narrow ? 3 : 1 }).lineCount * 10 + 2;
+    y += 6;
     if (TOUCH) {
       // Buttons instead of keys: resume, damage numbers, sound, quit.
       const btns: [string, () => void][] = [
@@ -650,21 +723,30 @@ export class GameScene extends Phaser.Scene {
         [this.sound.mute ? 'SOUND OFF' : 'SOUND ON', () => { this.sound.mute = !this.sound.mute; K.sfx.muted = this.sound.mute; this.resume(); this.pause(); }],
         ['QUIT', () => this.quitRun()],
       ];
-      const bw = 80, gap = 6, x0 = W / 2 - (btns.length * bw + (btns.length - 1) * gap) / 2, by = yb + 28;
+      const per = narrow ? 2 : 4, gap = 6, bw = narrow ? (bw0 - pad * 2 - gap) / 2 : 80;
+      const x0 = W / 2 - (per * bw + (per - 1) * gap) / 2;
       btns.forEach(([label, act], i) => {
-        const bx = x0 + i * (bw + gap);
-        o.push(box(this, bx, by, bw, 18, ui.bgInt, i === 0 ? ui.accentInt : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
-        T(bx + bw / 2, by + 5, label, { align: 'center', color: i === 0 ? ui.accentInt : ui.textInt });
-        this.pauseBtns.push({ x: bx, y: by - 2, w: bw, h: 22, act });
+        const bx = x0 + (i % per) * (bw + gap), by = y + Math.floor(i / per) * (TAP + 6);
+        o.push(box(this, bx, by, bw, TAP, ui.bgInt, i === 0 ? ui.accentInt : ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+        T(bx + bw / 2, by + (TAP - 7) / 2, label, { align: 'center', color: i === 0 ? ui.accentInt : ui.textInt });
+        this.pauseBtns.push({ x: bx, y: by - 2, w: bw, h: TAP + 4, act });
       });
+      y += Math.ceil(btns.length / per) * (TAP + 6) + 2;
     } else {
-      T(W / 2, yb + 32, 'ENTER resume   Q quit', { align: 'center' });
-      T(W / 2, yb + 43, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
+      T(W / 2, y + 4, 'ENTER resume   Q quit', { align: 'center' });
+      T(W / 2, y + 15, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
+      y += 30;
     }
     const info = [this.heat ? `HEAT ${this.heat}` : '', this.mode !== 'standard' ? this.mode.toUpperCase() : '', `WAVE ${this.wave}`,
       hogName(this.hog).toUpperCase(), this.funding ? `FUNDING +${Math.round(((1 + WAVE.funding) ** this.funding - 1) * 100)}%` : '']
       .filter(Boolean).join('   ');
-    T(W / 2, yb + (TOUCH ? 51 : 55), info, { align: 'center', color: ui.dimInt, maxWidth: 350, maxLines: 1 });
+    y += T(W / 2, y, info, { align: 'center', color: ui.dimInt, maxWidth: bw0 - 10, maxLines: narrow ? 2 : 1 }).lineCount * 10 + 6;
+    // The panel behind it all, then everything moved to the middle of the screen.
+    const g = box(this, bx0, 0, bw0, y, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 100);
+    o.unshift(g);
+    const dy = Math.max(4, Math.round(H / 2 - y / 2));
+    this.shiftObjs(o, 0, dy);
+    this.pauseBtns.forEach((b) => { b.y += dy; });
     this.pauseObjs = o;
   }
 
@@ -677,8 +759,61 @@ export class GameScene extends Phaser.Scene {
     this.showBanner(true);
   }
 
+  // ---------------------------------------------------------------- resize
+  /** Move screen-fixed objects; full-view fills are resized instead. */
+  private shiftObjs(objs: Phaser.GameObjects.GameObject[], dx: number, dy: number) {
+    for (const o of objs) {
+      if (!o.active) continue;
+      if (isFill(o)) { (o as Phaser.GameObjects.Rectangle).setSize(W, H); continue; }
+      const t = o as unknown as Phaser.GameObjects.Components.Transform;
+      t.x += dx; t.y += dy;
+    }
+  }
+
+  /** The view changed (a phone rotated, a window resized): zoom the world, rebuild the HUD, lay out whatever is open. */
+  private onResize() {
+    if (!this.hud) return;
+    const dx = (W - this.viewW) / 2, dy = (H - this.viewH) / 2;
+    this.viewW = W; this.viewH = H;
+    this.puOverlay.setSize(W, H);
+    this.cameras.main.setZoom(this.worldCamZoom());
+    // HUD: rebuild at the new edges (the boss bar too, if it was up).
+    const boss = this.hud.bossBar ? { on: this.hud.bossBar.g.visible } : null;
+    this.hudObjs.forEach((o) => o.destroy());
+    this.hud.bossBar?.g.destroy();
+    this.hud.bossName?.destroy();
+    this.buildHud();
+    if (boss) {
+      this.makeBossBar();
+      this.hud.bossBar!.g.setVisible(boss.on);
+      this.hud.bossName?.setText(bossTitle(this.bossVersion())).setVisible(boss.on);
+    }
+    this.refreshIcons();
+    this.updateHud();
+    // Open screens are laid out again for the new shape; the crest popup stays in the bottom-right corner.
+    if (this.bannerObjs.length && this.curBanner) { this.bannerObjs.forEach((o) => o.destroy()); this.drawBanner(this.curBanner); }
+    this.shiftObjs(this.crestObjs, dx * 2, dy * 2);
+    const m = this.modal;
+    if (m?.rebuild) {
+      const keep = { sel: m.sel, armed: m.armed, at: m.at };
+      m.objs.forEach((o) => o.destroy());
+      this.modal = null;
+      m.rebuild(keep);
+    } else if (m) {
+      this.shiftObjs(m.objs, dx, dy);
+    }
+    if (this.paused) { this.resume(); this.pause(); }
+  }
+
   // ---------------------------------------------------------------- HUD
   private buildHud() {
+    // Everything buildHud (and the boss bar) adds is remembered, so a resize can tear it down and rebuild it.
+    const before = new Set(this.children.list);
+    this.buildHudObjs();
+    this.hudObjs = this.children.list.filter((o) => !before.has(o));
+  }
+
+  private buildHudObjs() {
     const ui = K.ui;
     const xp = bar(this, 2, 2, W - 4, 4, ui.accentInt, 0x000000, ui.panelInt);
     xp.g.setDepth(UI + 90);
@@ -689,20 +824,21 @@ export class GameScene extends Phaser.Scene {
     const kills = text(this, W - 4, 20, 'BUGS 0', { align: 'right', fixed: true, depth: UI + 90 });
     const gold = text(this, W - 4, 30, 'GOLD 0', { align: 'right', color: 0xf8d878, fixed: true, depth: UI + 90 });
     const risk = text(this, W - 4, 40, '', { align: 'right', color: 0xf87858, fixed: true, depth: UI + 90 });
-    text(this, 4, 10, K.theme.prospect.short.toUpperCase(), { color: ui.dimInt, fixed: true, depth: UI + 90, maxWidth: 170, maxLines: 1 });
+    text(this, 4, 10, K.theme.prospect.short.toUpperCase(), { color: ui.dimInt, fixed: true, depth: UI + 90, maxWidth: Math.min(170, W / 2 - 60), maxLines: 1 });
     const tags = [this.heat ? `HEAT ${this.heat}` : '', this.mode === 'daily' ? 'DAILY' : this.yolo ? 'YOLO' : ''].filter(Boolean);
     if (tags.length) text(this, 4, 20, tags.join(' '), { color: 0xf87858, fixed: true, depth: UI + 90 });
-    const waveTxt = text(this, 4, tags.length ? 30 : 20, '', { color: ui.accentInt, fixed: true, depth: UI + 90 });
+    // A narrow screen has the clock right above the wave line, so the wave line drops below it.
+    const waveTxt = text(this, 4, NARROW() ? 32 : tags.length ? 30 : 20, '', { color: ui.accentInt, fixed: true, depth: UI + 90 });
     const icons = this.add.container(4, H - 20).setScrollFactor(0).setDepth(UI + 90);
     const arrow = this.add.image(0, 0, spr('boss_shot')).setScrollFactor(0).setDepth(UI + 95).setVisible(false).setScale(2);
     const chestArrow = this.add.image(0, 0, spr('chest')).setScrollFactor(0).setDepth(UI + 95).setVisible(false);
-    const pu = text(this, W / 2, 68, '', { align: 'center', fixed: true, depth: UI + 90 }); // below the banner box
+    const pu = text(this, W / 2, NARROW() ? 128 : 68, '', { align: 'center', fixed: true, depth: UI + 90, maxWidth: W - 8, maxLines: 2 }); // below the banner box
     if (TOUCH) {
       // Touch: a pause button left of the clock.
       const r = this.pauseRect();
-      box(this, r.x + 3, r.y + 3, r.w - 6, r.h - 6, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 90);
-      this.add.rectangle(r.x + 10, r.y + 8, 2, 7, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
-      this.add.rectangle(r.x + 14, r.y + 8, 2, 7, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
+      box(this, r.x + 2, r.y + 2, r.w - 4, r.h - 4, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 90);
+      this.add.rectangle(r.x + r.w / 2 - 4, r.y + r.h / 2 - 4, 3, 8, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
+      this.add.rectangle(r.x + r.w / 2 + 1, r.y + r.h / 2 - 4, 3, 8, ui.textInt).setOrigin(0).setScrollFactor(0).setDepth(UI + 91);
     }
     this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu };
   }
@@ -731,9 +867,11 @@ export class GameScene extends Phaser.Scene {
   refreshIcons() {
     const c = this.hud.icons;
     c.removeAll(true);
-    const many = this.weapons.size + this.passives.size > 22;
+    // One row, weapons then passives; a second row up when they don't fit the screen's width.
+    const many = (this.weapons.size + this.passives.size) * 19 + 6 > W - 8;
     let x = 0, y = 0;
     const add = (key: string, frame: number, lvl: number, evo: boolean) => {
+      if (x + 16 > W - 8) { x = 0; y -= 21; }
       if (evo) c.add(this.add.rectangle(x - 1, y - 1, 18, 18, 0xf8d878).setOrigin(0));
       c.add(this.add.image(x, y, key, frame).setOrigin(0).setDisplaySize(16, 16));
       if (!evo) for (let i = 0; i < lvl; i++) c.add(this.add.rectangle(x + 1 + i * 3, y + 17, 2, 2, K.ui.accentInt).setOrigin(0));
@@ -781,7 +919,8 @@ export class GameScene extends Phaser.Scene {
     if (this.boss && this.hud.bossBar) {
       this.hud.bossBar.draw(this.boss.hp / this.boss.maxHp, 0xf83800);
       const cam = this.cameras.main;
-      const bx = this.boss.s.x - cam.scrollX, by = this.boss.s.y - cam.scrollY;
+      const k = W / camW(cam); // world -> screen: the world camera zooms in further than the HUD
+      const bx = (this.boss.s.x - cam.worldView.x) * k, by = (this.boss.s.y - cam.worldView.y) * k;
       const off = bx < 0 || bx > W || by < 0 || by > H;
       this.hud.arrow.setVisible(off && Math.floor(this.time.now / 250) % 2 === 0);
       if (off) this.hud.arrow.setPosition(Phaser.Math.Clamp(bx, 10, W - 10), Phaser.Math.Clamp(by, 34, H - 30));
@@ -798,7 +937,8 @@ export class GameScene extends Phaser.Scene {
     }
     const ca = this.hud.chestArrow;
     if (best) {
-      const cx = best.s.x - cam.scrollX, cy = best.s.y - cam.scrollY;
+      const k = W / camW(cam);
+      const cx = (best.s.x - cam.worldView.x) * k, cy = (best.s.y - cam.worldView.y) * k;
       const off = cx < 0 || cx > W || cy < 0 || cy > H;
       ca.setVisible(off && Math.floor(this.time.now / 300) % 2 === 0);
       if (off) ca.setPosition(Phaser.Math.Clamp(cx, 12, W - 12), Phaser.Math.Clamp(cy, 40, H - 32));
@@ -816,19 +956,27 @@ export class GameScene extends Phaser.Scene {
 
   private nextBanner() {
     const b = this.banners.shift();
-    if (!b) { this.bannerBusy = false; return; }
+    if (!b) { this.bannerBusy = false; this.curBanner = null; return; }
     this.bannerBusy = true;
-    const ui = K.ui;
-    const g = box(this, 60, 30, W - 120, 34, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 80);
-    const t1 = text(this, W / 2, 35, b.title, { align: 'center', color: ui.accentInt, fixed: true, depth: UI + 81, maxWidth: W - 140, maxLines: 1 });
-    const t2 = text(this, W / 2, 48, b.body, { align: 'center', fixed: true, depth: UI + 81, maxWidth: W - 140, maxLines: 1 });
-    this.bannerObjs = [g, t1, t2];
-    if (this.modal) this.showBanner(false);
+    this.drawBanner(b);
     this.time.delayedCall(this.banners.length > 2 ? 1600 : 2600, () => {
-      [g, t1, t2].forEach((o) => o.destroy());
+      this.bannerObjs.forEach((o) => o.destroy());
       this.bannerObjs = [];
+      this.curBanner = null;
       this.time.delayedCall(200, () => this.nextBanner());
     });
+  }
+
+  /** The banner box: across the top, or on a narrow screen full width under the HUD with room for two lines. */
+  private drawBanner(b: { title: string; body: string }) {
+    const ui = K.ui, narrow = NARROW();
+    const mx = narrow ? 6 : 60, y = narrow ? 80 : 30, tw = W - mx * 2 - 16;
+    const t1 = text(this, W / 2, y + 5, b.title, { align: 'center', color: ui.accentInt, fixed: true, depth: UI + 81, maxWidth: tw, maxLines: 1 });
+    const t2 = text(this, W / 2, y + 18, b.body, { align: 'center', fixed: true, depth: UI + 81, maxWidth: tw, maxLines: narrow ? 2 : 1 });
+    const g = box(this, mx, y, W - mx * 2, 24 + t2.lineCount * 10, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 80);
+    this.curBanner = b;
+    this.bannerObjs = [g, t1, t2];
+    if (this.modal || this.paused) this.showBanner(false);
   }
 
   private showBanner(on: boolean) {
@@ -888,6 +1036,7 @@ export class GameScene extends Phaser.Scene {
     this.spawn(dt);
     this.buildGrid();
     this.moveEnemies(dt);
+    this.tickMoat(dt);
     this.fireWeapons(dt);
     tickSystems(this, dt);
     this.moveProjectiles(dt);
@@ -1128,10 +1277,10 @@ export class GameScene extends Phaser.Scene {
   /** A point just outside the camera view; if that side is beyond the arena wall, the opposite side. */
   offscreenPoint(angle?: number): [number, number] {
     const cam = this.cameras.main;
-    const cx = cam.scrollX + W / 2, cy = cam.scrollY + H / 2;
+    const cx = cam.worldView.x + camW(cam) / 2, cy = cam.worldView.y + camH(cam) / 2;
     const edge = (ang: number): [number, number] => {
       const c = Math.cos(ang), s = Math.sin(ang);
-      const k = 1 / Math.max(Math.abs(c) / (W / 2 + 24), Math.abs(s) / (H / 2 + 24));
+      const k = 1 / Math.max(Math.abs(c) / (camW(cam) / 2 + 24), Math.abs(s) / (camH(cam) / 2 + 24));
       return [cx + c * k, cy + s * k];
     };
     const a = angle ?? this.R.next() * Math.PI * 2;
@@ -1196,6 +1345,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   restoreTint(e: Enemy) {
+    if (e.reaper) { e.s.setTintFill(VOID); return; }
     if (this.pu.freeze > 0 && !e.boss && e.arch !== 'crate') e.s.setTint(0xa4e4fc);
     else if (e.tint !== null) e.s.setTint(e.tint); else e.s.clearTint();
   }
@@ -1294,8 +1444,8 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < n; i++) {
       if (i === gap || i === gap + 1) continue; // always a way through
       const f = (i + 0.5) / n;
-      const x = st.dx > 0 ? cam.scrollX - 16 : st.dx < 0 ? cam.scrollX + W + 16 : cam.scrollX + f * W;
-      const y = st.dy > 0 ? cam.scrollY - 16 : st.dy < 0 ? cam.scrollY + H + 16 : cam.scrollY + f * H;
+      const x = st.dx > 0 ? cam.worldView.x - 16 : st.dx < 0 ? cam.worldView.x + camW(cam) + 16 : cam.worldView.x + f * camW(cam);
+      const y = st.dy > 0 ? cam.worldView.y - 16 : st.dy < 0 ? cam.worldView.y + camH(cam) + 16 : cam.worldView.y + f * camH(cam);
       const e = this.addEnemy('runner', x, y);
       if (e) { e.vx = st.dx; e.vy = st.dy; e.t = 9; e.s.setPosition(x, y); }
     }
@@ -1399,9 +1549,12 @@ export class GameScene extends Phaser.Scene {
         case 'spitter':
           e.t -= dt;
           if (d < 100) { mx = -dx; my = -dy; sp *= 0.7; } else if (d < 150) { mx = -dy; my = dx; sp *= 0.5; }
+          // Wind-up: the spitter blinks white for 0.4 s before it fires, so you see the shot coming.
+          if (d < 230 && e.t > 0 && e.t < 0.4) { if (Math.floor(e.t * 20) % 2) e.s.setTintFill(0xfcfcfc); else this.restoreTint(e); }
           if (e.t <= 0 && d < 230) {
             e.t = Phaser.Math.FloatBetween(2.4, 3.2);
-            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.ease(this.diff.dmg) * this.dmgScale(), 4, 1, 'spit', true).s.setScale(0.75);
+            this.restoreTint(e);
+            this.shoot('boss_shot', e.s.x, e.s.y, dx * 70, dy * 70, 9 * this.ease(this.diff.dmg) * this.dmgScale(), 4, 1, 'spit', true);
             this.sfx('spit', 0.3, 120);
           }
           break;
@@ -1546,6 +1699,60 @@ export class GameScene extends Phaser.Scene {
     this.pool.push(e);
   }
 
+  // ---------------------------------------------------------------- Data Moat
+  /** The moat's level with patches (0 = not held). */
+  private moatLv() { const l = this.passives.get('moat') ?? 0; return l ? l + 0.5 * (this.ppatch.get('moat') ?? 0) : 0; }
+  /** Moat radius (0 when not held). */
+  moatR() { const l = this.moatLv(); return l ? 30 + 3 * Math.min(l, 8) : 0; }
+  private moatMax() { return 4 + 3 * this.moatLv(); }
+  /** Spend water to block something; false when the moat is dry. */
+  private moatBlock(cost: number) {
+    if (!this.moatLv() || this.moat.fill < 1) return false;
+    this.moat.fill = Math.max(0, this.moat.fill - cost);
+    this.moat.calm = 0;
+    return true;
+  }
+
+  /** Data Moat: small bugs that reach the ring are shoved back out and nicked, each block costs water, and a dry moat
+   * lets everything through until it refills (starts a second after the last block). Bosses and Nohog wade across. */
+  private tickMoat(dt: number) {
+    const lv = this.moatLv();
+    if (!lv) return;
+    const m = this.moat, max = this.moatMax(), R = this.moatR(), p = this.player;
+    if (lv > m.lv) { m.lv = lv; m.fill = max; } // a new level fills it to the brim
+    m.calm += dt;
+    if (m.calm > 1) m.fill = Math.min(max, m.fill + (0.8 + 0.4 * lv) * dt);
+    if (m.fill < 1 || this.interlude) return;
+    for (const e of this.near(p.x, p.y, R + 12)) {
+      if (e.boss || e.twin || e.reaper || e.arch === 'crate' || !e.alive) continue;
+      const dx = e.s.x - p.x, dy = e.s.y - p.y, d = Math.hypot(dx, dy) || 1;
+      if (d > R) continue;
+      if ((e.hitAt.moat ?? 0) <= this.elapsed) {
+        if (!this.moatBlock(e.elite ? 2 : 1)) return;
+        e.hitAt.moat = this.elapsed + 0.6;
+        this.damage(e, 6 + 3 * lv, (dx / d) * 180, (dy / d) * 180, 'moat', true);
+        if (!e.alive) continue;
+      }
+      e.s.x = p.x + (dx / d) * (R + 1); e.s.y = p.y + (dy / d) * (R + 1);
+      if (e.mode === 2) e.mode = 0; // a dash ends at the water
+    }
+  }
+
+  /** The moat: a water ring whose width and brightness show how full it is; a faint dashed ring when dry. */
+  private drawMoat() {
+    const g = this.moatG;
+    g.clear();
+    const R = this.moatR();
+    if (!R) return;
+    const p = this.player, f = this.moat.fill / this.moatMax(), t = this.time.now;
+    if (this.moat.fill < 1) {
+      for (let i = 0; i < 16; i += 2) g.lineStyle(1, 0x3cbcfc, 0.3).beginPath().arc(p.x, p.y, R, (i / 16) * 6.283, ((i + 1) / 16) * 6.283).strokePath();
+      return;
+    }
+    g.lineStyle(2 + 4 * f, 0x0078f8, 0.25 + 0.3 * f).strokeCircle(p.x, p.y, R);
+    g.lineStyle(1, 0xa4e4fc, 0.4 + 0.4 * f).strokeCircle(p.x, p.y, R + Math.sin(t / 300) * 1.5);
+  }
+
   // ---------------------------------------------------------------- damage
   /** Weapon version multiplier: patches (x1.12 each) and the v2.0 major. */
   wMul(src: string) {
@@ -1574,8 +1781,10 @@ export class GameScene extends Phaser.Scene {
     if (src !== 'batch_exports') batchTag(this, e, d);
     if (e.boss && this.bossAffixes.includes('monolith')) this.plateHit(e, d);
     if (crit) this.run.crits++;
-    // Flash white on hit; the boss is hit constantly, so it only blinks every so often.
-    if (e.mode !== 3 && (!e.boss || e.flash < -120)) { e.flash = 70; e.s.setTintFill(0xffffff); }
+    // Flash white on hit; the boss is hit constantly, so it only blinks every so often. In a crowd only elites and bosses
+    // flash: a swarm of white silhouettes hides everything else.
+    const flash = this.enemies.length < CROWD || e.elite || e.boss || e.twin;
+    if (flash && e.mode !== 3 && (!e.boss || e.flash < -120)) { e.flash = 70; e.s.setTintFill(0xffffff); }
     if (!e.boss && !e.reaper) { e.kx += kx * e.kb; e.ky += ky * e.kb; }
     if (this.numbers && d >= 1) {
       if (e.acc === 0) e.accT = e.boss ? 0.4 : 0.25;
@@ -1605,7 +1814,12 @@ export class GameScene extends Phaser.Scene {
     const crit = e.accCrit;
     e.acc = 0; e.accCrit = false;
     if (!this.numbers || v < 1 || this.numBudget < 1) return;
-    this.numBudget -= 1;
+    // A crowded screen shows only crits, bosses and elites, and hits well above the usual (at half the usual rate).
+    const big = v >= this.numAvg * 3;
+    this.numAvg = this.numAvg ? this.numAvg * 0.95 + v * 0.05 : v;
+    const crowded = this.enemies.length >= CROWD;
+    if (crowded && !(crit || big || e.boss || e.elite)) return;
+    this.numBudget -= crowded ? 2 : 1;
     const label = v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e4 ? `${Math.round(v / 1000)}K` : `${v}`;
     floatText(this, e.s.x + Phaser.Math.Between(-3, 3), e.s.y - e.r - 6, crit ? `${label}!` : label, crit ? 0xf8d878 : 0xfcfcfc, crit ? 0.8 : 0.55);
   }
@@ -1669,7 +1883,6 @@ export class GameScene extends Phaser.Scene {
         floatText(this, o.s.x, o.s.y - 12, 'RACE LOST', 0xf83800, 0.6);
       });
     }
-    pipeTransform(this, e);
     if (this.pu.webhook > 0 && this.projs.length < 250) {
       // Webhook: every kill fires a bolt at the next bug.
       const t = this.nearest(e.s.x, e.s.y, 180);
@@ -1691,7 +1904,7 @@ export class GameScene extends Phaser.Scene {
     let n = 0;
     for (const o of [...this.enemies]) {
       if (o.boss || o.twin || o.reaper || o.arch === 'crate' || o.hp > o.maxHp * 0.2) continue;
-      if (o.s.x < cam.scrollX || o.s.x > cam.scrollX + W || o.s.y < cam.scrollY || o.s.y > cam.scrollY + H) continue;
+      if (o.s.x < cam.worldView.x || o.s.x > cam.worldView.x + camW(cam) || o.s.y < cam.worldView.y || o.s.y > cam.worldView.y + camH(cam)) continue;
       n++;
       this.damage(o, o.hp + 1, 0, 0, 'reaper', true, true);
     }
@@ -1762,7 +1975,7 @@ export class GameScene extends Phaser.Scene {
     if (this.waveMods.includes('freeze')) {
       // Code Freeze: a frosty sheen.
       const cam = this.cameras.main;
-      g.fillStyle(0xa4e4fc, 0.06).fillRect(cam.scrollX, cam.scrollY, W, H);
+      g.fillStyle(0xa4e4fc, 0.06).fillRect(cam.worldView.x, cam.worldView.y, camW(cam), camH(cam));
     }
   }
 
@@ -1854,8 +2067,8 @@ export class GameScene extends Phaser.Scene {
   /** Kill Switch: the most common kind of bug on screen is switched off. */
   private killSwitch() {
     const cam = this.cameras.main;
-    const on = this.enemies.filter((e) => !e.boss && !e.twin && !e.reaper && e.arch !== 'crate' && e.s.x > cam.scrollX && e.s.x < cam.scrollX + W
-      && e.s.y > cam.scrollY && e.s.y < cam.scrollY + H);
+    const on = this.enemies.filter((e) => !e.boss && !e.twin && !e.reaper && e.arch !== 'crate' && e.s.x > cam.worldView.x && e.s.x < cam.worldView.x + camW(cam)
+      && e.s.y > cam.worldView.y && e.s.y < cam.worldView.y + camH(cam));
     const count = new Map<string, number>();
     for (const e of on) count.set(e.arch, (count.get(e.arch) ?? 0) + 1);
     const top = [...count.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -1906,12 +2119,39 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const s = this.add.image(x, y, spr('gem')).setDepth(3);
-    const rel = v / this.xpScale();
-    if (rel >= 5) s.setTint(0xf878f8); else if (rel >= 2) s.setTint(0x58d854);
     // Ingestion Lag: gems take 2 s to show up.
     const lag = this.waveMods.includes('inglag') ? 2 : 0;
     if (lag) s.setAlpha(0.25);
-    this.gems.push({ s, v, pull: false, t: -lag });
+    const g = { s, v, pull: false, t: -lag };
+    this.tintGem(g);
+    this.gems.push(g);
+  }
+
+  /** A gem's look follows its worth: blue, green, pink, then a bigger gold one (merged gems get there). */
+  private tintGem(g: { s: Phaser.GameObjects.Image; v: number }) {
+    const rel = g.v / this.xpScale();
+    if (rel >= 20) g.s.setTint(0xf8d878).setScale(1.4);
+    else if (rel >= 5) g.s.setTint(0xf878f8).setScale(rel >= 10 ? 1.2 : 1);
+    else if (rel >= 2) g.s.setTint(0x58d854);
+  }
+
+  /** A crowded floor: gems lying close together melt into one worth the lot, so the XP stays but the clutter goes. */
+  private mergeGems() {
+    const gs = this.gems, R2 = 22 * 22;
+    for (let i = 0; i < gs.length; i++) {
+      const a = gs[i];
+      if (a.pull || a.t < 0) continue;
+      let merged = false;
+      for (let j = gs.length - 1; j > i; j--) {
+        const b = gs[j];
+        if (b.pull || b.t < 0 || (a.s.x - b.s.x) ** 2 + (a.s.y - b.s.y) ** 2 > R2) continue;
+        a.v += b.v;
+        b.s.destroy();
+        gs.splice(j, 1);
+        merged = true;
+      }
+      if (merged) this.tintGem(a);
+    }
   }
 
   /** Every gem within r of (x, y) flies to the hog (Summarizer scanners, Party Mode). */
@@ -1932,19 +2172,23 @@ export class GameScene extends Phaser.Scene {
       const [key, frame] = this.iconOf('power', kind);
       s = this.add.image(cx, cy, key, frame).setDisplaySize(16, 16);
     } else {
-      s = this.add.image(cx, cy, spr(kind === 'relic' ? 'merch' : kind)).setDepth(kind === 'chest' ? 4 : 3);
+      s = this.add.image(cx, cy, spr(kind === 'relic' ? 'merch' : kind));
     }
+    // Pickups draw above the bugs (below their shots), so a chest or powerup is never hidden under a swarm. Coins and snacks stay low.
+    s.setDepth(kind === 'coin' || kind === 'food' ? 3 : 11.3);
     if (big) s.setScale(1.5).setTint(0xf8d878);
+    else if (kind === 'food') s.setScale(1.1);
     // A little hop so drops read as drops; powerups and lore keep bobbing so they stand out on the floor.
     this.tweens.add({ targets: s, y: s.y - 8, duration: 140, yoyo: true, ease: 'Quad.Out' });
     if (isPower(kind) || kind === 'relic' || kind === 'page') {
-      s.setDepth(4.5);
       this.tweens.add({ targets: s, y: s.y - 3, duration: 450, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: 300 });
     }
     this.items.push({ s, kind, pull: false, big, data });
   }
 
   private moveGems(dt: number) {
+    this.mergeT -= dt;
+    if (this.gems.length > 80 && this.mergeT <= 0) { this.mergeT = 0.5; this.mergeGems(); }
     const px = this.player.x, py = this.player.y, mag = this.st.magnet;
     const ingest = this.releases.has('ingestion');
     for (let i = this.gems.length - 1; i >= 0; i--) {
@@ -2015,7 +2259,7 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case 'food': {
-        const heal = HEAL_AMOUNT;
+        const heal = Math.max(HEAL_AMOUNT, Math.round(this.st.maxHp * HEAL_FRAC));
         this.hp = Math.min(this.st.maxHp, this.hp + heal);
         floatText(this, p.x, p.y - 18, `+${heal}`, 0x58d854);
         this.sfx('food', 0.6);
@@ -2065,7 +2309,7 @@ export class GameScene extends Phaser.Scene {
     shake(this, 6, 350);
     hitstop(this, 90);
     for (const e of [...this.enemies]) {
-      const onScreen = e.s.x > cam.scrollX - 8 && e.s.x < cam.scrollX + W + 8 && e.s.y > cam.scrollY - 8 && e.s.y < cam.scrollY + H + 8;
+      const onScreen = e.s.x > cam.worldView.x - 8 && e.s.x < cam.worldView.x + camW(cam) + 8 && e.s.y > cam.worldView.y - 8 && e.s.y < cam.worldView.y + camH(cam) + 8;
       if (!onScreen || e.reaper) continue;
       if (e.boss || e.twin) this.damage(e, e.maxHp * 0.06, 0, 0, 'hotfix', true, true);
       else this.damage(e, e.hp + 1, 0, 0, 'hotfix', true, true);
@@ -2120,105 +2364,176 @@ export class GameScene extends Phaser.Scene {
     if (this.releases.has('clickhouse')) this.hp = Math.min(this.st.maxHp, this.hp + 5);
   }
 
-  openLevelUp(cards?: Card[], kind: 'levelup' | 'release' | 'cmdk' = 'levelup') {
+  openLevelUp(cards?: Card[], kind: 'levelup' | 'release' | 'cmdk' = 'levelup', keep?: Keep) {
     if (!cards) this.pendingLevels--;
     this.modal?.objs.forEach((o) => o.destroy());
     cards ??= drawCards(this.build(), () => this.RC.next());
+    const hand = cards;
     const rel = kind === 'release', cmd = kind === 'cmdk';
     hooks.state = rel ? 'release' : kind;
-    const ui = K.ui;
+    const ui = K.ui, narrow = NARROW();
     const objs: Phaser.GameObjects.GameObject[] = [];
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { objs.push(o); return o; };
+    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => add(text(this, x, y, str, { fixed: true, depth: UI + 102, ...opts }));
     this.showBanner(false);
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
+    add(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setName('fill').setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
     const title = rel ? 'SHIP A RELEASE' : cmd ? 'CMD+K' : 'LEVEL UP!';
     const sub = rel ? `Wave ${this.wave + 1}: ${this.waveName(this.wave + 1)} is next. Pick one, free` : cmd ? 'Run any powerup' : 'Pick a PostHog product or upgrade';
-    objs.push(text(this, W / 2, 20, title, { scale: 2, align: 'center', color: rel ? 0xf8d878 : cmd ? 0xfcfcfc : ui.accentInt, fixed: true, depth: UI + 101 }));
-    objs.push(text(this, W / 2, 40, sub, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101, maxWidth: W - 30, maxLines: 1 }));
-    const cw = 136, gap = 12, x0 = (W - (cw * cards.length + gap * (cards.length - 1))) / 2;
     const partners = partnersOf(this.build());
-    cards.forEach((c, i) => {
-      const x = x0 + i * (cw + gap), y = 56;
-      objs.push(box(this, x, y, cw, 156, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
-      const [ik, ifr] = c.kind === 'heal' ? [spr('food'), 0] : c.kind === 'gold' ? [spr('coin'), 0] : this.iconOf(c.kind === 'passive' ? 'passive'
-        : c.kind === 'release' ? 'release' : cmd ? 'power' : 'weapon', c.id);
-      const icon = this.add.image(x + cw / 2, y + 24, ik, ifr).setScrollFactor(0).setDepth(UI + 102);
-      icon.setDisplaySize(ik === HOG32 ? 40 : 32, ik === HOG32 ? 40 : 32);
-      objs.push(icon);
-      let name: string, tag: string, line: string, hint = '';
-      if (cmd) {
-        const P = POWERUPS[c.id as PowerId];
-        name = P.name; tag = 'POWERUP'; line = P.line;
-      } else if (c.kind === 'weapon') {
-        const w = this.weapons.get(c.id as WeaponId);
-        const evo = WEAPONS[c.id as WeaponId].evo;
-        name = w?.evo && evo ? evo.name : productName(c.id);
-        if (w && w.level >= MAX_LEVEL) {
-          const next = { ...w, patch: w.patch + 1 } as WState;
-          tag = `PATCH ${semver(next)}`;
-          line = `x${PATCH_MUL} damage${!w.evo && evo ? `. Evolve it with ${PASSIVES[evo.passive].name} + a chest` : ''}`;
-        } else {
-          tag = w ? (w.level + 1 >= MAX_LEVEL ? 'LV MAX' : `LV ${w.level + 1}`) : isTool(c.id) ? 'NEW TOOL!' : 'NEW!';
-          line = w ? WEAPONS[c.id as WeaponId].upgrade : productLine(c.id);
-          hint = evo ? `Evolves with ${PASSIVES[evo.passive].name}` : '';
-        }
-      } else if (c.kind === 'passive') {
-        const id = c.id as PassiveId;
-        const l = this.passives.get(id) ?? 0;
-        name = PASSIVES[id].name;
-        if (l >= PASSIVES[id].max) { tag = `PATCH ${(this.ppatch.get(id) ?? 0) + 1}`; line = `Half a level more: ${PASSIVES[id].line}`; }
-        else { tag = l ? `LV ${l + 1}` : 'NEW!'; line = PASSIVES[id].line; }
-        const w = [...this.weapons.values()].find((x) => !x.evo && WEAPONS[x.id].evo?.passive === id);
-        if (w && partners.has(id)) hint = `Evolves ${productName(w.id)}`;
-      } else if (c.kind === 'release') {
-        const r = RELEASES[c.id as ReleaseId];
-        const n = this.releases.get(c.id as ReleaseId) ?? 0;
-        name = r.name; tag = n ? `RELEASE x${n + 1}` : 'RELEASE'; line = r.line;
-      } else if (c.kind === 'major') {
-        const evo = WEAPONS[c.id as WeaponId].evo;
-        name = evo?.name ?? productName(c.id); tag = 'v2.0 MAJOR'; line = `x${MAJOR.dmg} damage, +1 amount, fires 15% faster`;
-      } else if (c.kind === 'heal') { name = 'Snack'; tag = ''; line = 'Heal 30 HP'; }
-      else { name = 'Bonus'; tag = ''; line = '+10 gold'; }
-      objs.push(text(this, x + cw / 2, y + 44, name, { align: 'center', color: ui.textInt, fixed: true, depth: UI + 102, maxWidth: cw - 12, maxLines: 2 }));
-      objs.push(text(this, x + cw / 2, y + 68, tag, { align: 'center', color: c.kind === 'release' || c.kind === 'major' ? 0xf8d878 : ui.accentInt, fixed: true, depth: UI + 102 }));
-      objs.push(text(this, x + cw / 2, y + 82, line, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 102, maxWidth: cw - 14, maxLines: 4 }));
-      if (hint) objs.push(text(this, x + cw / 2, y + 128, hint, { align: 'center', color: 0xf8d878, fixed: true, depth: UI + 102, maxWidth: cw - 10, maxLines: 2 }));
-    });
-    const sel = this.add.graphics().setScrollFactor(0).setDepth(UI + 103);
-    objs.push(sel);
-    if (kind === 'levelup' && TOUCH) {
-      // Touch: three buttons, with Drake on either side.
-      objs.push(this.add.image(W / 2 - 166, 224, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-      objs.push(this.add.image(W / 2 + 166, 224, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-      ([[`REROLL ${this.rerolls}`, -99], [`SKIP ${this.skips}`, 0], [`BANISH ${this.banishes}`, 99]] as [string, number][]).forEach(([label, dx]) => {
-        objs.push(box(this, W / 2 + dx - 44, 216, 88, 16, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
-        objs.push(text(this, W / 2 + dx, 220, label, { align: 'center', color: ui.textInt, fixed: true, depth: UI + 102 }));
+    const rects: Rect[] = [], btns: (Rect & { act: () => void })[] = [];
+    const btnDefs: [string, () => void][] = [[`REROLL ${this.rerolls}`, () => this.reroll()], [`SKIP ${this.skips}`, () => this.skip()], [`BANISH ${this.banishes}`, () => this.banish()]];
+    const footer = TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'LEFT/RIGHT choose   ENTER pick';
+    const funding = `Funding round: +${Math.round(WAVE.funding * 100)}% damage, +${WAVE.fundingHp} max HP`;
+    if (narrow) {
+      // Portrait: the cards stack, each a wide row with its icon on the left; the whole block sits mid-screen.
+      const cw = W - 16, ch = 78, gap = 6, x = 8;
+      let y = 0;
+      T(W / 2, y, title, { scale: 2, align: 'center', color: rel ? 0xf8d878 : cmd ? 0xfcfcfc : ui.accentInt });
+      y += 22;
+      y += T(W / 2, y, sub, { align: 'center', color: ui.dimInt, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 8;
+      hand.forEach((c) => {
+        const ct = this.cardText(c, cmd, partners);
+        add(box(this, x, y, cw, ch, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+        const icon = add(this.add.image(x + 24, y + ch / 2, ct.ik, ct.ifr).setScrollFactor(0).setDepth(UI + 102));
+        icon.setDisplaySize(ct.ik === HOG32 ? 40 : 32, ct.ik === HOG32 ? 40 : 32);
+        const tx = x + 48, tw = cw - 56;
+        T(tx, y + 6, ct.name, { color: ui.textInt, maxWidth: tw, maxLines: 1 });
+        if (ct.tag) T(x + cw - 8, y + 6, ct.tag, { align: 'right', color: ct.tagCol });
+        T(tx, y + 18, ct.line, { color: ui.dimInt, maxWidth: tw, maxLines: ct.hint ? 4 : 5 });
+        if (ct.hint) T(tx, y + ch - 13, ct.hint, { color: 0xf8d878, maxWidth: tw, maxLines: 1 });
+        rects.push({ x, y, w: cw, h: ch });
+        y += ch + gap;
       });
-    } else if (kind === 'levelup') {
-      // Drake says nah to a reroll, yah to a banish.
-      objs.push(this.add.image(W / 2 - 128, 226, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-      objs.push(this.add.image(W / 2 + 126, 226, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-      objs.push(text(this, W / 2, 222, `R REROLL ${this.rerolls}    X SKIP ${this.skips}    B BANISH ${this.banishes}`,
-        { align: 'center', color: ui.textInt, fixed: true, depth: UI + 101 }));
-    } else if (rel) {
-      objs.push(text(this, W / 2, 222, `Funding round: +${Math.round(WAVE.funding * 100)}% damage, +${WAVE.fundingHp} max HP`, { align: 'center', color: 0x3cbcfc, fixed: true, depth: UI + 101 }));
+      y += 2;
+      if (kind === 'levelup' && TOUCH) {
+        const bw = (cw - 12) / 3;
+        btnDefs.forEach(([label, act], i) => {
+          const bx = x + i * (bw + 6);
+          add(box(this, bx, y, bw, TAP, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+          T(bx + bw / 2, y + (TAP - 7) / 2, label, { align: 'center', color: ui.textInt });
+          btns.push({ x: bx, y, w: bw, h: TAP, act });
+        });
+        y += TAP + 8;
+      } else if (kind === 'levelup') {
+        y += T(W / 2, y, `R REROLL ${this.rerolls}  X SKIP ${this.skips}  B BANISH ${this.banishes}`, { align: 'center', color: ui.textInt, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 6;
+      } else if (rel) {
+        y += T(W / 2, y, funding, { align: 'center', color: 0x3cbcfc, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 6;
+      }
+      y += T(W / 2, y, footer, { align: 'center', color: ui.dimInt, maxWidth: cw, maxLines: 2 }).lineCount * 10;
+      add(this.add.graphics().setScrollFactor(0).setDepth(UI + 103));
+      const dy = Math.max(6, Math.round(H / 2 - y / 2));
+      this.shiftObjs(objs, 0, dy);
+      rects.forEach((r) => { r.y += dy; });
+      btns.forEach((b) => { b.y += dy; });
+    } else {
+      // Landscape: the cards side by side, centred in a taller screen.
+      const my = MY();
+      T(W / 2, 20 + my, title, { scale: 2, align: 'center', color: rel ? 0xf8d878 : cmd ? 0xfcfcfc : ui.accentInt, depth: UI + 101 });
+      T(W / 2, 40 + my, sub, { align: 'center', color: ui.dimInt, depth: UI + 101, maxWidth: W - 30, maxLines: 1 });
+      const cw = 136, gap = 12, x0 = (W - (cw * hand.length + gap * (hand.length - 1))) / 2;
+      hand.forEach((c, i) => {
+        const x = x0 + i * (cw + gap), y = 56 + my;
+        const ct = this.cardText(c, cmd, partners);
+        add(box(this, x, y, cw, 156, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+        const icon = add(this.add.image(x + cw / 2, y + 24, ct.ik, ct.ifr).setScrollFactor(0).setDepth(UI + 102));
+        icon.setDisplaySize(ct.ik === HOG32 ? 40 : 32, ct.ik === HOG32 ? 40 : 32);
+        T(x + cw / 2, y + 44, ct.name, { align: 'center', color: ui.textInt, maxWidth: cw - 12, maxLines: 2 });
+        T(x + cw / 2, y + 68, ct.tag, { align: 'center', color: ct.tagCol });
+        T(x + cw / 2, y + 82, ct.line, { align: 'center', color: ui.dimInt, maxWidth: cw - 14, maxLines: 4 });
+        if (ct.hint) T(x + cw / 2, y + 128, ct.hint, { align: 'center', color: 0xf8d878, maxWidth: cw - 10, maxLines: 2 });
+        rects.push({ x, y, w: cw, h: 156 });
+      });
+      add(this.add.graphics().setScrollFactor(0).setDepth(UI + 103));
+      if (kind === 'levelup' && TOUCH) {
+        // Touch: three buttons, with Drake on either side.
+        add(this.add.image(W / 2 - 166, 224 + my, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+        add(this.add.image(W / 2 + 166, 224 + my, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+        btnDefs.forEach(([label, act], i) => {
+          const cx = W / 2 + (i - 1) * 99;
+          add(box(this, cx - 46, 216 + my, 92, 21, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+          T(cx, 223 + my, label, { align: 'center', color: ui.textInt });
+          btns.push({ x: cx - 49, y: 214 + my, w: 98, h: 25, act });
+        });
+      } else if (kind === 'levelup') {
+        // Drake says nah to a reroll, yah to a banish.
+        add(this.add.image(W / 2 - 128, 226 + my, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+        add(this.add.image(W / 2 + 126, 226 + my, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
+        T(W / 2, 222 + my, `R REROLL ${this.rerolls}    X SKIP ${this.skips}    B BANISH ${this.banishes}`, { align: 'center', color: ui.textInt, depth: UI + 101 });
+      } else if (rel) {
+        T(W / 2, 222 + my, funding, { align: 'center', color: 0x3cbcfc, depth: UI + 101 });
+      }
+      T(W / 2, (kind === 'levelup' && TOUCH ? 243 : 240) + my, footer, { align: 'center', color: ui.dimInt, depth: UI + 101 });
     }
-    objs.push(text(this, W / 2, 240, TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'LEFT/RIGHT choose   ENTER pick', { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 101 }));
-    const m: Modal = { kind, cards, sel: 0, objs, armed: false };
-    m.at = this.time.now;
+    const m: Modal = { kind, cards: hand, sel: 0, objs, armed: false, rects, btns, rebuild: (k) => this.openLevelUp(hand, kind, k) };
+    m.at = keep?.at ?? this.time.now;
     this.modal = m;
+    if (keep) {
+      m.armed = keep.armed;
+      if (!keep.armed) this.time.delayedCall(350, () => (m.armed = true));
+      m.sel = keep.sel;
+      if (m.sel >= 0) this.selectCard(m.sel, true);
+      return;
+    }
     // Ignore Enter for a moment so a held key doesn't pick blindly.
     this.time.delayedCall(350, () => (m.armed = true));
     if (TOUCH) m.sel = -1; else this.selectCard(0, true); // touch: nothing preselected, so one stray tap can't pick
+  }
+
+  /** A card's icon and words. */
+  private cardText(c: Card, cmd: boolean, partners: Set<string>) {
+    const [ik, ifr] = c.kind === 'heal' ? [spr('food'), 0] : c.kind === 'gold' ? [spr('coin'), 0] : this.iconOf(c.kind === 'passive' ? 'passive'
+      : c.kind === 'release' ? 'release' : cmd ? 'power' : 'weapon', c.id);
+    let name: string, tag: string, line: string, hint = '';
+    if (cmd) {
+      const P = POWERUPS[c.id as PowerId];
+      name = P.name; tag = 'POWERUP'; line = P.line;
+    } else if (c.kind === 'weapon') {
+      const w = this.weapons.get(c.id as WeaponId);
+      const evo = WEAPONS[c.id as WeaponId].evo;
+      name = w?.evo && evo ? evo.name : productName(c.id);
+      if (w && w.level >= MAX_LEVEL) {
+        const next = { ...w, patch: w.patch + 1 } as WState;
+        tag = `PATCH ${semver(next)}`;
+        line = `x${PATCH_MUL} damage${!w.evo && evo ? `. Evolve it with ${PASSIVES[evo.passive].name} + a chest` : ''}`;
+      } else {
+        tag = w ? (w.level + 1 >= MAX_LEVEL ? 'LV MAX' : `LV ${w.level + 1}`) : isTool(c.id) ? 'NEW TOOL!' : 'NEW!';
+        line = w ? WEAPONS[c.id as WeaponId].upgrade : productLine(c.id);
+        hint = evo ? `Evolves with ${PASSIVES[evo.passive].name}` : '';
+      }
+    } else if (c.kind === 'passive') {
+      const id = c.id as PassiveId;
+      const l = this.passives.get(id) ?? 0;
+      name = PASSIVES[id].name;
+      if (l >= PASSIVES[id].max) { tag = `PATCH ${(this.ppatch.get(id) ?? 0) + 1}`; line = `Half a level more: ${PASSIVES[id].line}`; }
+      else { tag = l ? `LV ${l + 1}` : 'NEW!'; line = PASSIVES[id].line; }
+      const w = [...this.weapons.values()].find((x) => !x.evo && WEAPONS[x.id].evo?.passive === id);
+      if (w && partners.has(id)) hint = `Evolves ${productName(w.id)}`;
+    } else if (c.kind === 'release') {
+      const r = RELEASES[c.id as ReleaseId];
+      const n = this.releases.get(c.id as ReleaseId) ?? 0;
+      name = r.name; tag = n ? `RELEASE x${n + 1}` : 'RELEASE'; line = r.line;
+    } else if (c.kind === 'major') {
+      const evo = WEAPONS[c.id as WeaponId].evo;
+      name = evo?.name ?? productName(c.id); tag = 'v2.0 MAJOR'; line = `x${MAJOR.dmg} damage, +1 amount, fires 15% faster`;
+    } else if (c.kind === 'heal') { name = 'Snack'; tag = ''; line = 'Heal 30 HP'; }
+    else { name = 'Bonus'; tag = ''; line = '+10 gold'; }
+    const tagCol = c.kind === 'release' || c.kind === 'major' ? 0xf8d878 : K.ui.accentInt;
+    return { ik: ik as string, ifr: ifr as number, name, tag, line, hint, tagCol };
+  }
+
+  /** The selection frame around card / choice i, as the modal drew it. */
+  private frameSel(m: Modal, i: number) {
+    const g = m.objs.find((o) => o instanceof Phaser.GameObjects.Graphics && o.depth === UI + 103) as Phaser.GameObjects.Graphics;
+    const r = m.rects?.[i];
+    g.setPosition(0, 0).clear();
+    if (r) g.lineStyle(2, K.ui.accentInt, 1).strokeRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4);
   }
 
   private selectCard(i: number, silent = false) {
     const m = this.modal;
     if (!m || !['levelup', 'release', 'cmdk'].includes(m.kind)) return;
     m.sel = i;
-    const n = m.cards.length;
-    const cw = 136, gap = 12, x0 = (W - (cw * n + gap * (n - 1))) / 2;
-    const g = m.objs.find((o) => o instanceof Phaser.GameObjects.Graphics && o.depth === UI + 103) as Phaser.GameObjects.Graphics;
-    g.clear().lineStyle(2, K.ui.accentInt, 1).strokeRect(x0 + i * (cw + gap) - 2, 54, cw + 4, 160);
+    this.frameSel(m, i);
     if (!silent) this.sfx('move', 0.5);
   }
 
@@ -2405,6 +2720,7 @@ export class GameScene extends Phaser.Scene {
     w.evo = true;
     w.level = MAX_LEVEL;
     w.patch = 0;
+    w.born = this.elapsed - SPOTLIGHT / 2; // a short bright showing, then it settles into the background
     resetVisuals(w);
     const name = WEAPONS[w.id].evo?.name ?? productName(w.id);
     this.run.evolutions.push(name);
@@ -2425,50 +2741,57 @@ export class GameScene extends Phaser.Scene {
     if (!sv.codex.includes(name)) { sv.codex.push(name); persist(); }
   }
 
-  private showChest(title: string, lines: [string, string, number][]) {
+  private showChest(title: string, lines: [string, string, number][], keep?: Keep) {
     const ui = K.ui;
     const evo = title !== 'CHEST!';
-    this.sfx(evo ? 'evolve' : 'chest', 0.9);
-    const p = this.player;
-    burst(this, p.x, p.y, 0xf8d878, evo ? 40 : 20, { speed: evo ? 220 : 150, gravity: 0, colours: [0xfcfcfc, K.ui.accentInt] });
-    if (evo) { shake(this, 4, 250); this.cameras.main.flash(200, 255, 240, 180); }
+    if (!keep) {
+      this.sfx(evo ? 'evolve' : 'chest', 0.9);
+      const p = this.player;
+      burst(this, p.x, p.y, 0xf8d878, evo ? 40 : 20, { speed: evo ? 220 : 150, gravity: 0, colours: [0xfcfcfc, K.ui.accentInt] });
+      if (evo) { shake(this, 4, 250); this.cameras.main.flash(200, 255, 240, 180); }
+    }
     const objs: Phaser.GameObjects.GameObject[] = [];
     this.showBanner(false);
+    const bw = Math.min(260, W - 12), tw = bw - 20;
     const h = 44 + lines.length * 20;
     const y0 = Math.round(H / 2 - h / 2);
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
-    objs.push(box(this, W / 2 - 130, y0, 260, h, ui.bgInt, 0xf8d878, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
-    objs.push(this.add.image(W / 2 - 110, y0 + 16, spr('chest'), 1).setScale(2).setScrollFactor(0).setDepth(UI + 102));
+    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.55).setName('fill').setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
+    objs.push(box(this, W / 2 - bw / 2, y0, bw, h, ui.bgInt, 0xf8d878, ui.panelInt).setScrollFactor(0).setDepth(UI + 101));
+    objs.push(this.add.image(W / 2 - bw / 2 + 20, y0 + 16, spr('chest'), 1).setScale(2).setScrollFactor(0).setDepth(UI + 102));
     objs.push(text(this, W / 2 + 10, y0 + 9, title, { scale: 2, align: 'center', color: 0xf8d878, fixed: true, depth: UI + 102 }));
     lines.forEach(([a, b, col], i) => {
       const y = y0 + 34 + i * 20;
-      objs.push(text(this, W / 2, y, a, { align: 'center', color: col, fixed: true, depth: UI + 102, maxWidth: 240, maxLines: 1 }));
-      if (b) objs.push(text(this, W / 2, y + 9, b, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 102, maxWidth: 240, maxLines: 1 }));
+      objs.push(text(this, W / 2, y, a, { align: 'center', color: col, fixed: true, depth: UI + 102, maxWidth: tw, maxLines: 1 }));
+      if (b) objs.push(text(this, W / 2, y + 9, b, { align: 'center', color: ui.dimInt, fixed: true, depth: UI + 102, maxWidth: tw, maxLines: 1 }));
     });
     hooks.state = 'chest';
-    const m: Modal = { kind: 'chest', cards: [], sel: 0, objs, armed: false };
-    m.at = this.time.now;
+    const m: Modal = { kind: 'chest', cards: [], sel: 0, objs, armed: false, rebuild: (k) => this.showChest(title, lines, k) };
+    m.at = keep?.at ?? this.time.now;
     this.modal = m;
-    this.time.delayedCall(this.autopilot ? 250 : 500, () => (m.armed = true));
+    if (keep?.armed) m.armed = true;
+    else this.time.delayedCall(this.autopilot ? 250 : 500, () => (m.armed = true));
     this.time.delayedCall(this.autopilot ? 400 : 2600, () => { if (this.modal === m) this.closeModal(); });
   }
 
   // ---------------------------------------------------------------- weapons + projectiles
   addWeapon(id: WeaponId) {
     if (this.weapons.has(id)) return;
-    this.weapons.set(id, newWeapon(id));
+    const w = newWeapon(id);
+    w.born = this.elapsed;
+    this.weapons.set(id, w);
     this.refreshIcons();
   }
 
   shoot(key: string, x: number, y: number, vx: number, vy: number, dmg: number, life: number, pierce: number, src: string, hostile = false): Proj {
-    const s = this.add.image(x, y, spr(key)).setDepth(hostile ? 12 : 8);
+    const s = this.add.image(x, y, spr(key)).setDepth(hostile ? 12 : OWN + 0.1);
+    if (hostile) s.setScale(1.6); // enemy shots read at phone size (drawShots adds a halo and trail)
     const pr: Proj = { s, vx, vy, dmg, life, pierce, src, hit: new Set(), hostile };
     this.projs.push(pr);
     return pr;
   }
 
   zapLine(x1: number, y1: number, x2: number, y2: number, col = 0xfcfcfc) {
-    const g = this.add.graphics().setDepth(19);
+    const g = this.add.graphics().setDepth(OWN + 0.4).setAlpha(this.fxAlpha());
     g.lineStyle(1, col, 1).beginPath().moveTo(x1, y1);
     const n = 4;
     for (let i = 1; i < n; i++) {
@@ -2504,7 +2827,9 @@ export class GameScene extends Phaser.Scene {
       pr.s.y += pr.vy * dt;
       let dead = pr.life <= 0 || pr.s.x < -20 || pr.s.y < -20 || pr.s.x > WORLD_W + 20 || pr.s.y > WORLD_H + 20;
       if (!dead && pr.hostile) {
-        if (Phaser.Math.Distance.Between(pr.s.x, pr.s.y, p.x, p.y) < 9) { this.hurt(pr.dmg, pr.src); dead = true; }
+        const pd = Phaser.Math.Distance.Between(pr.s.x, pr.s.y, p.x, p.y);
+        if (pd < 9) { this.hurt(pr.dmg, pr.src); dead = true; }
+        else if (pd < this.moatR() && this.moatBlock(1)) { dead = true; burst(this, pr.s.x, pr.s.y, 0x3cbcfc, 3, { speed: 50 }); }
       } else if (!dead) {
         for (const e of this.near(pr.s.x, pr.s.y, 3)) {
           if (pr.hit.has(e)) continue;
@@ -2907,15 +3232,21 @@ export class GameScene extends Phaser.Scene {
     for (const a of fx) this.banner(`NEW TRICK: ${AFFIX_TEXT[a][0]}`, AFFIX_TEXT[a][1]);
     if (v >= 2) this.banner(name, `"${K.theme.game.boss.taunt}"`);
     if (this.yolo) allHands(this, 18);
-    if (!this.hud.bossBar) {
-      const bb = bar(this, 250, H - 9, W - 256, 5, 0xf83800, 0x000000, K.ui.textInt);
-      bb.g.setDepth(UI + 90);
-      this.hud.bossBar = bb;
-      this.hud.bossName = text(this, W - 6, H - 21, K.theme.game.boss.name, { align: 'right', color: K.ui.accentInt, fixed: true, depth: UI + 90,
-        maxWidth: W - 256, maxLines: 1 });
-    }
-    this.hud.bossBar.g.setVisible(true);
+    if (!this.hud.bossBar) this.makeBossBar();
+    this.hud.bossBar!.g.setVisible(true);
     this.hud.bossName?.setText(bossTitle(v)).setVisible(true);
+  }
+
+  /** Bottom right, beside the build icons; a narrow view is short of width, so the bar runs along the top, under the wave line. */
+  private makeBossBar() {
+    const narrow = NARROW();
+    const bb = narrow ? bar(this, 6, 52, W - 42, 5, 0xf83800, 0x000000, K.ui.textInt) : bar(this, 250, H - 9, W - 256, 5, 0xf83800, 0x000000, K.ui.textInt);
+    bb.g.setDepth(UI + 90);
+    this.hud.bossBar = bb;
+    this.hud.bossName = narrow
+      ? text(this, 6, 61, K.theme.game.boss.name, { color: K.ui.accentInt, fixed: true, depth: UI + 90, maxWidth: W - 44, maxLines: 1 })
+      : text(this, W - 6, H - 21, K.theme.game.boss.name, { align: 'right', color: K.ui.accentInt, fixed: true, depth: UI + 90,
+        maxWidth: W - 256, maxLines: 1 });
   }
 
   private bossDown(b: Enemy) {
@@ -2990,45 +3321,81 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => this.openActBreak());
   }
 
-  private openActBreak() {
+  private openActBreak(keep?: Keep) {
     if (this.over || this.won) return;
-    if (this.modal || this.paused) { this.time.delayedCall(300, () => this.openActBreak()); return; } // a chest is open, or paused
-    const ui = K.ui;
+    if (!keep && (this.modal || this.paused)) { this.time.delayedCall(300, () => this.openActBreak()); return; } // a chest is open, or paused
+    const ui = K.ui, narrow = NARROW();
     const objs: Phaser.GameObjects.GameObject[] = [];
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { objs.push(o); return o; };
     this.showBanner(false);
     hooks.state = 'actbreak';
     const D = UI + 101;
+    const T = (x: number, y: number, str: string, opts: Parameters<typeof text>[4]) => add(text(this, x, y, str, { fixed: true, depth: D, ...opts }));
     const v = this.bossVersion();
     const risk = this.gold - this.goldSafe;
     const bonus = this.cashBonus();
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.8).setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
-    objs.push(text(this, W / 2, 14, v >= 2 ? `v${v}.0 SHIPPED!` : 'WAVE 1 CLEAR!', { scale: 3, align: 'center', color: ui.accentInt, fixed: true, depth: D, shadow: ui.panelInt }));
-    objs.push(text(this, W / 2, 44, `${bossTitle(v)} is squashed. Nice work.`, { align: 'center', color: ui.textInt, fixed: true, depth: D,
-      maxWidth: W - 40, maxLines: 1 }));
-    objs.push(text(this, W / 2, 58, `TIME ${clock(this.elapsed)}   BUGS ${this.kills}   LEVEL ${this.level}   SCORE ${this.score()}`,
-      { align: 'center', color: 0xf8d878, fixed: true, depth: D, maxWidth: W - 30, maxLines: 1 }));
-    const cw = 200, gap = 16, x0 = (W - (cw * 2 + gap)) / 2, y = 76;
+    const head = v >= 2 ? `v${v}.0 SHIPPED!` : 'WAVE 1 CLEAR!';
     const next = this.wave + 1;
     const opts: [string, string, number][] = [
       ['CONTINUE', `Wave ${next}: ${this.waveName(next)}. Pick a release, +${Math.round(WAVE.funding * 100)}% funding. Your gold is safe from here`, 0x58d854],
       ['CASH OUT', `Bank ${this.gold} gold${bonus ? ` + ${bonus} cash-out bonus` : ''} and end the run`, 0xf8d878],
     ];
-    opts.forEach(([t, line, col], i) => {
-      const x = x0 + i * (cw + gap);
-      objs.push(box(this, x, y, cw, 126, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
-      const img = i ? this.add.image(x + cw / 2, y + 26, spr('chest'), 0).setScale(2) : this.add.image(x + cw / 2, y + 24, HOG32, hogFrame('rocket'));
-      objs.push(img.setScrollFactor(0).setDepth(D + 1));
-      objs.push(text(this, x + cw / 2, y + 48, t, { scale: 2, align: 'center', color: col, fixed: true, depth: D + 1 }));
-      objs.push(text(this, x + cw / 2, y + 70, line, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1, maxWidth: cw - 16, maxLines: 5 }));
-    });
-    const sel = this.add.graphics().setScrollFactor(0).setDepth(UI + 103);
-    objs.push(sel);
     const warn = risk > 0 && this.wave >= 2 ? `${risk} gold at risk: die later, lose half. Cash out keeps it all.` : 'Keep going? Later waves have the biggest scores.';
-    objs.push(text(this, W / 2, 214, warn, { align: 'center', color: risk > 0 ? 0xf87858 : ui.textInt, fixed: true, depth: D, maxWidth: W - 20, maxLines: 1 }));
-    objs.push(text(this, W / 2, 238, TOUCH ? 'TAP a choice, TAP it again to confirm' : 'LEFT/RIGHT choose   ENTER confirm', { align: 'center', color: ui.dimInt, fixed: true, depth: D }));
-    const m: Modal = { kind: 'act', cards: [], sel: 0, objs, armed: false };
-    m.at = this.time.now;
+    const footer = TOUCH ? 'TAP a choice, TAP it again to confirm' : 'LEFT/RIGHT choose   ENTER confirm';
+    const stats = `TIME ${clock(this.elapsed)}   BUGS ${this.kills}   LEVEL ${this.level}   SCORE ${this.score()}`;
+    const art = (i: number, x: number, y: number) => add((i ? this.add.image(x, y + 2, spr('chest'), 0).setScale(2) : this.add.image(x, y, HOG32, hogFrame('rocket'))).setScrollFactor(0).setDepth(D + 1));
+    const rects: Rect[] = [];
+    add(this.add.rectangle(0, 0, W, H, 0x000000, 0.8).setName('fill').setOrigin(0).setScrollFactor(0).setDepth(UI + 100));
+    if (narrow) {
+      // Portrait: the two choices stack, each a wide row with its picture on the left; the block sits mid-screen.
+      const cw = W - 16, ch = 86, x = 8;
+      let y = 0;
+      T(W / 2, y, head, { scale: fitScale(head, cw, 3), align: 'center', color: ui.accentInt, shadow: ui.panelInt });
+      y += 32;
+      y += T(W / 2, y, `${bossTitle(v)} is squashed. Nice work.`, { align: 'center', color: ui.textInt, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 4;
+      y += T(W / 2, y, stats, { align: 'center', color: 0xf8d878, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 8;
+      opts.forEach(([t, line, col], i) => {
+        add(box(this, x, y, cw, ch, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
+        art(i, x + 28, y + ch / 2);
+        T(x + 56, y + 8, t, { scale: 2, color: col, depth: D + 1 });
+        T(x + 56, y + 30, line, { color: ui.dimInt, depth: D + 1, maxWidth: cw - 64, maxLines: 5 });
+        rects.push({ x, y, w: cw, h: ch });
+        y += ch + 8;
+      });
+      add(this.add.graphics().setScrollFactor(0).setDepth(UI + 103));
+      y += T(W / 2, y, warn, { align: 'center', color: risk > 0 ? 0xf87858 : ui.textInt, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 8;
+      y += T(W / 2, y, footer, { align: 'center', color: ui.dimInt, maxWidth: cw, maxLines: 2 }).lineCount * 10;
+      const dy = Math.max(6, Math.round(H / 2 - y / 2));
+      this.shiftObjs(objs, 0, dy);
+      rects.forEach((r) => { r.y += dy; });
+    } else {
+      const my = MY();
+      T(W / 2, 14 + my, head, { scale: 3, align: 'center', color: ui.accentInt, shadow: ui.panelInt });
+      T(W / 2, 44 + my, `${bossTitle(v)} is squashed. Nice work.`, { align: 'center', color: ui.textInt, maxWidth: W - 40, maxLines: 1 });
+      T(W / 2, 58 + my, stats, { align: 'center', color: 0xf8d878, maxWidth: W - 30, maxLines: 1 });
+      const cw = 200, gap = 16, x0 = (W - (cw * 2 + gap)) / 2, y = 76 + my;
+      opts.forEach(([t, line, col], i) => {
+        const x = x0 + i * (cw + gap);
+        add(box(this, x, y, cw, 126, ui.bgInt, ui.textInt, ui.panelInt).setScrollFactor(0).setDepth(D));
+        art(i, x + cw / 2, y + 24);
+        T(x + cw / 2, y + 48, t, { scale: 2, align: 'center', color: col, depth: D + 1 });
+        T(x + cw / 2, y + 70, line, { align: 'center', color: ui.dimInt, depth: D + 1, maxWidth: cw - 16, maxLines: 5 });
+        rects.push({ x, y, w: cw, h: 126 });
+      });
+      add(this.add.graphics().setScrollFactor(0).setDepth(UI + 103));
+      T(W / 2, 214 + my, warn, { align: 'center', color: risk > 0 ? 0xf87858 : ui.textInt, maxWidth: W - 20, maxLines: 1 });
+      T(W / 2, 238 + my, footer, { align: 'center', color: ui.dimInt });
+    }
+    const m: Modal = { kind: 'act', cards: [], sel: 0, objs, armed: false, rects, rebuild: (k) => this.openActBreak(k) };
+    m.at = keep?.at ?? this.time.now;
     this.modal = m;
+    if (keep) {
+      m.armed = keep.armed;
+      if (!keep.armed) this.time.delayedCall(700, () => (m.armed = true));
+      m.sel = keep.sel;
+      if (m.sel >= 0) this.selectAct(m.sel, true);
+      return;
+    }
     this.sfx('evolve', 0.8);
     this.time.delayedCall(this.autopilot ? 300 : 700, () => (m.armed = true));
     if (TOUCH) m.sel = -1; else this.selectAct(0, true);
@@ -3038,9 +3405,7 @@ export class GameScene extends Phaser.Scene {
     const m = this.modal;
     if (!m || m.kind !== 'act') return;
     m.sel = i;
-    const cw = 200, gap = 16, x0 = (W - (cw * 2 + gap)) / 2;
-    const g = m.objs.find((o) => o instanceof Phaser.GameObjects.Graphics && o.depth === UI + 103) as Phaser.GameObjects.Graphics;
-    g.clear().lineStyle(2, K.ui.accentInt, 1).strokeRect(x0 + i * (cw + gap) - 2, 74, cw + 4, 130);
+    this.frameSel(m, i);
     if (!silent) this.sfx('move', 0.5);
   }
 
@@ -3137,7 +3502,7 @@ export class GameScene extends Phaser.Scene {
   private reaperDown(e: Enemy) {
     this.pool.push(e);
     e.s.setTexture(spr('enemy_1')).setScale(1).setAngle(0);
-    this.banner('THE REAPER IS DOWN?!', 'Nobody has ever... an angel appears');
+    this.banner('NOHOG IS DOWN?!', 'You filled the void... an angel appears');
     this.unlock('angel');
     shake(this, 10, 900);
     this.cameras.main.flash(500, 255, 255, 255);
@@ -3164,9 +3529,30 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- drawing & end
   private draw() {
     this.fx.clear();
-    drawWeapons(this, this.fx, this.auraG);
-    drawTools(this, this.fx);
-    drawSystems(this, this.fx);
+    this.wfx.forEach((g) => g.clear());
+    // Your own effects sit under the bugs and fade as the waves climb (evolved weapons most); bugs, their shots,
+    // telegraphs and pickups stay fully visible. A weapon you just picked up stays bright for a while so you can see it.
+    const a = this.fxAlpha();
+    this.auraG.setAlpha(a);
+    particleAlpha(this, a);
+    for (const pr of this.projs) if (!pr.hostile) pr.s.setAlpha(this.wAlpha(pr.src));
+    this.weapons.forEach((w) => {
+      const wa = this.wAlpha(w.id);
+      w.orbs.forEach((o) => o.setAlpha(wa));
+      w.flags.forEach((f) => f.s.setAlpha(wa));
+      w.drone?.setAlpha(wa);
+      for (const it of w.items) if (typeof it?.s?.setAlpha === 'function') it.s.setAlpha(wa);
+    });
+    const gfx = (id: WeaponId) => {
+      let g = this.wfx.get(id);
+      if (!g) { g = this.add.graphics().setDepth(OWN + 0.2); this.wfx.set(id, g); }
+      return g.setAlpha(this.wAlpha(id));
+    };
+    drawWeapons(this, gfx, this.auraG);
+    drawTools(this, gfx);
+    drawSystems(this, this.fx); // the drive-by lane and Nohog's void are threats: never faded
+    this.drawMoat();
+    this.drawShots();
     this.drawHazards();
     this.drawEnemyFx();
     this.drawBossFx();
@@ -3185,6 +3571,33 @@ export class GameScene extends Phaser.Scene {
     else if (p.tintTopLeft !== 0xf83800 && p.isTinted && !this.over) p.clearTint();
     if (this.invuln > 0 && this.pu.autopilot <= 0) p.setAlpha(Math.floor(t / 60) % 2 ? 0.4 : 1);
     else p.setAlpha(1);
+  }
+
+  /** How opaque your weapons' effects are: fully until wave 3, then fainter, so late waves stay readable. */
+  fxAlpha() { return this.wave >= 7 ? 0.45 : this.wave >= 5 ? 0.55 : this.wave >= 3 ? 0.7 : this.wave >= 2 ? 0.85 : 1; }
+
+  /** One weapon's fade: fxAlpha, lower once evolved (v1.0+ looks calmer, not louder), but full for SPOTLIGHT seconds
+   * after you pick it up so a late tool never gets lost under the ones you maxed early. Other sources use fxAlpha. */
+  wAlpha(src: string) {
+    const w = this.weapons.get(src as WeaponId), base = this.fxAlpha();
+    if (!w) return base;
+    const calm = base * (w.evo ? 0.6 : 1) * (w.major ? 0.85 : 1);
+    const age = this.elapsed - w.born;
+    return age < SPOTLIGHT ? 1 : age < SPOTLIGHT + 3 ? 1 + (calm - 1) * ((age - SPOTLIGHT) / 3) : calm;
+  }
+
+  /** Enemy shots: a pulsing red halo and a short trail, so an incoming shot pops out of any swarm. */
+  private drawShots() {
+    const g = this.shotG;
+    g.clear();
+    const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 70);
+    for (const pr of this.projs) {
+      if (!pr.hostile) continue;
+      const x = pr.s.x, y = pr.s.y, sp = Math.hypot(pr.vx, pr.vy) || 1, tx = x - (pr.vx / sp) * 14, ty = y - (pr.vy / sp) * 14;
+      g.lineStyle(4, 0xf83800, 0.35).lineBetween(tx, ty, x, y).lineStyle(2, 0xfca044, 0.6).lineBetween(x - (pr.vx / sp) * 8, y - (pr.vy / sp) * 8, x, y);
+      g.fillStyle(0xf83800, 0.25 + 0.2 * pulse).fillCircle(x, y, 6 + 1.5 * pulse);
+      g.lineStyle(1, 0xfcfcfc, 0.5 + 0.4 * pulse).strokeCircle(x, y, 7 + 1.5 * pulse);
+    }
   }
 
   /** Outage: the lights go out beyond a circle around the hog. */
@@ -3288,12 +3701,15 @@ export class GameScene extends Phaser.Scene {
     const ui = K.ui;
     const objs: Phaser.GameObjects.GameObject[] = [];
     const D = UI + 150;
-    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.85).setOrigin(0).setScrollFactor(0).setDepth(D));
+    objs.push(this.add.rectangle(0, 0, W, H, 0x000000, 0.85).setName('fill').setOrigin(0).setScrollFactor(0).setDepth(D));
     objs.push(text(this, W / 2, 20, ids.length > 1 ? 'NEW HOGGIES!' : 'NEW HOGGIE!', { scale: 3, align: 'center', color: 0xf8d878, fixed: true, depth: D + 1 }));
     const show = ids.slice(0, 8);
-    const cols = Math.min(4, show.length), cw = 108, x0 = W / 2 - (cols * cw) / 2 + cw / 2;
+    const cols = Math.min(NARROW() ? 2 : 4, show.length), cw = 108, x0 = W / 2 - (cols * cw) / 2 + cw / 2;
+    const rowsN = Math.ceil(show.length / cols);
+    // A narrow screen stacks up to four rows: the block is laid out from the top, then centred as a whole.
+    const gy = (i: number) => 94 + Math.floor(i / cols) * 86;
     show.forEach((id, i) => {
-      const x = x0 + (i % cols) * cw, y = 94 + Math.floor(i / cols) * 86;
+      const x = x0 + (i % cols) * cw, y = gy(i);
       const img = this.add.image(x, y, HOG64, hogFrame(id)).setScrollFactor(0).setDepth(D + 1).setScale(0);
       const nm = text(this, x, y + 36, hogName(id).toUpperCase(), { align: 'center', color: isSignature(id) ? 0xf8d878 : ui.textInt, fixed: true, depth: D + 1, maxWidth: cw - 6, maxLines: 1 });
       nm.setAlpha(0);
@@ -3301,8 +3717,10 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: img, scale: 1, duration: 300, delay: 250 * i, ease: 'Back.Out', onStart: () => this.sfx('select', 0.6) });
       this.tweens.add({ targets: nm, alpha: 1, duration: 200, delay: 250 * i + 200 });
     });
-    if (ids.length > 8) objs.push(text(this, W / 2, 240, `+${ids.length - 8} more in the SHOP`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
-    objs.push(text(this, W / 2, 252, `Pick one in SHOP > HOGGIES.   ${TOUCH ? 'TAP' : 'ENTER'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
+    const fy = NARROW() ? gy((rowsN - 1) * cols) + 56 : 240;
+    if (ids.length > 8) objs.push(text(this, W / 2, fy, `+${ids.length - 8} more in the SHOP`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
+    objs.push(text(this, W / 2, fy + 12, `Pick one in SHOP > HOGGIES.   ${TOUCH ? 'TAP' : 'ENTER'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1, maxWidth: W - 12, maxLines: 2 }));
+    this.shiftObjs(objs, 0, NARROW() ? Math.max(0, Math.round(H / 2 - (fy + 24) / 2)) : MY());
     this.revealing = true; // onKey lets the reveal's ENTER through while the run is over
     const m: Modal = { kind: 'reveal', cards: [], sel: 0, objs, armed: false };
     m.at = this.time.now;
@@ -3372,6 +3790,7 @@ export class GameScene extends Phaser.Scene {
         (Object.keys(PASSIVES) as PassiveId[]).slice(0, 6).forEach((id) => this.passives.set(id, Math.min(PASSIVES[id].max, lvl)));
         this.recalc(); this.refreshIcons();
       },
+      passive: (id: PassiveId, lvl = 1) => { this.passives.set(id, Math.min(PASSIVES[id].max, lvl)); this.recalc(); this.refreshIcons(); },
       chest: (big = false) => { this.dropItem('chest', this.player.x + 20, this.player.y, !!big); },
       pickup: (kind: ItemKind = 'vacuum') => { this.dropItem(kind, this.player.x + 20, this.player.y); },
       hotfix: () => this.hotfix(),

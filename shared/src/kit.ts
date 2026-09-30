@@ -7,7 +7,7 @@ import { deriveUi, snap, Ui } from './palette';
 import { hooks, sharedDebug } from './hooks';
 import { initAnalytics, capture } from './analytics';
 import { Sfx, ZzfxParams } from './zzfx';
-import { W, H, TOUCH } from './ui';
+import { W, H, TOUCH, APP, PX, fitView } from './ui';
 import { BootScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
 import { meta, initMeta, achieve, dailySeed, randomSeed, AchievementDef, RunResult } from './meta';
 import { OverlayScene, toast, burst, floatText, shake, hitstop } from './juice';
@@ -41,6 +41,8 @@ export interface KitDef {
   howTo: (theme: any) => string[];
   /** The kit plays with touch (drag/tap); shared screens then show tap hints on phones. */
   touch?: boolean;
+  /** The view takes the screen's shape (ui.W/H are live and every screen lays out for them). Off: a fixed 480x270. */
+  resizable?: boolean;
   /** Queue extra kit-fixed assets in the Boot scene's preload (sheets that aren't theme slots). */
   preload?: (scene: Phaser.Scene) => void;
   /** Draw kit art on the title screen (sprites, lineup). */
@@ -157,28 +159,36 @@ export async function startKit(kit: KitDef) {
   initMeta(kit.id, K.manifest.slug ?? 'default', kit.achievements, (a) => toast(null, `ACHIEVEMENT: ${a.name}`));
   beginRun({});
 
-  // Desktop: whole-number zoom for crisp pixels. Phones: fill the screen (a fractional zoom beats a tiny canvas).
+  // Resizable kits: the view is the screen's shape at a whole number of device pixels per game pixel (crisp, full screen).
+  // Fixed kits: desktop gets whole-number zoom for crisp pixels; phones fill the screen (a fractional zoom beats a tiny canvas).
+  if (kit.resizable) fitView();
   const zoom = () => {
+    if (kit.resizable) return 1 / (window.devicePixelRatio || 1); // the canvas is already device pixels
     const z = Math.min(window.innerWidth / W, window.innerHeight / H);
     return TOUCH ? Math.max(0.5, Math.floor(z * 8) / 8) : Math.max(1, Math.floor(z));
   };
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
-    width: W,
-    height: H,
+    width: Math.round(W * PX),
+    height: Math.round(H * PX),
     zoom: zoom(),
     pixelArt: true,
     roundPixels: true,
     backgroundColor: K.ui.bg,
     scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER }, // #game flexbox centres the canvas; CENTER_BOTH would double the offset
     physics: { default: 'arcade', arcade: { debug: false } },
-    input: { keyboard: true, gamepad: false },
+    // In the app, touches anywhere on screen reach the game (points off the canvas map outside 0..W/0..H).
+    input: { keyboard: true, gamepad: false, ...(APP ? { touch: { target: 'game' } } : {}) },
     audio: { disableWebAudio: false },
     fps: { target: 60 },
     scene: [BootScene, TitleScene, HowToScene, ...kit.scenes, EndScene, OverlayScene],
   });
-  window.addEventListener('resize', () => game.scale.setZoom(zoom()));
+  window.addEventListener('resize', () => {
+    // Scenes follow a resize through the scale manager's 'resize' event (menus re-centre, the game re-anchors its HUD).
+    if (kit.resizable && fitView()) game.scale.resize(Math.round(W * PX), Math.round(H * PX));
+    game.scale.setZoom(zoom());
+  });
   game.events.on('step', () => { hooks.fps = Math.round(game.loop.actualFps); });
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyM') {
@@ -189,6 +199,7 @@ export async function startKit(kit: KitDef) {
   });
   K.sfx = new Sfx(null, kit.sfx, hashPitch(theme.prospect.name));
   (window as any).__phaser = game;
+  if (APP) appBridge(game);
   Object.assign(sharedDebug, {
     // The live KitDef, e.g. to try a titleMenu: __game.debug.kitDef().titleMenu = () => [...]; then debug.goto('Title').
     kitDef: () => K.kit,
@@ -198,7 +209,7 @@ export async function startKit(kit: KitDef) {
     juiceTest: () => {
       const sc = game.scene.getScenes(true).filter((s) => s.scene.key !== 'Overlay').pop();
       if (!sc) return;
-      const cam = sc.cameras.main, x = cam.scrollX + W / 2, y = cam.scrollY + H / 2;
+      const cam = sc.cameras.main, x = cam.worldView.centerX, y = cam.worldView.centerY;
       burst(sc, x, y, K.ui.accentInt, 24, { colours: [K.ui.textInt] });
       floatText(sc, x, y - 16, '+123', K.ui.accentInt);
       shake(sc, 3, 150);
@@ -208,6 +219,31 @@ export async function startKit(kit: KitDef) {
   });
   capture('game_opened', { referrer: document.referrer || null });
   return game;
+}
+
+/** Hooks the native app shell calls: the Android back button, and the app going to the background and back. */
+function appBridge(game: Phaser.Game) {
+  const key = (code: string, keyCode: number) => {
+    for (const type of ['keydown', 'keyup']) {
+      const e = new KeyboardEvent(type, { code, key: code, bubbles: true });
+      Object.defineProperty(e, 'keyCode', { get: () => keyCode }); // Phaser's key table reads keyCode
+      window.dispatchEvent(e);
+    }
+  };
+  const playing = () => hooks.scene === 'Game' && ['playing', 'boss'].includes(hooks.state);
+  Object.assign(window, {
+    /** Back button: true when the game used it (ESC: pause, or back to the title); false on the title = leave the app. */
+    __appBack: () => {
+      if (hooks.scene === 'Title') return false;
+      key('Escape', 27);
+      return true;
+    },
+    __appPause: () => {
+      if (playing()) key('Escape', 27); // leave the run paused, not running unseen
+      (game as any).onHidden(); // stop the loop and suspend audio, as a hidden browser tab does
+    },
+    __appResume: () => (game as any).onVisible(),
+  });
 }
 
 export function makeSfx(scene: Phaser.Scene) {

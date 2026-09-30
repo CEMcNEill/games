@@ -3,11 +3,82 @@ import Phaser from 'phaser';
 import { FONT, CHAR_W, LINE_H, cleanText } from './font';
 import { hooks } from './hooks';
 
-export const W = 480;
-export const H = 270;
+/** The base size: a landscape screen is at least DW x DH game pixels, a portrait one at least DH x DW. */
+export const DW = 480;
+export const DH = 270;
+/** The live view in game pixels. DW x DH unless the kit is resizable; then it takes the screen's shape, scaled so the
+ * short side is ~DH game pixels (and the long side at least DW): the same physical size for text and sprites in either
+ * orientation and on every phone. Screens lay themselves out for the live W x H (see NARROW). */
+export let W = DW;
+export let H = DH;
+/** Canvas pixels per game pixel. Resizable kits draw at the screen's full resolution (the canvas is W*PX x H*PX device
+ * pixels and every camera zooms by PX), so pixel art stays sharp at any scale. Fixed kits keep 1: a W x H canvas that
+ * CSS scales up. Phones get the exact fit; desktops keep a whole number for perfectly even pixels. */
+export let PX = 1;
+
+function viewFor(dw: number, dh: number) {
+  const short = Math.min(dw, dh), long = Math.max(dw, dh);
+  let s = Math.min(short / DH, long / DW);
+  s = TOUCH ? Math.max(0.5, s) : Math.max(1, Math.floor(s));
+  return { w: Math.floor(dw / s), h: Math.floor(dh / s), s };
+}
+
+function devicePx() {
+  const dpr = window.devicePixelRatio || 1;
+  return [Math.round(window.innerWidth * dpr), Math.round(window.innerHeight * dpr)];
+}
+
+/** Recompute W/H/PX for a resizable kit from the window. Returns true when the view changed. */
+export function fitView() {
+  const [dw, dh] = devicePx();
+  const v = viewFor(dw, dh);
+  const changed = v.w !== W || v.h !== H || v.s !== PX;
+  W = v.w; H = v.h; PX = v.s;
+  return changed;
+}
+
+/** The biggest view this screen gives in either orientation (worlds size themselves so a rotate still fits). */
+export function maxView() {
+  const [a, b] = devicePx();
+  const v1 = viewFor(a, b), v2 = viewFor(b, a);
+  return { w: Math.max(v1.w, v2.w), h: Math.max(v1.h, v2.h) };
+}
+
+/** A view narrower than the base width (a phone held upright): screens stack instead of sitting side by side. */
+export const NARROW = () => W < DW;
+
+/** How far the game world zooms in beyond the screen's resolution: a bigger (or taller) view shows about the same
+ * area of the world as a DW x DH screen, so the play area stays as busy as designed and sprites scale up with it. */
+export const worldZoom = () => Math.max(1, Math.sqrt((W * H) / (DW * DH)));
+
+/** A y laid out for a DH-tall screen, moved into a taller one: anchor 0 keeps it at the top, 1 pins it to the bottom,
+ * 0.5 keeps it centred. On a DH-tall screen it is unchanged. */
+export const vy = (y: number, anchor: number) => y + Math.round((H - DH) * anchor);
+
+/** A screen-space camera: game pixels 1:1 with the live view (zoomed by PX), re-fitted on resize. */
+export function fitCam(scene: Phaser.Scene, cam: Phaser.Cameras.Scene2D.Camera, zoom = () => 1) {
+  const place = () => cam.setZoom(PX * zoom()).centerOn(W / 2, H / 2);
+  place();
+  scene.scale.on('resize', place);
+  scene.events.once('shutdown', () => scene.scale.off('resize', place));
+}
+
+/** The world width / height a camera shows (valid any time, unlike worldView before the first render). */
+export const camW = (c: Phaser.Cameras.Scene2D.Camera) => c.width / c.zoom;
+export const camH = (c: Phaser.Cameras.Scene2D.Camera) => c.height / c.zoom;
+
+/** The world rectangle a camera shows (valid before its first render, unlike worldView). */
+export function viewRect(cam: Phaser.Cameras.Scene2D.Camera) {
+  const w = cam.width / cam.zoom, h = cam.height / cam.zoom;
+  return { x: cam.scrollX + cam.width / 2 - w / 2, y: cam.scrollY + cam.height / 2 - h / 2, w, h };
+}
 
 /** A phone or tablet (no hover, coarse pointer): kits show tap hints and touch controls. */
 export const TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+
+/** Running inside a native app shell (the Android WebView wrapper tags its user agent): already fullscreen, and the
+ * whole screen takes touch, not just the canvas. */
+export const APP = typeof navigator !== 'undefined' && /\bKitApp\b/.test(navigator.userAgent);
 
 export interface TextOpts {
   scale?: number;

@@ -192,7 +192,7 @@ cashes out after that wave's boss; default 2 so Gate 1's bot run ends), holdLeve
 showcase, warp(s), spawnBoss, hurtBoss(frac), killBoss (beats the current wave's boss: SHIPPED screen), wave(n) (jump
 into wave n), giveAll, maxAll, xp(n), flood(n), evolve(id), evolveAll, patch(id, n), major(id), release(id), tool(id),
 tools, powerup(kind) (drop), activate(kind), relic, page(n), superNova, passives(lvl), chest(big), pickup(kind),
-hotfix, crate, puddle, elite(arch), event(id), spawn(arch, n), reaper, driveBy, allHands(n), pr, bossHere(dx),
+hotfix, crate, puddle, elite(arch), event(id), spawn(arch, n), passive(id, lvl), reaper, driveBy, allHands(n), pr, bossHere(dx),
 bossHp(mult), heat(n), gold(n), numbers(on); in the shop: shopBuy(id | 'capsule'), hog(id), tab(i); plus the shared
 resetMeta, unlockAll, meta(patch), goto, juiceTest.
 `__game.stats`: hp, level, enemies, kills, weapons, versions, passives, gold, goldSafe, heat, mode, hog, trait, elites,

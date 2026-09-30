@@ -4,11 +4,12 @@
 import Phaser from 'phaser';
 import { spr } from '@shared/kit';
 import { burst, floatText, shake } from '@shared/juice';
-import { W, H } from '@shared/ui';
+import { camW, camH } from '@shared/ui';
 import type { GameScene, Enemy } from './game';
 import { HOG32, HOG64 } from './game';
 import { hogFrame } from './hoggies';
 import { save } from './save';
+import { OWN } from './weapons';
 
 interface Pal { s: Phaser.GameObjects.Image; t: number; off: number }
 interface Agent { s: Phaser.GameObjects.Image; life: number; a: number }
@@ -113,7 +114,7 @@ export function selfDrivingPr(g: GameScene) {
   let best: Enemy | null = null, bn = 0;
   for (let k = 0; k < 24 && g.enemies.length; k++) {
     const e = g.enemies[Math.floor(Math.random() * g.enemies.length)];
-    if (e.boss || e.arch === 'crate' || e.s.x < cam.scrollX || e.s.x > cam.scrollX + W || e.s.y < cam.scrollY || e.s.y > cam.scrollY + H) continue;
+    if (e.boss || e.arch === 'crate' || e.s.x < cam.worldView.x || e.s.x > cam.worldView.x + camW(cam) || e.s.y < cam.worldView.y || e.s.y > cam.worldView.y + camH(cam)) continue;
     const n = g.near(e.s.x, e.s.y, 60).length;
     if (n > bn) { bn = n; best = e; }
   }
@@ -124,7 +125,7 @@ export function selfDrivingPr(g: GameScene) {
     else if (!e.reaper) g.damage(e, e.maxHp * 0.4 + 30 * waveMul(g), 0, 0, 'selfdriving', true, true);
   }
   g.blast(x, y, 70, 0, 'selfdriving');
-  const fx = g.add.graphics().setDepth(19);
+  const fx = g.add.graphics().setDepth(OWN + 0.4).setAlpha(g.fxAlpha());
   fx.lineStyle(2, 0x3cbcfc, 1).strokeCircle(x, y, 70).lineStyle(1, 0xfcfcfc, 0.8).strokeCircle(x, y, 60);
   g.tweens.add({ targets: fx, alpha: 0, duration: 400, onComplete: () => fx.destroy() });
   floatText(g, x, y - 20, `PR #${1000 + Math.floor(Math.random() * 9000)} MERGED`, 0x3cbcfc, 0.7);
@@ -154,9 +155,9 @@ function tickDrive(g: GameScene, dt: number) {
     d.s = g.add.image(0, 0, HOG64, hogFrame('driving-hogzilla')).setDepth(15).setFlipX(d.dir > 0);
     shake(g, 4, 1200);
   }
-  const span = (d.horiz ? W : H) + 160;
+  const span = (d.horiz ? camW(cam) : camH(cam)) + 160;
   const k = (d.t - warn) * 560;
-  const along = (d.horiz ? cam.scrollX : cam.scrollY) + (d.dir > 0 ? -80 + k : span - 80 - k);
+  const along = (d.horiz ? cam.worldView.x : cam.worldView.y) + (d.dir > 0 ? -80 + k : span - 80 - k);
   if (d.horiz) d.s.setPosition(along, d.pos - 8); else d.s.setPosition(d.pos, along).setAngle(d.dir > 0 ? 90 : -90);
   // Everything in the lane near the car gets flattened (bosses take a chip).
   const x = d.s.x, y = d.s.y + (d.horiz ? 8 : 0);
@@ -185,14 +186,14 @@ function drawDrive(g: GameScene, fx: Phaser.GameObjects.Graphics) {
   const cam = g.cameras.main;
   const on = d.t < 1.8 ? Math.floor(d.t * 6) % 2 === 0 : true;
   const a = d.t < 1.8 ? (on ? 0.35 : 0.12) : 0.1;
-  if (d.horiz) fx.fillStyle(0xf8b800, a).fillRect(cam.scrollX, d.pos - 22, W, 44);
-  else fx.fillStyle(0xf8b800, a).fillRect(d.pos - 22, cam.scrollY, 44, H);
+  if (d.horiz) fx.fillStyle(0xf8b800, a).fillRect(cam.worldView.x, d.pos - 22, camW(cam), 44);
+  else fx.fillStyle(0xf8b800, a).fillRect(d.pos - 22, cam.worldView.y, 44, camH(cam));
   if (d.t < 1.8 && on) {
     // Chevrons pointing the way it's coming.
     fx.fillStyle(0xf83800, 0.9);
     for (let i = 0; i < 8; i++) {
       const f = (i + 0.5) / 8;
-      const cx = d.horiz ? cam.scrollX + f * W : d.pos, cy = d.horiz ? d.pos : cam.scrollY + f * H;
+      const cx = d.horiz ? cam.worldView.x + f * camW(cam) : d.pos, cy = d.horiz ? d.pos : cam.worldView.y + f * camH(cam);
       const ax = d.horiz ? d.dir * 6 : 0, ay = d.horiz ? 0 : d.dir * 6;
       fx.fillTriangle(cx + ax, cy + ay, cx - ax + (d.horiz ? 0 : 5), cy - ay + (d.horiz ? 5 : 0), cx - ax - (d.horiz ? 0 : 5), cy - ay - (d.horiz ? 5 : 0));
     }
@@ -208,8 +209,8 @@ export function allHands(g: GameScene, n = 24) {
   const dir = Math.random() < 0.5 ? 1 : -1;
   for (let i = 0; i < n; i++) {
     const id = ids[i % ids.length];
-    const y = cam.scrollY + 24 + ((i * 37) % (H - 48));
-    const x = dir > 0 ? cam.scrollX - 20 - (i % 6) * 26 : cam.scrollX + W + 20 + (i % 6) * 26;
+    const y = cam.worldView.y + 24 + ((i * 37) % (camH(cam) - 48));
+    const x = dir > 0 ? cam.worldView.x - 20 - (i % 6) * 26 : cam.worldView.x + camW(cam) + 20 + (i % 6) * 26;
     const s = g.add.image(x, y, HOG32, hogFrame(id)).setDepth(14).setFlipX(dir > 0);
     g.xs.runners.push({ s, vx: dir * (260 + (i % 5) * 30), vy: 0, life: 3.2 });
   }
@@ -234,18 +235,20 @@ function tickRunners(g: GameScene, dt: number) {
 }
 
 // ---------------------------------------------------------------- the Reaper
-/** Wave 13: "DEPRECATED." The Reaper hoggie comes for you, never stops, keeps speeding up. */
+/** Wave 13: Nohog, the endgame boss. A hog-shaped hole in the world (the Reaper's art filled with void) that comes for
+ * you, never stops and keeps speeding up. Internally still `reaper`. */
+export const VOID = 0x0c0014;
 export function spawnReaper(g: GameScene) {
   if (g.enemies.some((e) => e.reaper)) return;
   const [x, y] = g.offscreenPoint();
   const e = g.addEnemy('tank', x, y);
   if (!e) return;
-  e.s.stop().setTexture(HOG64, hogFrame('reaper')).setScale(0.75).setDepth(16);
+  e.s.stop().setTexture(HOG64, hogFrame('reaper')).setScale(0.75).setDepth(21); // above the fx layer its void is drawn on
   const hp = Math.max(1e6, g.dps() * 240);
   Object.assign(e, { reaper: true, hp, maxHp: hp, speed: 60, dmg: g.st.maxHp * 0.5, r: 16, armour: 1, kb: 0, tint: null, xp: 0 });
-  e.s.clearTint();
-  g.banner('DEPRECATED.', 'The Reaper has come for this release');
-  g.cameras.main.flash(400, 40, 40, 40);
+  e.s.setTintFill(VOID);
+  g.banner('NOHOG.', 'The void has come for this release');
+  g.cameras.main.flash(400, 20, 0, 40);
   g.sfx('boss', 1);
 }
 
@@ -253,8 +256,14 @@ export function drawSystems(g: GameScene, fx: Phaser.GameObjects.Graphics) {
   drawDrive(g, fx);
   const r = g.enemies.find((e) => e.reaper);
   if (r) {
-    // A creeping dark halo around the Reaper.
-    fx.fillStyle(0x000000, 0.25).fillCircle(r.s.x, r.s.y, 26 + Math.sin(g.time.now / 150) * 3);
-    if (Math.random() < 0.3) burst(g, r.s.x + Phaser.Math.Between(-10, 10), r.s.y + 10, 0x3c3c3c, 1, { speed: 20, gravity: -20, life: 0.6, size: 1 });
+    // Nohog's void: a black hole with a violet event horizon, and specks of the world spiralling in.
+    const t = g.time.now, x = r.s.x, y = r.s.y, R = 30 + Math.sin(t / 220) * 2;
+    fx.fillStyle(0x000000, 0.45).fillCircle(x, y, R).fillStyle(0x000000, 0.7).fillCircle(x, y, R * 0.65);
+    fx.lineStyle(2, 0x8c3cf8, 0.75).strokeCircle(x, y, R).lineStyle(1, 0xd8b8f8, 0.5).strokeCircle(x, y, R + 3 + Math.sin(t / 90) * 1.5);
+    for (let i = 0; i < 16; i++) {
+      const f = 1 - ((t / 1100 + i / 16) % 1), a = i * 2.39 + f * 2.2;
+      const d = R * 0.5 + f * 56;
+      fx.fillStyle(i % 3 ? 0x8c3cf8 : 0xfcfcfc, 0.3 + 0.5 * (1 - f)).fillRect(Math.round(x + Math.cos(a) * d), Math.round(y + Math.sin(a) * d), 1, 1);
+    }
   }
 }
