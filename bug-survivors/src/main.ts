@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { startKit, K, spr, anim, heatRow } from '@shared/kit';
 import { meta } from '@shared/meta';
-import { text, W, TOUCH } from '@shared/ui';
+import { text, W, DW, vy, TOUCH } from '@shared/ui';
 import schema from '../theme.schema.json';
 import defaultTheme from '../themes/default.json';
 import slots from '../slots.json';
@@ -30,6 +30,7 @@ startKit({
   scenes: [GameScene, ShopScene],
   gameScene: 'Game',
   touch: true,
+  resizable: true,
   // Kit-fixed PostHog brand art: every hoggie (player characters) and every team crest (achievements).
   preload: (scene) => {
     scene.load.spritesheet(HOG32, 'assets/kit/hoggies32.png', { frameWidth: 32, frameHeight: 32 });
@@ -52,13 +53,16 @@ startKit({
   },
   titleArt: (scene: Phaser.Scene) => {
     syncCrestHogs();
-    // The hoggie facing down a lineup of the prospect's bugs, with the boss looming.
-    scene.add.sprite(W / 2, 150, spr('boss')).play(anim('boss')).setAlpha(0.9);
+    // The hoggie facing down a lineup of the prospect's bugs, with the boss looming. A narrow screen squeezes the lineup
+    // in (k) and a tall one drops it to the middle (vy).
+    // On a wide touch screen the START button row needs the bottom, so the lineup sits a little higher.
+    const k = Math.min(1, W / DW), lift = TOUCH && W >= DW ? 14 : 0, y = (v: number) => vy(v, 0.45) - lift;
+    scene.add.sprite(W / 2, y(150), spr('boss')).play(anim('boss')).setAlpha(0.9);
     const hog = currentHog();
-    const im = scene.add.image(W / 2 - 150, 166, HOG64, hogFrame(hog)).setFlipX(true);
-    scene.tweens.add({ targets: im, y: 162, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    const im = scene.add.image(W / 2 - 150 * k, y(166), HOG64, hogFrame(hog)).setFlipX(true);
+    scene.tweens.add({ targets: im, y: y(162), duration: 500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     [0, 1, 2].forEach((i) => {
-      scene.add.sprite(W / 2 + 70 + i * 26, 170 + (i % 2) * 10, spr(`enemy_${i + 1}`)).setScale(2).setFlipX(true)
+      scene.add.sprite(W / 2 + (70 + i * 26) * k + 8 * (1 - k), y(170 + (i % 2) * 10), spr(`enemy_${i + 1}`)).setScale(2).setFlipX(true)
         .play(anim(`enemy_${i + 1}`));
     });
     // Returning players: gold, best wave, hoggie count and today's daily best.
@@ -69,8 +73,8 @@ startKit({
     if (meta.data.runs > 0) parts.push(`HOGGIES ${sv.hogs.length}/${HOGS.length}`);
     const db = dailyBest();
     if (db > 0) parts.push(`DAILY BEST ${db}`);
-    if (parts.length) text(scene, W / 2, 16, parts.join('   '), { align: 'center', color: 0xf8d878, depth: 10 });
-    if (meta.data.runs > 0) text(scene, W / 2 - 150, 202, hogName(hog).toUpperCase(), { align: 'center', color: K.ui.dimInt, depth: 10, maxWidth: 110, maxLines: 1 });
+    if (parts.length) text(scene, W / 2, W < DW ? 26 : 16, parts.join('   '), { align: 'center', color: 0xf8d878, depth: 10, maxWidth: W - 8, maxLines: 2 });
+    if (meta.data.runs > 0) text(scene, W / 2 - 150 * k, y(202), hogName(hog).toUpperCase(), { align: 'center', color: K.ui.dimInt, depth: 10, maxWidth: Math.min(110, (W / 2 - 150 * k) * 2 - 4), maxLines: 1 });
     // SHOP is a title choice: when the run starts in shop mode, jump from the how-to straight to the shop.
     const howto = scene.scene.get('HowTo');
     howto.events.off('create', toShop);

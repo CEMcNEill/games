@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { spr } from '@shared/kit';
 import { burst, floatText, shake } from '@shared/juice';
-import { W, H } from '@shared/ui';
+import { camW, camH } from '@shared/ui';
 import type { GameScene, Enemy } from './game';
 import { HOG32, HOG64 } from './game';
 import { hogFrame } from './hoggies';
@@ -113,7 +113,7 @@ export function selfDrivingPr(g: GameScene) {
   let best: Enemy | null = null, bn = 0;
   for (let k = 0; k < 24 && g.enemies.length; k++) {
     const e = g.enemies[Math.floor(Math.random() * g.enemies.length)];
-    if (e.boss || e.arch === 'crate' || e.s.x < cam.scrollX || e.s.x > cam.scrollX + W || e.s.y < cam.scrollY || e.s.y > cam.scrollY + H) continue;
+    if (e.boss || e.arch === 'crate' || e.s.x < cam.worldView.x || e.s.x > cam.worldView.x + camW(cam) || e.s.y < cam.worldView.y || e.s.y > cam.worldView.y + camH(cam)) continue;
     const n = g.near(e.s.x, e.s.y, 60).length;
     if (n > bn) { bn = n; best = e; }
   }
@@ -124,7 +124,7 @@ export function selfDrivingPr(g: GameScene) {
     else if (!e.reaper) g.damage(e, e.maxHp * 0.4 + 30 * waveMul(g), 0, 0, 'selfdriving', true, true);
   }
   g.blast(x, y, 70, 0, 'selfdriving');
-  const fx = g.add.graphics().setDepth(19);
+  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
   fx.lineStyle(2, 0x3cbcfc, 1).strokeCircle(x, y, 70).lineStyle(1, 0xfcfcfc, 0.8).strokeCircle(x, y, 60);
   g.tweens.add({ targets: fx, alpha: 0, duration: 400, onComplete: () => fx.destroy() });
   floatText(g, x, y - 20, `PR #${1000 + Math.floor(Math.random() * 9000)} MERGED`, 0x3cbcfc, 0.7);
@@ -154,9 +154,9 @@ function tickDrive(g: GameScene, dt: number) {
     d.s = g.add.image(0, 0, HOG64, hogFrame('driving-hogzilla')).setDepth(15).setFlipX(d.dir > 0);
     shake(g, 4, 1200);
   }
-  const span = (d.horiz ? W : H) + 160;
+  const span = (d.horiz ? camW(cam) : camH(cam)) + 160;
   const k = (d.t - warn) * 560;
-  const along = (d.horiz ? cam.scrollX : cam.scrollY) + (d.dir > 0 ? -80 + k : span - 80 - k);
+  const along = (d.horiz ? cam.worldView.x : cam.worldView.y) + (d.dir > 0 ? -80 + k : span - 80 - k);
   if (d.horiz) d.s.setPosition(along, d.pos - 8); else d.s.setPosition(d.pos, along).setAngle(d.dir > 0 ? 90 : -90);
   // Everything in the lane near the car gets flattened (bosses take a chip).
   const x = d.s.x, y = d.s.y + (d.horiz ? 8 : 0);
@@ -185,14 +185,14 @@ function drawDrive(g: GameScene, fx: Phaser.GameObjects.Graphics) {
   const cam = g.cameras.main;
   const on = d.t < 1.8 ? Math.floor(d.t * 6) % 2 === 0 : true;
   const a = d.t < 1.8 ? (on ? 0.35 : 0.12) : 0.1;
-  if (d.horiz) fx.fillStyle(0xf8b800, a).fillRect(cam.scrollX, d.pos - 22, W, 44);
-  else fx.fillStyle(0xf8b800, a).fillRect(d.pos - 22, cam.scrollY, 44, H);
+  if (d.horiz) fx.fillStyle(0xf8b800, a).fillRect(cam.worldView.x, d.pos - 22, camW(cam), 44);
+  else fx.fillStyle(0xf8b800, a).fillRect(d.pos - 22, cam.worldView.y, 44, camH(cam));
   if (d.t < 1.8 && on) {
     // Chevrons pointing the way it's coming.
     fx.fillStyle(0xf83800, 0.9);
     for (let i = 0; i < 8; i++) {
       const f = (i + 0.5) / 8;
-      const cx = d.horiz ? cam.scrollX + f * W : d.pos, cy = d.horiz ? d.pos : cam.scrollY + f * H;
+      const cx = d.horiz ? cam.worldView.x + f * camW(cam) : d.pos, cy = d.horiz ? d.pos : cam.worldView.y + f * camH(cam);
       const ax = d.horiz ? d.dir * 6 : 0, ay = d.horiz ? 0 : d.dir * 6;
       fx.fillTriangle(cx + ax, cy + ay, cx - ax + (d.horiz ? 0 : 5), cy - ay + (d.horiz ? 5 : 0), cx - ax - (d.horiz ? 0 : 5), cy - ay - (d.horiz ? 5 : 0));
     }
@@ -208,8 +208,8 @@ export function allHands(g: GameScene, n = 24) {
   const dir = Math.random() < 0.5 ? 1 : -1;
   for (let i = 0; i < n; i++) {
     const id = ids[i % ids.length];
-    const y = cam.scrollY + 24 + ((i * 37) % (H - 48));
-    const x = dir > 0 ? cam.scrollX - 20 - (i % 6) * 26 : cam.scrollX + W + 20 + (i % 6) * 26;
+    const y = cam.worldView.y + 24 + ((i * 37) % (camH(cam) - 48));
+    const x = dir > 0 ? cam.worldView.x - 20 - (i % 6) * 26 : cam.worldView.x + camW(cam) + 20 + (i % 6) * 26;
     const s = g.add.image(x, y, HOG32, hogFrame(id)).setDepth(14).setFlipX(dir > 0);
     g.xs.runners.push({ s, vx: dir * (260 + (i % 5) * 30), vy: 0, life: 3.2 });
   }

@@ -17,7 +17,7 @@
 import Phaser from 'phaser';
 import { K } from './kit';
 import { meta } from './meta';
-import { text, box, PixelText, W } from './ui';
+import { text, box, PixelText, W, fitCam } from './ui';
 
 const reduced = () => { try { return meta.reducedMotion(); } catch { return false; } };
 
@@ -171,6 +171,11 @@ export function burst(scene: Phaser.Scene, x: number, y: number, colour = 0xffff
   }
 }
 
+/** Fade this scene's particles (kill bursts, sparks): late-game screens get busy. 1 = fully opaque. */
+export function particleAlpha(scene: Phaser.Scene, a: number) {
+  if (scene?.sys?.isActive()) layer(scene).g.setAlpha(a);
+}
+
 export function floatText(scene: Phaser.Scene, x: number, y: number, str: string | number, colour = 0xfcfcfc, life = 0.7) {
   if (!scene?.sys?.isActive()) return;
   const L = layer(scene);
@@ -198,6 +203,7 @@ export class OverlayScene extends Phaser.Scene {
 
   create() {
     this.busy = false;
+    fitCam(this, this.cameras.main);
     this.events.on('update', () => { if (!this.busy && queue.length) this.show(queue.shift()!); });
   }
 

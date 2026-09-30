@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { spr } from '@shared/kit';
 import { burst, floatText } from '@shared/juice';
-import { W, H } from '@shared/ui';
+import { camW, camH } from '@shared/ui';
 import type { GameScene, Enemy } from './game';
 import type { WState } from './weapons';
 
@@ -125,7 +125,7 @@ function runExport(g: GameScene, w: WState, k: number, replay: boolean) {
   for (let i = 0; i < Math.min(8, rows); i++) {
     const b = g.add.image(p.x, p.y, spr('crate')).setDepth(19).setScale(0.5);
     const cam = g.cameras.main;
-    g.tweens.add({ targets: b, x: cam.scrollX + W + 20, y: cam.scrollY + Phaser.Math.Between(20, H - 20), duration: 600 + i * 40,
+    g.tweens.add({ targets: b, x: cam.worldView.x + camW(cam) + 20, y: cam.worldView.y + Phaser.Math.Between(20, camH(cam) - 20), duration: 600 + i * 40,
       ease: 'Quad.In', onComplete: () => b.destroy() });
   }
   g.sfx('chest', 0.4, 200);
@@ -177,7 +177,7 @@ function prLaser(g: GameScene) {
   for (const e of g.near((p.x + ex) / 2, (p.y + ey) / 2, 175)) {
     if (seg(e.s.x, e.s.y, p.x, p.y, ex, ey)[0] < 10 + e.r) g.damage(e, 90, Math.cos(a) * 120, Math.sin(a) * 120, 'scouts');
   }
-  const fx = g.add.graphics().setDepth(19);
+  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
   fx.lineStyle(7, 0x3cbcfc, 0.35).lineBetween(p.x, p.y, ex, ey).lineStyle(2, 0xfcfcfc, 1).lineBetween(p.x, p.y, ex, ey);
   g.tweens.add({ targets: fx, alpha: 0, duration: 260, onComplete: () => fx.destroy() });
   floatText(g, p.x, p.y - 26, 'PR MERGED', 0x3cbcfc, 0.8);
@@ -202,7 +202,7 @@ function runQuery(g: GameScene, w: WState) {
   let n = 0;
   for (const e of [...g.enemies]) {
     if (!e.alive || e.arch === 'crate') continue;
-    if (e.s.x < cam.scrollX - 8 || e.s.x > cam.scrollX + W + 8 || e.s.y < cam.scrollY - 8 || e.s.y > cam.scrollY + H + 8) continue;
+    if (e.s.x < cam.worldView.x - 8 || e.s.x > cam.worldView.x + camW(cam) + 8 || e.s.y < cam.worldView.y - 8 || e.s.y > cam.worldView.y + camH(cam) + 8) continue;
     if (e.reaper) continue;
     if (e.boss || e.twin) { g.damage(e, e.maxHp * 0.008, 0, 0, 'hogql', true, true); continue; }
     if (e.hp < e.maxHp * thr) { n++; g.damage(e, e.hp + 1, 0, 0, 'hogql', true, true); }
@@ -227,12 +227,12 @@ const logs: Fn = (g, w, dt) => {
     const thick = 5 * s.area * (w.major ? 2 : 1);
     for (let k = 0; k < n; k++) {
       const fromTop = (logId + k) % 2 === 0;
-      const y = fromTop ? cam.scrollY - 6 - k * 26 : cam.scrollY + H + 6 + k * 26;
-      lines.push({ x: cam.scrollX, y, vx: 0, vy: fromTop ? 110 : -110, life: 3, id: logId++, vert: false, len: W, w: thick });
+      const y = fromTop ? cam.worldView.y - 6 - k * 26 : cam.worldView.y + camH(cam) + 6 + k * 26;
+      lines.push({ x: cam.worldView.x, y, vx: 0, vy: fromTop ? 110 : -110, life: 3, id: logId++, vert: false, len: camW(cam), w: thick });
       if (w.evo) {
         const fromLeft = k % 2 === 0;
-        const x = fromLeft ? cam.scrollX - 6 - k * 26 : cam.scrollX + W + 6 + k * 26;
-        lines.push({ x, y: cam.scrollY, vx: fromLeft ? 160 : -160, vy: 0, life: 3.4, id: logId++, vert: true, len: H, w: thick });
+        const x = fromLeft ? cam.worldView.x - 6 - k * 26 : cam.worldView.x + camW(cam) + 6 + k * 26;
+        lines.push({ x, y: cam.worldView.y, vx: fromLeft ? 160 : -160, vy: 0, life: 3.4, id: logId++, vert: true, len: camH(cam), w: thick });
       }
     }
   }
@@ -299,7 +299,7 @@ const aiObservability: Fn = (g, w, dt) => {
   w.timer = (w.evo ? 0.9 : 1.7 - 0.15 * L) * s.cd;
   const depth = (L >= 4 ? 3 : 2) + (w.evo ? 1 : 0), branch = 2 + (w.major ? 1 : 0) + Math.min(1, s.amount);
   const hit = new Set<Enemy>([root]);
-  const fx = g.add.graphics().setDepth(19);
+  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
   const dmg0 = w.evo ? 40 : 18 + 6 * L;
   const spanHit = (e: Enemy, dmg: number) => {
     // Evaluations: a span on a bug that was already traced lands as a crit.
