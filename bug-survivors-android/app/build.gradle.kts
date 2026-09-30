@@ -10,8 +10,8 @@ android {
         applicationId = "es.funglass.bugsurvivors"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2 co-op"
+        versionCode = 4
+        versionName = "1.3 co-op"
     }
 
     // The game itself is the web build (node build-kits.mjs bug-survivors), packed as-is: dist/ is the assets root.

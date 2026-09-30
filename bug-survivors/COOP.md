@@ -14,6 +14,9 @@ countdown runs and the game starts on every device at once.
   While the tray is open your hog is in code review: a shield bubble means no damage, you walk at 70% speed, and it
   lasts 8 s per hand. The camera shifts so your hog stays above the tray. A hand left for 20 s is picked for you.
   Only the between-wave choices (the SHIPPED call and releases) hold the world.
+- **Finding each other:** a teammate who is off your screen gets a marker on the screen's edge. It's in their colour,
+  points from your hog toward them, and shows their seat and HP. A downed teammate's marker flashes red ("P2 DOWN")
+  and its bar shows review progress. Teammates on screen have a name tag and an HP bar under them.
 - **Nobody plays alone.** Out of HP (with no revives left), your hog goes down. "IT'S NOT OK TO LET YOUR TEAMMATE FAIL"
   flashes, and a teammate standing on you for 3 s reviews you back in. Downed hogs also come back at the next wave. The
   run ends when every hog is down at once.
