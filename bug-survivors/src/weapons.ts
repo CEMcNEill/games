@@ -27,15 +27,18 @@ export interface WState {
   major: boolean;                         // v2.0 major release
   items: any[];                           // tools: pipes, scanners, turrets, log lines...
   cnt: number;                            // tools: a counter (scout flags, export hits...)
+  born: number;                           // run time it was picked up (or evolved): its effects stay bright for a while
 }
 
 export const newWeapon = (id: WeaponId): WState => ({ id, level: 1, evo: false, timer: 0.3, angle: 0, flags: [], orbs: [], rings: [], nova: 1,
-  spots: [], drone: null, patch: 0, major: false, items: [], cnt: 0 });
+  spots: [], drone: null, patch: 0, major: false, items: [], cnt: 0, born: 0 });
 
 /** "v0.3", "v1.0", "v1.4", "v2.1": the weapon's version for cards, HUD and pause. */
 export const semver = (w: WState) => (w.major ? `v2.${w.patch}` : w.evo ? `v1.${w.patch}` : w.level >= 5 && w.patch ? `v0.5.${w.patch}` : `v0.${w.level}`);
 
 const GOLD = 0xf8d878;
+/** Your weapons draw at this depth: under the bugs (5-6) and the hog (10), so threats always read on top of your effects. */
+export const OWN = 4.5;
 
 /** Survey aura radius and slow factor (also read by enemy movement and drawing). */
 export function aura(w: WState | undefined, s: Stats) {
@@ -97,7 +100,7 @@ const sessionReplay: Fn = (g, w, dt) => {
   const n = (w.evo ? 6 : Math.min(5, 2 + L)) + s.amount; // 3 orbs at level 1: a viable starting weapon
   const orbs = w.orbs;
   while (orbs.length < n) {
-    const o = g.add.image(p.x, p.y, spr('orb')).setDepth(9);
+    const o = g.add.image(p.x, p.y, spr('orb')).setDepth(OWN + 0.3);
     if (w.evo) o.setScale(1.5);
     orbs.push(o);
   }
@@ -282,7 +285,7 @@ const heatmaps: Fn = (g, w, dt) => {
 const posthogAi: Fn = (g, w, dt) => {
   const s = g.st, p = g.player, L = w.level;
   if (!w.drone) {
-    w.drone = g.add.sprite(p.x, p.y - 16, spr('drone')).setDepth(11);
+    w.drone = g.add.sprite(p.x, p.y - 16, spr('drone')).setDepth(OWN + 0.4);
     w.drone.play(anim('drone'));
     if (w.evo) w.drone.setTint(GOLD);
   }
@@ -314,7 +317,7 @@ const posthogAi: Fn = (g, w, dt) => {
 const dataWarehouse: Fn = (g, w) => {
   const s = g.st, p = g.player, L = w.level;
   const n = Math.min(4, 1 + Math.floor(L / 2) + s.amount);
-  while (w.orbs.length < n) w.orbs.push(g.add.image(p.x, p.y, spr('vault')).setDepth(9).setScale(1.25));
+  while (w.orbs.length < n) w.orbs.push(g.add.image(p.x, p.y, spr('vault')).setDepth(OWN + 0.3).setScale(1.25));
   while (w.orbs.length > n) w.orbs.pop()!.destroy();
   const rad = (56 + 4 * L) * s.area;
   const spin = -g.elapsed * 1.15;
@@ -376,7 +379,7 @@ export const WEAPON_FNS: Partial<Record<WeaponId, Fn>> = {
 };
 
 /** Rings (analytics), the survey aura, heat tiles and traffic beams, drawn each frame. */
-export function drawWeapons(g: GameScene, fx: Phaser.GameObjects.Graphics, auraG: Phaser.GameObjects.Graphics) {
+export function drawWeapons(g: GameScene, gfx: (id: WeaponId) => Phaser.GameObjects.Graphics, auraG: Phaser.GameObjects.Graphics) {
   const sv = g.weapons.get('surveys');
   auraG.clear();
   const hm = g.weapons.get('heatmaps');
@@ -391,6 +394,7 @@ export function drawWeapons(g: GameScene, fx: Phaser.GameObjects.Graphics, auraG
   }
   const wa = g.weapons.get('web_analytics');
   if (wa) {
+    const fx = gfx('web_analytics');
     const { len, angles } = beams(wa, g.st);
     const px = g.player.x, py = g.player.y;
     for (const a of angles) {
@@ -415,6 +419,7 @@ export function drawWeapons(g: GameScene, fx: Phaser.GameObjects.Graphics, auraG
   }
   const pa = g.weapons.get('product_analytics');
   if (pa) {
+    const fx = gfx('product_analytics');
     for (const r of pa.rings) {
       if (r.r <= 0) continue;
       const n = pa.evo ? 36 : 24;

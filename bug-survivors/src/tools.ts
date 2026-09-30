@@ -6,14 +6,15 @@ import { spr } from '@shared/kit';
 import { burst, floatText } from '@shared/juice';
 import { camW, camH } from '@shared/ui';
 import type { GameScene, Enemy } from './game';
-import type { WState } from './weapons';
+import { HOG64 } from './game';
+import { hogFrame } from './hoggies';
+import type { WeaponId } from './content';
+import { OWN, type WState } from './weapons';
 
 type Fn = (g: GameScene, w: WState, dt: number) => void;
 const GOLD = 0xf8d878;
 
-interface Pipe { x1: number; y1: number; x2: number; y2: number; t: number; life: number; tick: number }
 interface Scout { s: Phaser.GameObjects.Image; a: number; t: number }
-interface LogLine { x: number; y: number; vx: number; vy: number; life: number; id: number; vert: boolean; len: number; w: number }
 interface Scanner { x: number; y: number; a: number; t: number; life: number; kind: number; zap: number }
 interface Turret { s: Phaser.GameObjects.Image; t: number; life: number }
 
@@ -39,56 +40,107 @@ function crowdDir(g: GameScene, r: number): [number, number] {
 }
 
 // ---------------------------------------------------------------- Data Pipelines
-const dataPipelines: Fn = (g, w, dt) => {
-  const s = g.st, p = g.player, L = w.level;
-  const pipes = w.items as Pipe[];
-  w.timer -= dt;
-  if (w.timer <= 0) {
-    w.timer = (w.evo ? 2.6 : 4.6 - 0.35 * L) * s.cd;
-    const len = (w.evo ? 190 : 110 + 15 * L) * s.area;
-    const n = 1 + (s.amount >= 2 ? 1 : 0);
-    let [dx, dy] = crowdDir(g, 170);
-    for (let k = 0; k < n; k++) {
-      if (k) [dx, dy] = [-dx, -dy];
-      pipes.push({ x1: p.x, y1: p.y, x2: p.x + dx * len, y2: p.y + dy * len, t: 0, life: 3.5, tick: 0 });
-    }
-    g.sfx('vacuum', 0.35, 200);
-  }
-  const dmg = w.evo ? 26 : 8 + 4 * L, endDmg = w.evo ? 60 : 20 + 8 * L;
-  for (let i = pipes.length - 1; i >= 0; i--) {
-    const q = pipes[i];
-    q.t += dt; q.tick -= dt;
-    if (q.t >= q.life) { pipes.splice(i, 1); continue; }
-    const len = Math.hypot(q.x2 - q.x1, q.y2 - q.y1) || 1;
-    const ux = (q.x2 - q.x1) / len, uy = (q.y2 - q.y1) / len;
-    // Bugs touching the pipe get sucked along it toward the destination.
-    for (const e of g.near((q.x1 + q.x2) / 2, (q.y1 + q.y2) / 2, len / 2 + 12)) {
-      if (e.boss || e.arch === 'crate') continue;
-      const [d] = seg(e.s.x, e.s.y, q.x1, q.y1, q.x2, q.y2);
-      if (d > 10 * s.area + e.r) continue;
-      e.kx += ux * 420 * dt * e.kb; e.ky += uy * 420 * dt * e.kb;
-      e.hitAt.pipeT = g.elapsed + 0.4;
-      if ((e.hitAt.pipe ?? 0) > g.elapsed) continue;
-      e.hitAt.pipe = g.elapsed + 0.4;
-      g.damage(e, dmg, 0, 0, 'data_pipelines', true);
-    }
-    if (q.tick <= 0) {
-      // The destination end: whatever comes out gets hit hard.
-      q.tick = 0.5;
-      for (const e of g.near(q.x2, q.y2, 22 * s.area)) g.damage(e, endDmg, ux * 160, uy * 160, 'data_pipelines');
-    }
-  }
+/** A pipeline run: seconds sucking in, then the blast out the back. At most once a minute (cooldowns don't touch it). */
+export const PIPE = { every: 60, first: 6, suck: 1.4, blow: 0.9 };
+const PIPE_RING = 520; // px/s the blast ring sweeps out at
+
+interface PipeRun { id: number; t: number; dx: number; dy: number; half: number; eaten: number; ring: number }
+let pipeId = 1;
+
+const onScreen = (g: GameScene, x: number, y: number, pad = 8) => {
+  const v = g.cameras.main.worldView, cam = g.cameras.main;
+  return x > v.x - pad && x < v.x + camW(cam) + pad && y > v.y - pad && y < v.y + camH(cam) + pad;
 };
 
-/** Hog Transformations: a bug that dies in a pipe fires back out as a homing event (called from kill()). */
-export function pipeTransform(g: GameScene, e: Enemy) {
+/** Pipeline: every 60 s the hog vacuums up every small bug in front of it (elites too on v2.0), then blasts them out the
+ * back in a ring that wipes the screen: small bugs die, elites lose half their HP, bosses take a chip. The hog can't be
+ * hurt for the whole run. Evolved (Hog Transformations) it sucks from every side. */
+const dataPipelines: Fn = (g, w, dt) => {
+  const p = g.player;
+  const runs = w.items as PipeRun[];
+  let run = runs[0];
+  if (!run) {
+    if (!w.cnt) { w.cnt = 1; w.timer = PIPE.first; }
+    w.timer -= dt;
+    if (w.timer > 0 || g.interlude) return;
+    w.timer = PIPE.every;
+    const f = g.facing;
+    run = { id: pipeId++, t: 0, dx: f.x, dy: f.y, half: w.evo ? Math.PI : 0.6 + 0.12 * w.level, eaten: 0, ring: 0 };
+    runs.push(run);
+    floatText(g, p.x, p.y - 30, 'PIPELINE RUN', 0xfca044, 1);
+    g.sfx('vacuum', 0.9, 200);
+  }
+  run.t += dt;
+  const end = PIPE.suck + PIPE.blow;
+  g.invuln = Math.max(g.invuln, end + 0.3 - run.t);
+  const grab = (e: Enemy) => !e.boss && !e.twin && !e.reaper && e.arch !== 'crate' && (!e.elite || w.major);
+  if (run.t < PIPE.suck) {
+    // Suck: everything small in the cone on screen gets pulled in, faster and faster, and is ingested at the mouth.
+    const pull = 160 + 620 * (run.t / PIPE.suck);
+    for (const e of [...g.enemies]) {
+      if (!e.alive || !grab(e)) continue;
+      const ex = e.s.x - p.x, ey = e.s.y - p.y, d = Math.hypot(ex, ey) || 1;
+      if (e.hitAt.suck !== run.id) {
+        if (!onScreen(g, e.s.x, e.s.y)) continue;
+        const dot = (ex * run.dx + ey * run.dy) / d;
+        if (Math.acos(Phaser.Math.Clamp(dot, -1, 1)) > run.half) continue;
+        e.hitAt.suck = run.id;
+      }
+      if (d < 10) { run.eaten++; g.damage(e, e.hp + 1, 0, 0, 'data_pipelines', true, true); continue; }
+      const step = Math.min(d, pull * dt);
+      e.s.x -= (ex / d) * step; e.s.y -= (ey / d) * step;
+      e.kx = 0; e.ky = 0;
+    }
+    return;
+  }
+  if (!run.ring) {
+    // Blow: the ingested bugs come out the back as broken events, and the blast ring starts sweeping out.
+    run.ring = 1;
+    g.sfx('bomb', 0.8, 200);
+    g.cameras.main.flash(160, 252, 160, 68);
+    const n = Math.min(24, run.eaten);
+    for (let i = 0; i < n; i++) {
+      const a = Math.atan2(-run.dy, -run.dx) + (Math.random() - 0.5) * 0.9, sp = 260 + Math.random() * 140;
+      g.shoot('shot', p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, 40, 0.9, 99, 'data_pipelines').s.setTintFill(i % 2 ? 0xfca044 : 0xfcfcfc);
+    }
+  }
+  run.ring = Math.max(1, (run.t - PIPE.suck) * PIPE_RING);
+  for (const e of [...g.enemies]) {
+    if (!e.alive || e.reaper || e.hitAt.wipe === run.id) continue;
+    if ((e.s.x - p.x) ** 2 + (e.s.y - p.y) ** 2 > run.ring * run.ring || !onScreen(g, e.s.x, e.s.y)) continue;
+    e.hitAt.wipe = run.id;
+    if (e.boss || e.twin) g.damage(e, e.maxHp * 0.08, 0, 0, 'data_pipelines', true, true);
+    else if (e.elite) g.damage(e, e.maxHp * 0.5, 0, 0, 'data_pipelines', true, true);
+    else g.damage(e, e.hp + 1, 0, 0, 'data_pipelines', true, true);
+  }
+  if (run.t >= end) runs.length = 0;
+};
+
+/** Pipeline effects: the intake cone and hose while sucking, then the exhaust and the blast ring. Drawn on the threat
+ * layer at full strength: it's a once-a-minute screen event and you should see it. */
+function drawPipeline(g: GameScene, fx: Phaser.GameObjects.Graphics) {
   const w = g.weapons.get('data_pipelines');
-  if (!w?.evo || (e.hitAt.pipeT ?? 0) < g.elapsed || g.projs.length > 250) return;
-  const t = g.nearest(e.s.x, e.s.y, 200);
-  if (!t) return;
-  const a = Math.atan2(t.s.y - e.s.y, t.s.x - e.s.x);
-  const pr = g.shoot('homing', e.s.x, e.s.y, Math.cos(a) * 220, Math.sin(a) * 220, 34, 1.6, 2, 'data_pipelines');
-  pr.homing = t; pr.speed = 220; pr.s.setTint(0xfca044);
+  const run = (w?.items as PipeRun[] | undefined)?.[0];
+  if (!run) return;
+  const p = g.player, t = g.time.now, a0 = Math.atan2(run.dy, run.dx);
+  if (run.t < PIPE.suck) {
+    const k = Math.min(1, run.t / 0.2), R = 200;
+    fx.fillStyle(0xfca044, 0.1 * k).slice(p.x, p.y, R, a0 - run.half, a0 + run.half).fillPath();
+    // Streaks flowing into the mouth.
+    for (let i = 0; i < 18; i++) {
+      const a = a0 + (((i * 0.618) % 1) * 2 - 1) * run.half, f = 1 - ((t / 260 + i / 18) % 1);
+      const r = 14 + f * (R - 14);
+      fx.fillStyle(0xfcfcfc, 0.7 * k * (1 - f * 0.5)).fillRect(Math.round(p.x + Math.cos(a) * r) - 1, Math.round(p.y + Math.sin(a) * r) - 1, 2, 2);
+    }
+    const hx = p.x + run.dx * 14, hy = p.y + run.dy * 14;
+    fx.lineStyle(7, 0x3c3c3c, 1).lineBetween(p.x, p.y, hx, hy).lineStyle(4, 0xe45c10, 1).lineBetween(p.x, p.y, hx, hy);
+    fx.fillStyle(0x3c3c3c, 1).fillCircle(hx, hy, 5).lineStyle(1, 0xfca044, 1).strokeCircle(hx, hy, 6 + Math.sin(t / 40));
+    return;
+  }
+  const k = 1 - (run.t - PIPE.suck) / PIPE.blow;
+  const bx = p.x - run.dx * 360, by = p.y - run.dy * 360;
+  fx.lineStyle(18, 0xfca044, 0.25 * k).lineBetween(p.x, p.y, bx, by).lineStyle(6, 0xfcfcfc, 0.6 * k).lineBetween(p.x, p.y, bx, by);
+  fx.lineStyle(4, 0xfca044, 0.8 * k).strokeCircle(p.x, p.y, run.ring).lineStyle(1, 0xfcfcfc, k).strokeCircle(p.x, p.y, run.ring - 3);
 }
 
 // ---------------------------------------------------------------- Batch Exports
@@ -123,7 +175,7 @@ function runExport(g: GameScene, w: WState, k: number, replay: boolean) {
   const p = g.player;
   floatText(g, p.x, p.y - 30, `${replay ? 'BACKFILLED' : 'EXPORTED'} ${rows} ROWS`, 0x3cbcfc, 0.9);
   for (let i = 0; i < Math.min(8, rows); i++) {
-    const b = g.add.image(p.x, p.y, spr('crate')).setDepth(19).setScale(0.5);
+    const b = g.add.image(p.x, p.y, spr('crate')).setDepth(OWN + 0.4).setScale(0.5);
     const cam = g.cameras.main;
     g.tweens.add({ targets: b, x: cam.worldView.x + camW(cam) + 20, y: cam.worldView.y + Phaser.Math.Between(20, camH(cam) - 20), duration: 600 + i * 40,
       ease: 'Quad.In', onComplete: () => b.destroy() });
@@ -136,7 +188,7 @@ const scouts: Fn = (g, w, dt) => {
   const s = g.st, p = g.player, L = w.level;
   const troop = w.items as Scout[];
   const n = Math.min(8, 1 + L + s.amount + (w.evo ? 2 : 0));
-  while (troop.length < n) troop.push({ s: g.add.image(p.x, p.y, spr('drone')).setDepth(11).setTint(w.evo ? GOLD : 0x3cbcfc), a: Math.random() * 6.28, t: Math.random() });
+  while (troop.length < n) troop.push({ s: g.add.image(p.x, p.y, spr('drone')).setDepth(OWN + 0.4).setTint(w.evo ? GOLD : 0x3cbcfc), a: Math.random() * 6.28, t: Math.random() });
   const flagFor = w.major ? 8 : 4;
   troop.forEach((sc, i) => {
     sc.a += dt * (0.8 + (i % 3) * 0.2);
@@ -177,7 +229,7 @@ function prLaser(g: GameScene) {
   for (const e of g.near((p.x + ex) / 2, (p.y + ey) / 2, 175)) {
     if (seg(e.s.x, e.s.y, p.x, p.y, ex, ey)[0] < 10 + e.r) g.damage(e, 90, Math.cos(a) * 120, Math.sin(a) * 120, 'scouts');
   }
-  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
+  const fx = g.add.graphics().setDepth(OWN + 0.4).setAlpha(g.wAlpha('scouts'));
   fx.lineStyle(7, 0x3cbcfc, 0.35).lineBetween(p.x, p.y, ex, ey).lineStyle(2, 0xfcfcfc, 1).lineBetween(p.x, p.y, ex, ey);
   g.tweens.add({ targets: fx, alpha: 0, duration: 260, onComplete: () => fx.destroy() });
   floatText(g, p.x, p.y - 26, 'PR MERGED', 0x3cbcfc, 0.8);
@@ -215,43 +267,74 @@ function runQuery(g: GameScene, w: WState) {
 }
 
 // ---------------------------------------------------------------- Logs
-let logId = 1;
+/** Logs: every 10-15 s Hogzilla tears across the screen through the thick of the bugs, dropping log bombs down the road.
+ * No screen shake. Evolved (Firehose): two cars on crossing lanes. */
+interface Bomber { s: Phaser.GameObjects.Image; horiz: boolean; pos: number; dir: number; along: number; end: number; drop: number; id: number }
+interface LogBomb { x: number; y: number; t: number }
+let bomberId = 1;
+const BOMBER_SPEED = 380, BOMB_FUSE = 0.35, BOMB_EVERY = 20;
+
 const logs: Fn = (g, w, dt) => {
-  const s = g.st, L = w.level;
-  const lines = w.items as LogLine[];
+  const s = g.st, L = w.level, p = g.player;
+  const st = (w.items[0] ??= { cars: [] as Bomber[], bombs: [] as LogBomb[] }) as { cars: Bomber[]; bombs: LogBomb[] };
   w.timer -= dt;
-  if (w.timer <= 0) {
-    w.timer = (w.evo ? 1.8 : 2.8 - 0.2 * L) * s.cd;
-    const cam = g.cameras.main;
-    const n = (w.evo ? 2 : 1 + (L >= 3 ? 1 : 0) + (L >= 5 ? 1 : 0)) + Math.min(1, s.amount);
-    const thick = 5 * s.area * (w.major ? 2 : 1);
-    for (let k = 0; k < n; k++) {
-      const fromTop = (logId + k) % 2 === 0;
-      const y = fromTop ? cam.worldView.y - 6 - k * 26 : cam.worldView.y + camH(cam) + 6 + k * 26;
-      lines.push({ x: cam.worldView.x, y, vx: 0, vy: fromTop ? 110 : -110, life: 3, id: logId++, vert: false, len: camW(cam), w: thick });
-      if (w.evo) {
-        const fromLeft = k % 2 === 0;
-        const x = fromLeft ? cam.worldView.x - 6 - k * 26 : cam.worldView.x + camW(cam) + 6 + k * 26;
-        lines.push({ x, y: cam.worldView.y, vx: fromLeft ? 160 : -160, vy: 0, life: 3.4, id: logId++, vert: true, len: camH(cam), w: thick });
-      }
+  if (w.timer <= 0 && !st.cars.length && !g.interlude) {
+    w.timer = w.evo ? 10 : 15 - L;
+    const cam = g.cameras.main, v = cam.worldView;
+    const [cx, cy] = crowdDir(g, 170);
+    const tx = p.x + cx * 50, ty = p.y + cy * 50;
+    const first = Math.random() < 0.5;
+    for (const horiz of w.evo ? [true, false] : [first]) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const lo = horiz ? v.x : v.y, len = horiz ? camW(cam) : camH(cam);
+      const along = dir > 0 ? lo - 50 : lo + len + 50;
+      const car = g.add.image(0, 0, HOG64, hogFrame('driving-hogzilla')).setDepth(OWN + 0.5).setScale(0.75);
+      if (horiz) car.setFlipX(dir > 0); else car.setAngle(dir > 0 ? 90 : -90);
+      st.cars.push({ s: car, horiz, pos: horiz ? ty : tx, dir, along, end: dir > 0 ? lo + len + 50 : lo - 50, drop: 0, id: bomberId++ });
     }
+    g.sfx('charge', 0.5, 200);
   }
-  const dmg = w.evo ? 22 : 7 + 3 * L;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const l = lines[i];
-    l.life -= dt;
-    l.x += l.vx * dt; l.y += l.vy * dt;
-    if (l.life <= 0) { lines.splice(i, 1); continue; }
-    const key = `log${l.id}`;
-    const cx = l.vert ? l.x : l.x + l.len / 2, cy = l.vert ? l.y + l.len / 2 : l.y;
-    for (const e of g.near(cx, cy, l.len / 2 + 6)) {
-      const d = l.vert ? Math.abs(e.s.x - l.x) : Math.abs(e.s.y - l.y);
-      if (d > l.w + e.r || e.hitAt[key]) continue;
-      e.hitAt[key] = 1;
-      g.damage(e, dmg, l.vx * 0.4, l.vy * 0.4, 'logs');
+  const R = (22 + 2 * L) * s.area * (w.major ? 1.5 : 1), dmg = w.evo ? 70 : 24 + 9 * L;
+  for (let i = st.cars.length - 1; i >= 0; i--) {
+    const c = st.cars[i];
+    const step = BOMBER_SPEED * dt;
+    c.along += c.dir * step;
+    const x = c.horiz ? c.along : c.pos, y = c.horiz ? c.pos : c.along;
+    c.s.setPosition(x, y - (c.horiz ? 6 : 0));
+    // Log bombs every BOMB_EVERY px, zig-zagging either side of the road.
+    c.drop += step;
+    while (c.drop >= BOMB_EVERY) {
+      c.drop -= BOMB_EVERY;
+      const side = (st.bombs.length % 2 ? 1 : -1) * 12;
+      st.bombs.push({ x: x + (c.horiz ? 0 : side), y: y + (c.horiz ? side : 0), t: 0 });
     }
+    // The car itself runs bugs over.
+    for (const e of g.near(x, y, 16)) {
+      if (e.hitAt.bomber === c.id || e.reaper) continue;
+      e.hitAt.bomber = c.id;
+      g.damage(e, dmg * 1.5, c.horiz ? c.dir * 200 : 0, c.horiz ? 0 : c.dir * 200, 'logs', true);
+    }
+    if ((c.dir > 0 && c.along > c.end) || (c.dir < 0 && c.along < c.end)) { c.s.destroy(); st.cars.splice(i, 1); }
+  }
+  for (let i = st.bombs.length - 1; i >= 0; i--) {
+    const b = st.bombs[i];
+    b.t += dt;
+    if (b.t < BOMB_FUSE) continue;
+    g.blast(b.x, b.y, R, dmg, 'logs');
+    st.bombs.splice(i, 1);
+    if (i % 3 === 0) g.sfx('explode', 0.25, 90);
   }
 };
+
+function drawLogs(g: GameScene, fx: Phaser.GameObjects.Graphics) {
+  const st = g.weapons.get('logs')?.items[0] as { bombs: LogBomb[] } | undefined;
+  if (!st) return;
+  // A log bomb: a little scroll with a blinking fuse.
+  for (const b of st.bombs) {
+    fx.fillStyle(0x3c3c3c, 1).fillRect(b.x - 4, b.y - 2, 8, 4).fillStyle(0xb8f818, 1).fillRect(b.x - 3, b.y - 1, 6, 1);
+    if (Math.floor(b.t * 20) % 2 === 0) fx.fillStyle(0xf83800, 1).fillRect(b.x + 3, b.y - 4, 2, 2);
+  }
+}
 
 // ---------------------------------------------------------------- Replay Vision
 const replayVision: Fn = (g, w, dt) => {
@@ -299,7 +382,7 @@ const aiObservability: Fn = (g, w, dt) => {
   w.timer = (w.evo ? 0.9 : 1.7 - 0.15 * L) * s.cd;
   const depth = (L >= 4 ? 3 : 2) + (w.evo ? 1 : 0), branch = 2 + (w.major ? 1 : 0) + Math.min(1, s.amount);
   const hit = new Set<Enemy>([root]);
-  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
+  const fx = g.add.graphics().setDepth(OWN + 0.4).setAlpha(g.wAlpha('ai_observability'));
   const dmg0 = w.evo ? 40 : 18 + 6 * L;
   const spanHit = (e: Enemy, dmg: number) => {
     // Evaluations: a span on a bug that was already traced lands as a crit.
@@ -380,7 +463,7 @@ const endpoints: Fn = (g, w, dt) => {
 const desktop: Fn = (g, w, dt) => {
   const s = g.st, p = g.player, L = w.level;
   const n = Math.min(9, (w.evo ? 9 : 2 + L) + s.amount);
-  while (w.orbs.length < n) w.orbs.push(g.add.image(p.x, p.y, spr('ai_bolt')).setDepth(9).setTint(w.evo ? GOLD : 0xd8b8f8));
+  while (w.orbs.length < n) w.orbs.push(g.add.image(p.x, p.y, spr('ai_bolt')).setDepth(OWN + 0.3).setTint(w.evo ? GOLD : 0xd8b8f8));
   while (w.orbs.length > n) w.orbs.pop()!.destroy();
   if (n >= 9) g.earn('posthog-desktop');
   const rad = 34 * s.area, spin = g.elapsed * 1.2;
@@ -418,40 +501,12 @@ export const TOOL_FNS: Record<string, Fn> = {
 };
 
 /** Pipes, log lines and scanner cones, drawn each frame. */
-export function drawTools(g: GameScene, fx: Phaser.GameObjects.Graphics) {
-  const t = g.time.now;
-  const dp = g.weapons.get('data_pipelines');
-  if (dp) {
-    for (const q of dp.items as Pipe[]) {
-      const k = q.t < 0.2 ? q.t / 0.2 : q.t > q.life - 0.4 ? (q.life - q.t) / 0.4 : 1;
-      const x2 = q.x1 + (q.x2 - q.x1) * Math.min(1, q.t / 0.2), y2 = q.y1 + (q.y2 - q.y1) * Math.min(1, q.t / 0.2);
-      fx.lineStyle(9, 0x7c7c7c, 0.55 * k).lineBetween(q.x1, q.y1, x2, y2);
-      fx.lineStyle(5, dp.evo ? 0xf8b800 : 0xe45c10, 0.8 * k).lineBetween(q.x1, q.y1, x2, y2);
-      for (let i = 0; i < 6; i++) {
-        const f = (t / 300 + i / 6) % 1;
-        fx.fillStyle(0xfcfcfc, k).fillRect(Math.round(q.x1 + (x2 - q.x1) * f) - 1, Math.round(q.y1 + (y2 - q.y1) * f) - 1, 2, 2);
-      }
-      fx.fillStyle(0x3c3c3c, k).fillCircle(x2, y2, 5).lineStyle(1, 0xfca044, k).strokeCircle(x2, y2, 7);
-    }
-  }
-  const lg = g.weapons.get('logs');
-  if (lg) {
-    for (const l of lg.items as LogLine[]) {
-      const a = Math.min(1, l.life);
-      if (l.vert) fx.fillStyle(0x58d854, 0.07 * a).fillRect(l.x - l.w, l.y, l.w * 2, l.len);
-      else fx.fillStyle(0x58d854, 0.07 * a).fillRect(l.x, l.y - l.w, l.len, l.w * 2);
-      // "Text": a row of little glyph blocks.
-      for (let i = 0; i < 30; i++) {
-        const h = ((l.id * 7 + i * 13) % 5);
-        if (h < 2) continue;
-        const col = h === 4 ? 0xf8d878 : 0xb8f818;
-        if (l.vert) fx.fillStyle(col, 0.7 * a).fillRect(Math.round(l.x) - 1, Math.round(l.y + i * (l.len / 30)), 2, h + 1);
-        else fx.fillStyle(col, 0.7 * a).fillRect(Math.round(l.x + i * (l.len / 30)), Math.round(l.y) - 1, h + 1, 2);
-      }
-    }
-  }
+export function drawTools(g: GameScene, gfx: (id: WeaponId) => Phaser.GameObjects.Graphics) {
+  drawPipeline(g, g.fx);
+  if (g.weapons.has('logs')) drawLogs(g, gfx('logs'));
   const rv = g.weapons.get('replay_vision');
   if (rv) {
+    const fx = gfx('replay_vision');
     const range = (rv.evo ? 120 : 85 + 5 * rv.level) * g.st.area, half = (0.45 + 0.04 * rv.level) * (rv.evo ? 1.3 : 1);
     for (const q of rv.items as Scanner[]) {
       const a = Math.min(1, (q.life - q.t) / 0.5);

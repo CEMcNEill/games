@@ -9,6 +9,7 @@ import type { GameScene, Enemy } from './game';
 import { HOG32, HOG64 } from './game';
 import { hogFrame } from './hoggies';
 import { save } from './save';
+import { OWN } from './weapons';
 
 interface Pal { s: Phaser.GameObjects.Image; t: number; off: number }
 interface Agent { s: Phaser.GameObjects.Image; life: number; a: number }
@@ -124,7 +125,7 @@ export function selfDrivingPr(g: GameScene) {
     else if (!e.reaper) g.damage(e, e.maxHp * 0.4 + 30 * waveMul(g), 0, 0, 'selfdriving', true, true);
   }
   g.blast(x, y, 70, 0, 'selfdriving');
-  const fx = g.add.graphics().setDepth(19).setAlpha(g.fxAlpha());
+  const fx = g.add.graphics().setDepth(OWN + 0.4).setAlpha(g.fxAlpha());
   fx.lineStyle(2, 0x3cbcfc, 1).strokeCircle(x, y, 70).lineStyle(1, 0xfcfcfc, 0.8).strokeCircle(x, y, 60);
   g.tweens.add({ targets: fx, alpha: 0, duration: 400, onComplete: () => fx.destroy() });
   floatText(g, x, y - 20, `PR #${1000 + Math.floor(Math.random() * 9000)} MERGED`, 0x3cbcfc, 0.7);
@@ -234,18 +235,20 @@ function tickRunners(g: GameScene, dt: number) {
 }
 
 // ---------------------------------------------------------------- the Reaper
-/** Wave 13: "DEPRECATED." The Reaper hoggie comes for you, never stops, keeps speeding up. */
+/** Wave 13: Nohog, the endgame boss. A hog-shaped hole in the world (the Reaper's art filled with void) that comes for
+ * you, never stops and keeps speeding up. Internally still `reaper`. */
+export const VOID = 0x0c0014;
 export function spawnReaper(g: GameScene) {
   if (g.enemies.some((e) => e.reaper)) return;
   const [x, y] = g.offscreenPoint();
   const e = g.addEnemy('tank', x, y);
   if (!e) return;
-  e.s.stop().setTexture(HOG64, hogFrame('reaper')).setScale(0.75).setDepth(16);
+  e.s.stop().setTexture(HOG64, hogFrame('reaper')).setScale(0.75).setDepth(21); // above the fx layer its void is drawn on
   const hp = Math.max(1e6, g.dps() * 240);
   Object.assign(e, { reaper: true, hp, maxHp: hp, speed: 60, dmg: g.st.maxHp * 0.5, r: 16, armour: 1, kb: 0, tint: null, xp: 0 });
-  e.s.clearTint();
-  g.banner('DEPRECATED.', 'The Reaper has come for this release');
-  g.cameras.main.flash(400, 40, 40, 40);
+  e.s.setTintFill(VOID);
+  g.banner('NOHOG.', 'The void has come for this release');
+  g.cameras.main.flash(400, 20, 0, 40);
   g.sfx('boss', 1);
 }
 
@@ -253,8 +256,14 @@ export function drawSystems(g: GameScene, fx: Phaser.GameObjects.Graphics) {
   drawDrive(g, fx);
   const r = g.enemies.find((e) => e.reaper);
   if (r) {
-    // A creeping dark halo around the Reaper.
-    fx.fillStyle(0x000000, 0.25).fillCircle(r.s.x, r.s.y, 26 + Math.sin(g.time.now / 150) * 3);
-    if (Math.random() < 0.3) burst(g, r.s.x + Phaser.Math.Between(-10, 10), r.s.y + 10, 0x3c3c3c, 1, { speed: 20, gravity: -20, life: 0.6, size: 1 });
+    // Nohog's void: a black hole with a violet event horizon, and specks of the world spiralling in.
+    const t = g.time.now, x = r.s.x, y = r.s.y, R = 30 + Math.sin(t / 220) * 2;
+    fx.fillStyle(0x000000, 0.45).fillCircle(x, y, R).fillStyle(0x000000, 0.7).fillCircle(x, y, R * 0.65);
+    fx.lineStyle(2, 0x8c3cf8, 0.75).strokeCircle(x, y, R).lineStyle(1, 0xd8b8f8, 0.5).strokeCircle(x, y, R + 3 + Math.sin(t / 90) * 1.5);
+    for (let i = 0; i < 16; i++) {
+      const f = 1 - ((t / 1100 + i / 16) % 1), a = i * 2.39 + f * 2.2;
+      const d = R * 0.5 + f * 56;
+      fx.fillStyle(i % 3 ? 0x8c3cf8 : 0xfcfcfc, 0.3 + 0.5 * (1 - f)).fillRect(Math.round(x + Math.cos(a) * d), Math.round(y + Math.sin(a) * d), 1, 1);
+    }
   }
 }

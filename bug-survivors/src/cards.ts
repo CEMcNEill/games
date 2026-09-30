@@ -23,6 +23,8 @@ export interface Build {
 export const partnersOf = (b: Build) => new Set([...b.weapons.values()].filter((w) => !w.evo && WEAPONS[w.id].evo)
   .map((w) => WEAPONS[w.id].evo!.passive));
 const evoPassive = (id: WeaponId) => WEAPONS[id].evo?.passive;
+/** Weapons offered less often when new (a screen-wiping Pipeline should feel like a find). */
+const RARE: Partial<Record<WeaponId, number>> = { data_pipelines: 0.3 };
 const LATE_PASSIVES = new Set<PassiveId>(['driver', 'public', 'weird', 'whynow', 'optimist']);
 /** A weapon at LV 5 that still waits for its evolution (partner + chest). */
 const evoPending = (w: WState) => !w.evo && !!WEAPONS[w.id].evo;
@@ -34,7 +36,7 @@ export function cardPool(b: Build): { c: Card; w: number }[] {
   for (const id of b.products) {
     if (b.banished.has(id)) continue;
     const w = b.weapons.get(id);
-    if (!w) pool.push({ c: { kind: 'weapon', id }, w: nW < 3 ? 2.4 : nW < 4 ? 1.3 : nW < 8 ? 0.8 : 0.4 });
+    if (!w) pool.push({ c: { kind: 'weapon', id }, w: (nW < 3 ? 2.4 : nW < 4 ? 1.3 : nW < 8 ? 0.8 : 0.4) * (RARE[id] ?? 1) });
     else if (w.level < MAX_LEVEL) {
       const ep = evoPassive(id);
       pool.push({ c: { kind: 'weapon', id }, w: 3 + (ep && b.passives.has(ep) ? 1.5 * b.luck : 0) });
@@ -81,7 +83,7 @@ export function drawCards(b: Build, rnd: () => number, n = 3): Card[] {
 /** The Release screen after a boss: 3 cards from releases, new tools and v2.0 majors. Through wave 5 at least
  * one new tool is on offer while any are left. */
 export function drawRelease(b: Build, rnd: () => number): Card[] {
-  const tools = TOOL_IDS.filter((t: ToolId) => !b.weapons.has(t) && !b.banished.has(t)).map((id) => ({ c: { kind: 'weapon', id } as Card, w: 1.2 }));
+  const tools = TOOL_IDS.filter((t: ToolId) => !b.weapons.has(t) && !b.banished.has(t)).map((id) => ({ c: { kind: 'weapon', id } as Card, w: 1.2 * (RARE[id] ?? 1) }));
   const majors = [...b.weapons.values()].filter((w) => w.evo && !w.major).map((w) => ({ c: { kind: 'major', id: w.id } as Card, w: 1.1 }));
   const rel = RELEASE_IDS.filter((r) => (b.releases.get(r) ?? 0) < (RELEASES[r].stack ?? 1)).map((id) => ({ c: { kind: 'release', id } as Card, w: 1 }));
   const out: Card[] = [];
@@ -108,7 +110,7 @@ export function botRank(c: Card, b: Build): number {
     if (lvl >= PASSIVES[id].max) return id === 'maxhp' || id === 'armour' ? 3.5 : 3;
     let r = lvl ? 4 : 3;
     if (partners.has(id)) r += 6;
-    if (id === 'maxhp' || id === 'armour' || id === 'revive') r += 2;
+    if (id === 'maxhp' || id === 'armour' || id === 'revive' || id === 'moat' || id === 'regen') r += 2;
     return r;
   }
   if (c.kind === 'major') return 8;

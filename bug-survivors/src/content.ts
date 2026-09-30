@@ -12,7 +12,7 @@ export type WeaponId = ProductId | ToolId;
 export const TOOL_IDS: ToolId[] = ['web_analytics', 'heatmaps', 'posthog_ai', 'data_warehouse', 'workflows',
   'data_pipelines', 'batch_exports', 'scouts', 'hogql', 'logs', 'replay_vision', 'ai_observability', 'revenue', 'endpoints', 'desktop'];
 export type PassiveId = 'speed' | 'magnet' | 'maxhp' | 'cooldown' | 'armour' | 'area' | 'amount' | 'crit' | 'growth' | 'luck' | 'revive'
-  | 'driver' | 'public' | 'weird' | 'whynow' | 'optimist';
+  | 'driver' | 'public' | 'weird' | 'whynow' | 'optimist' | 'moat' | 'regen';
 
 export const MAX_LEVEL = 5;
 export const MAX_PASSIVES = 6;
@@ -80,9 +80,9 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     evo: { passive: 'maxhp', name: 'Managed Warehouse', line: 'Drums shatter bugs into shards' }, major: 'Two rings of drums' },
   workflows: { name: 'Workflows', line: 'Automation: a zap that hops from bug to bug', upgrade: 'Longer chains, more often', short: 'Workflows',
     evo: { passive: 'whynow', name: 'Multi-Channel Blast', line: 'Zaps fork at every hop' }, major: 'Chains never stop early' },
-  data_pipelines: { name: 'Data Pipelines', line: 'Pipeline: sucks bugs in, shoots them out broken', upgrade: 'Longer pipes, harder hits',
-    short: 'Pipelines', crest: 'ingestion', major: 'Two pipes at once',
-    evo: { passive: 'optimist', name: 'Hog Transformations', line: 'Bugs that die in a pipe become ammo' } },
+  data_pipelines: { name: 'Data Pipelines', line: 'Once a minute: vacuum up the bugs ahead, blast the screen clean', upgrade: 'Wider intake',
+    short: 'Pipelines', crest: 'ingestion', major: 'Sucks in elites too',
+    evo: { passive: 'optimist', name: 'Hog Transformations', line: 'Sucks in bugs from every side' } },
   batch_exports: { name: 'Batch Exports', line: 'Every 10 s, tagged bugs take a bulk hit', upgrade: 'Bigger export, shorter batches',
     short: 'Batch', crest: 'batch-exports', major: 'Exports hit twice as hard',
     evo: { passive: 'growth', name: 'Backfill', line: 'Every export replays the last one' } },
@@ -92,9 +92,9 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   hogql: { name: 'HogQL', line: 'DELETE FROM bugs WHERE hp < 6%', upgrade: 'Higher threshold, runs more often', short: 'HogQL',
     crest: 'clickhouse', major: 'Query runs twice',
     evo: { passive: 'public', name: 'Materialized View', line: 'Deletes every 3 s, higher threshold' } },
-  logs: { name: 'Logs', line: 'tail -f: log lines scroll through the bugs', upgrade: 'More lines, harder hits', short: 'Logs',
-    crest: 'apm', major: 'Lines twice as thick',
-    evo: { passive: 'cooldown', name: 'Firehose', line: 'Walls of logs from two sides' } },
+  logs: { name: 'Logs', line: 'Hogzilla drives through the bugs, dropping log bombs', upgrade: 'Harder blasts, runs more often', short: 'Logs',
+    crest: 'apm', major: 'Blasts half again as big',
+    evo: { passive: 'cooldown', name: 'Firehose', line: 'Two Hogzillas on crossing lanes' } },
   replay_vision: { name: 'Replay Vision', line: 'Scanner eyes sweep and zap, and see hidden bugs', upgrade: '+1 scanner, wider cone',
     short: 'Vision', crest: 'customer-analytics', major: 'Scanners fire twice',
     evo: { passive: 'area', name: 'Sees Everything', line: 'Four scanner types at once' } },
@@ -137,6 +137,10 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   growth: { name: 'Docs Day', line: '+12% XP from gems', max: 5, patch: true, apply: (s, l) => { s.growth *= 1 + 0.12 * l; } },
   luck: { name: 'Lucky Commit', line: 'More drops, better chests', max: 5, patch: true, apply: (s, l) => { s.luck *= 1 + 0.15 * l; } },
   revive: { name: 'Rollback', line: 'Revive once at half HP', max: 1, apply: (s, l) => { s.revives += l; } },
+  // Staying alive without snacks: a moat that holds bugs off, and regen that scales with max HP.
+  moat: { name: 'Data Moat', line: 'A moat holds bugs and shots off you. It drains, then refills', max: 5, patch: true, crest: 'security',
+    apply: () => { /* game.ts: tickMoat */ } },
+  regen: { name: 'Self-Healing', line: 'Regen 0.8% of max HP a second', max: 5, patch: true, crest: 'support', apply: () => { /* game.ts: recalc */ } },
   // Handbook values
   driver: { name: "You're the Driver", line: '+8% damage while moving', max: 5, patch: true, crest: 'gtm-engineering', apply: () => { /* game.ts: moving */ } },
   public: { name: 'Make It Public', line: 'Bugs take +8% damage, armour or not', max: 5, patch: true, crest: 'editorial',
@@ -244,7 +248,7 @@ export const WAVES: Record<number, WaveDef> = {
 export const SCALE_MODS: WaveMod[] = ['spikes', 'puddles', 'hyper', 'enterprise', 'outage', 'freeze', 'inglag'];
 export const WAVE_MOD_TEXT: Record<WaveMod, string> = {
   none: '', spikes: 'traffic spikes', puddles: 'tech debt', hyper: 'hypergrowth', enterprise: 'armoured bugs', outage: 'outage',
-  freeze: 'icy floor', inglag: 'ingestion lag', reaper: 'the Reaper',
+  freeze: 'icy floor', inglag: 'ingestion lag', reaper: 'Nohog',
 };
 export const REAPER_WAVE = 13;
 
