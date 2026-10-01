@@ -39,7 +39,8 @@ countdown runs and the game starts on every device at once.
 
 ## Playtesting alone: bot rooms
 
-The codes **ZZZ1**, **ZZZ2** and **ZZZ3** open a room with 1, 2 or 3 bots. Bots are always ready, so you ready up
+The codes **ZZZ1**, **ZZZ2** and **ZZZ3** open a room with 1, 2 or 3 bots. **ZZZ4** is a squad: 3 bots that stick close
+to you (within about 45 px) instead of spreading out. Bots are always ready, so you ready up
 and play. They move and pick cards on their own (the game plays them identically on every device), keep their distance
 from you, and come to review you back in when you're down. Friends can still join the same code. When the room is full,
 a bot gives its seat to the friend. The bot rooms are shared by everyone who types that code, so use a normal code for a

@@ -5,7 +5,7 @@
 //
 // Routes (behind play.funglass.es/mp/*):
 //   GET /mp/health           -> "ok"
-//   GET /mp/ws/<CODE>        -> WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots)
+//   GET /mp/ws/<CODE>        -> WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots, ZZZ4 = 3 bots that stick close)
 
 export interface Env { ROOMS: DurableObjectNamespace }
 
@@ -16,9 +16,10 @@ const TICKS_PER_TURN = 3;   // the game steps at 60 Hz
 const COUNTDOWN_MS = 3000;
 const IDLE_INPUT_MS = 1500; // no input for this long: the player stands still
 const GONE_MS = 20000;      // disconnected this long mid-game: the player leaves the game
-const CODE_RE = /^([A-Z]{4}|ZZZ[1-3])$/;
-/** Playtest rooms: ZZZ1-ZZZ3 start with 1-3 bots, which make room for real players who join. */
-const botCount = (code: string) => (/^ZZZ[1-3]$/.test(code) ? +code[3] : 0);
+const CODE_RE = /^([A-Z]{4}|ZZZ[1-4])$/;
+/** Playtest rooms: ZZZ1-ZZZ3 start with 1-3 bots, ZZZ4 with 3 that stick close to their player. The bots make room for
+ * real players who join. */
+const botCount = (code: string) => (/^ZZZ[1-4]$/.test(code) ? Math.min(3, +code[3]) : 0);
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -153,7 +154,7 @@ export class Room {
   private addBots() {
     for (let i = 1; i <= botCount(this.code) && this.players.length < MAX_PLAYERS; i++) {
       const name = `BOT ${i}`;
-      this.players.push({ ws: null, token: `bot-${i}`, name, info: { bot: true, hog: '', name, shop: {}, pals: [], heat: 0 }, ready: true, slot: -1,
+      this.players.push({ ws: null, token: `bot-${i}`, name, info: { bot: true, follow: this.code === 'ZZZ4', hog: '', name, shop: {}, pals: [], heat: 0 }, ready: true, slot: -1,
         move: 0, moveAt: 0, goneAt: 0, left: false, over: false, bot: true });
     }
   }
