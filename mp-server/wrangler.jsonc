@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
   "routes": [{ "pattern": "play.funglass.es/mp/*", "zone_name": "funglass.es" }],
-  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }, { "name": "BOARDS", "class_name": "Board" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }, { "tag": "v2", "new_sqlite_classes": ["Board"] }],
   "observability": { "enabled": true }
 }

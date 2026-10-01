@@ -8,6 +8,8 @@ then relays the game's input turns (20 a second) to everyone in the room. It nev
 - `GET /mp/health` returns `ok`
 - `GET /mp/ws/<CODE>` opens a WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots, which give their seats
   to real players who join)
+- `GET|POST /mp/lb/<game>:<mode>` reads or adds to a leaderboard (the top 20, 3-letter initials; `src/board.ts`).
+  `DELETE /mp/lb/<board>/<id>` with header `x-admin-key` removes an entry (set the key: `wrangler secret put LB_ADMIN`).
 
 ## Run and deploy
 

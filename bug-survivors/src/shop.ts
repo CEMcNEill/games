@@ -1,7 +1,7 @@
 // Between-runs screen, reached from the title's MERCH choice: the merch store (every item in PostHog's real merch store,
 // each with a strange but useful effect; owning it is wearing it, and copies stack) and hoggie capsules, bought with gold;
-// the hoggie roster (pick who to play), the crest wall (achievements) and the lore page (merch drops, handbook pages,
-// evolutions, totals). TAB or 1-4 switch tabs; ESC goes back to the title. Mouse: click to choose, click again
+// the hoggie roster (pick who to play), the crest wall (achievements). TAB or 1-3 switch
+// tabs; ESC goes back to the title. Mouse: click to choose, click again
 // (double-click) to buy / play as; the wheel scrolls.
 import Phaser from 'phaser';
 import { K } from '@shared/kit';
@@ -9,14 +9,14 @@ import { hooks } from '@shared/hooks';
 import { meta } from '@shared/meta';
 import { text, box, W, H, NARROW, PixelText, TOUCH } from '@shared/ui';
 import { onKeys, onTap, starfield, screen, button, inside, Rect, TAP } from '@shared/scenes';
-import { WEAPONS, SUPER, PASSIVES, WeaponId, RELICS, RELIC_IDS, PAGES, capsulePrice, MERCH, MERCH_IDS, merchPrice } from './content';
+import { capsulePrice, MERCH, MERCH_IDS, merchPrice } from './content';
 import { productName, HOG32, HOG64, CREST64 } from './game';
 import { save, persist, rollCapsule, unlockHog, hasCrest, syncCrestHogs } from './save';
 import { HOGS, hogFrame, hogLine, sigOf, isSignature, SECRET_HOGS } from './hoggies';
 import { CREST_LIST, crestFrame, ACHIEVEMENTS } from './crests';
 
-const TABS = ['MERCH', 'HOGGIES', 'CRESTS', 'LORE'];
-const MER = 0, HOG = 1, CRE = 2, LORE = 3;
+const TABS = ['MERCH', 'HOGGIES', 'CRESTS'];
+const MER = 0, HOG = 1, CRE = 2;
 /** The merch list: the hoggie capsule first, then the store. */
 const ROWS = ['capsule', ...MERCH_IDS];
 
@@ -28,7 +28,6 @@ export class ShopScene extends Phaser.Scene {
   private mscroll = 0;  // merch list first row
   private mflash = '';  // merch message
   private lastClick = ''; // the item clicked last: a second click on it (a double-click) buys / plays as
-  private lorePage = 0;
   private flash = '';
   private objs: Phaser.GameObjects.GameObject[] = [];
   private tabRects: { x0: number; x1: number; i: number }[] = [];
@@ -56,7 +55,7 @@ export class ShopScene extends Phaser.Scene {
     onKeys(this, ['ArrowUp', 'KeyW'], () => this.move(0, -1), 120);
     onKeys(this, ['ArrowDown', 'KeyS'], () => this.move(0, 1), 120);
     onKeys(this, ['Tab'], () => this.moveTab(1), 150);
-    onKeys(this, ['Digit1', 'Digit2', 'Digit3', 'Digit4'], (code) => this.setTab(Number(code.slice(-1)) - 1), 150);
+    onKeys(this, ['Digit1', 'Digit2', 'Digit3'], (code) => this.setTab(Number(code.slice(-1)) - 1), 150);
     onKeys(this, ['Enter', 'Space', 'NumpadEnter'], () => this.act(), 250);
     onKeys(this, ['Escape', 'KeyQ'], () => { K.play('select'); this.scene.start('Title'); }, 150);
     // Touch (and mouse): tap tabs, rows and grid cells; tap a selected item again to buy / play as; swipe the grid.
@@ -102,8 +101,6 @@ export class ShopScene extends Phaser.Scene {
       const i = r * L.crestCols + c;
       if (c < 0 || c >= L.crestCols || r < 0 || i >= CREST_LIST.length) return;
       this.sel = i; K.play('move', 0.5); this.draw();
-    } else if (!TOUCH) {
-      this.lorePage = 1 - this.lorePage; K.play('move', 0.5); this.draw(); // touch uses the page button
     }
   }
 
@@ -113,7 +110,6 @@ export class ShopScene extends Phaser.Scene {
   private wheel(d: number) {
     if (this.tab === HOG) this.scrollHogs(d);
     else if (this.tab === CRE) this.move(d, 0);
-    else if (this.tab === LORE) { if (this.lorePage !== (d > 0 ? 1 : 0)) this.move(0, d); }
     else this.move(0, d);
   }
 
@@ -157,9 +153,6 @@ export class ShopScene extends Phaser.Scene {
       if (this.mrow < this.mscroll) this.mscroll = this.mrow;
       if (this.mrow >= this.mscroll + L.mRows) this.mscroll = this.mrow - L.mRows + 1;
       this.mflash = '';
-    } else {
-      if (dx) { this.moveTab(dx); return; }
-      this.lorePage = Phaser.Math.Clamp(this.lorePage + dy, 0, 1);
     }
     K.play('move', 0.5);
     this.draw();
@@ -247,15 +240,14 @@ export class ShopScene extends Phaser.Scene {
     }
     if (this.tab === MER) this.drawMerch(T);
     else if (this.tab === HOG) this.drawHogs(T);
-    else if (this.tab === CRE) this.drawCrests(T);
-    else this.drawLore(T);
+    else this.drawCrests(T);
     if (TOUCH) {
       this.addBtn({ x: L.mx + 6, y: H - 14 - TAP, w: 60, h: TAP }, 'BACK', () => { K.play('select'); this.scene.start('Title'); });
-      const help = ['Tap merch, then BUY. Copies stack. Swipe to scroll', 'Tap a hoggie, then PLAY. Swipe to scroll', 'Tap a crest to read it', ''][this.tab];
+      const help = ['Tap merch, then BUY. Copies stack. Swipe to scroll', 'Tap a hoggie, then PLAY. Swipe to scroll', 'Tap a crest to read it'][this.tab];
       if (help) T(L.mx + 74, H - 14 - TAP + (L.narrow ? 2 : 8), help, { color: ui.dimInt, maxWidth: W - L.mx * 2 - 84, maxLines: 2 });
     } else {
       const help = ['Click/wheel choose   double-click or ENTER buy',
-        'Click choose, wheel scrolls   double-click or ENTER play as', 'Click/wheel/arrows look', 'Wheel or UP/DOWN page'][this.tab];
+        'Click choose, wheel scrolls   double-click or ENTER play as', 'Click/wheel/arrows look'][this.tab];
       T(W / 2, H - 22, `${help}   TAB tabs   ESC back`, { align: 'center', color: ui.dimInt, maxWidth: W - 20, maxLines: 2 });
     }
   }
@@ -395,63 +387,6 @@ export class ShopScene extends Phaser.Scene {
     T(tx, y + 12 + desc.lineCount * 10, `Unlocks ${HOGS[hogFrame(c.hog)]?.name ?? c.hog}`, { color: open ? 0x58d854 : ui.dimInt, maxWidth: tw, maxLines: 1 });
   }
 
-  private drawLore(T: (x: number, y: number, s: string, o?: any) => PixelText) {
-    const ui = K.ui, L = this.lay;
-    const sv = save();
-    // Two columns side by side, or one long column on a narrow screen.
-    const cols = L.narrow ? 1 : 2, colW = L.narrow ? W - L.cx * 2 : 206, colX = (c: number) => L.cx + c * 216;
-    const y0 = L.gridY;
-    if (this.lorePage === 0) {
-      T(L.cx, L.top, `HANDBOOK PAGES ${sv.pages.length}/${PAGES.length}`, { color: ui.accentInt });
-      const per = Math.ceil(PAGES.length / cols);
-      PAGES.forEach(([t, line], i) => {
-        const col = Math.floor(i / per);
-        const y = y0 + (i % per) * 15;
-        const found = sv.pages.includes(i);
-        T(colX(col), y, found ? t : '???', { color: found ? 0xf8d878 : ui.dimInt, maxWidth: colW, maxLines: 1 });
-        if (found) T(colX(col), y + 7, line, { color: ui.dimInt, maxWidth: colW, maxLines: 1, scale: 1 });
-      });
-      if (TOUCH) this.addBtn(this.pageRect(), 'MORE >', () => { this.lorePage = 1; K.play('move', 0.5); this.draw(); });
-      else T(W - L.cx, L.top, 'DOWN: merch + more', { align: 'right', color: ui.dimInt });
-      return;
-    }
-    T(L.cx, L.top, `MERCH DROPS ${sv.relics.length}/${RELIC_IDS.length}`, { color: ui.accentInt });
-    const mcols = L.narrow ? 2 : 3, mw = L.narrow ? (W - L.cx * 2) / 2 : 145;
-    RELIC_IDS.forEach((r, i) => {
-      const found = sv.relics.includes(r);
-      T(L.cx + (i % mcols) * mw, y0 + Math.floor(i / mcols) * 10, found ? RELICS[r].name : '???', { color: found ? ui.textInt : ui.dimInt, maxWidth: mw - 5, maxLines: 1 });
-    });
-    // Evolution codex: found ones show their recipe, the rest stay a mystery.
-    const evos: [string, string][] = [
-      ...(Object.entries(WEAPONS) as [WeaponId, (typeof WEAPONS)[WeaponId]][]).filter(([, w]) => w.evo).map(([id, w]) =>
-        [w.evo!.name, `${productName(id)} + ${PASSIVES[w.evo!.passive].name}`] as [string, string]),
-      [SUPER.name, `${WEAPONS[SUPER.a].evo!.name} + ${WEAPONS[SUPER.b].evo!.name}`],
-    ];
-    const ey = y0 + Math.ceil(RELIC_IDS.length / mcols) * 10 + 6;
-    T(L.cx, ey, `EVOLUTIONS FOUND ${sv.codex.filter((n) => evos.some(([e]) => e === n)).length}/${evos.length}`, { color: ui.accentInt });
-    const per = L.narrow ? evos.length : 10;
-    evos.forEach(([n, how], i) => {
-      const found = sv.codex.includes(n);
-      const col = Math.floor(i / per);
-      const y = ey + 11 + (i % per) * 9;
-      T(colX(col), y, found ? n : '???', { color: found ? 0xf8d878 : ui.dimInt, maxWidth: colW, maxLines: 1 });
-      void how;
-    });
-    const m = meta.data;
-    const sy = L.narrow ? ey + 11 + evos.length * 9 + 8 : 190;
-    const s1 = T(L.cx, sy, `RUNS ${m.runs}   BEST WAVE ${sv.bestWave}   BUGS ${sv.kills}   GOLD EARNED ${sv.gold}   CHESTS ${sv.chests}`,
-      { color: ui.dimInt, maxWidth: W - L.cx * 2, maxLines: L.narrow ? 3 : 1 });
-    T(L.cx, sy + s1.lineCount * 10 + 2, `ELITES ${sv.elites}   REVIVES ${sv.revives}   DAILIES ${sv.dailies}   CAPSULES BOUGHT ${sv.capsules}`,
-      { color: ui.dimInt, maxWidth: W - L.cx * 2, maxLines: L.narrow ? 3 : 1 });
-    if (TOUCH) this.addBtn(this.pageRect(), '< PAGES', () => { this.lorePage = 0; K.play('move', 0.5); this.draw(); });
-    else T(W - L.cx, L.top, 'UP: handbook', { align: 'right', color: ui.dimInt });
-  }
-
-  /** The lore page button, top right of the page. */
-  private pageRect(): Rect {
-    const L = this.lay;
-    return { x: W - L.cx - 72, y: L.top - 8, w: 74, h: TAP - 2 };
-  }
 }
 
 /** Where the shop's pieces go on the live screen. At 480x270 it matches the original layout; a narrow (portrait) screen

@@ -5,6 +5,8 @@ import { K, anim, makeSfx, beginRun, finishRun, runProps, TitleRow } from './kit
 import { meta } from './meta';
 import { hooks } from './hooks';
 import { capture } from './analytics';
+import { lb } from './leaderboard';
+import type { ScoresData } from './scores';
 import { text, box, blink, fitScale, W, H, DW, DH, vy, NARROW, fitCam, viewRect, PixelText, CHAR_W, TOUCH as TOUCH_DEVICE, APP } from './ui';
 
 /** Touch hints and buttons: a phone or tablet, and a kit that plays with touch. */
@@ -364,14 +366,59 @@ export class EndScene extends Phaser.Scene {
     onKeys(this, ['Enter', 'Space', 'NumpadEnter', 'KeyR'], again, 800);
     onKeys(this, ['Escape'], () => this.scene.start('Title'), 800);
     {
-      // Two buttons above the credits (keys: ENTER and ESC); a stray tap does nothing.
-      const bw = Math.min(150, Math.floor((W - 22) / 2)), by = H - 60 - TAP;
-      const more: Rect = { x: Math.round(W / 2 - bw - 3), y: by, w: bw, h: TAP + 4 }, title: Rect = { x: Math.round(W / 2 + 3), y: by, w: bw, h: TAP + 4 };
-      button(this, more, touchUi() ? 'ONE MORE RUN' : 'ENTER  ONE MORE RUN', { color: ui.accentInt });
-      button(this, title, touchUi() ? 'TITLE' : 'ESC  TITLE');
-      onTap(this, (x, y) => { if (inside(more, x, y)) again(); else if (inside(title, x, y)) this.scene.start('Title'); }, 800);
+      // Buttons above the credits (keys: ENTER and ESC; S for scores); a stray tap does nothing. With leaderboards, a
+      // SCORES button in the middle turns into NEW HIGH SCORE when the run made the board.
+      const board = lb.enabled(), n = board ? 3 : 2, gap = 6, by = H - 60 - TAP;
+      const bw = Math.min(n === 3 ? 124 : 150, Math.floor((W - 16 - gap * (n - 1)) / n)), x0 = Math.round(W / 2 - (n * bw + (n - 1) * gap) / 2);
+      const r = (i: number): Rect => ({ x: x0 + i * (bw + gap), y: by, w: bw, h: TAP + 4 });
+      const more = r(0), scores = r(1), title = r(n - 1);
+      const keys = !touchUi();
+      button(this, more, keys ? 'ENTER  ONE MORE RUN' : 'ONE MORE RUN', { color: ui.accentInt });
+      button(this, title, keys ? 'ESC  TITLE' : 'TITLE');
+      // Leaderboard: is this run on the board? (Once per run, even if the screen is laid out again.)
+      const mode = lb.runMode();
+      const entry: ScoresData['entry'] = { score: d.score, mode,
+        stats: { time: Math.round(hooks.elapsed), ...safeStats(d) } };
+      let made = entryFor === K.run.startedAt; // laid out again after a rotate: it already made the board
+      let mid: Phaser.GameObjects.GameObject[] = [];
+      const drawMid = () => {
+        mid.forEach((o) => o.destroy());
+        mid = button(this, scores, made ? 'NEW HIGH SCORE!' : keys ? 'S  SCORES' : 'SCORES', { color: made ? 0xf8d878 : undefined });
+        if (made) blink(this, mid[1] as Phaser.GameObjects.Components.Visible & Phaser.GameObjects.GameObject, 400);
+      };
+      const toScores = (first?: string) => this.scene.start('Scores', (made
+        ? { from: 'end', mode, entry: { ...entry, first } } : { from: 'end', mode }) as ScoresData);
+      if (board) {
+        drawMid();
+        if (d.score > 0 && !made) {
+          lb.top(mode).then((top) => {
+            if (!top || !this.scene.isActive() || !lb.qualifies(top, d.score)) return;
+            made = true;
+            entryFor = K.run.startedAt;
+            drawMid();
+          });
+        }
+        onKeys(this, ['KeyS'], () => { if (!made) toScores(); }, 800);
+        // A letter key starts the initials on a run that made the board.
+        const letter = (e: KeyboardEvent) => { if (made && /^Key[A-Z]$/.test(e.code) && !e.repeat) toScores(e.code.slice(3)); };
+        window.addEventListener('keydown', letter);
+        this.events.once('shutdown', () => window.removeEventListener('keydown', letter));
+      }
+      onTap(this, (x, y) => {
+        if (inside(more, x, y)) again();
+        else if (inside(title, x, y)) this.scene.start('Title');
+        else if (board && inside(scores, x, y)) toScores();
+      }, 800);
     }
   }
+}
+
+/** The run whose leaderboard entry was offered (so it's offered once, even if the End screen is laid out again). */
+let entryFor = -1;
+
+/** The kit's leaderboard stats for this run; a broken kit hook just means no extra stats. */
+function safeStats(d: EndData): Record<string, number | string> {
+  try { return K.kit.leaderboard?.stats?.(d) ?? {}; } catch { return {}; }
 }
 
 // ---------------------------------------------------------------- title menu

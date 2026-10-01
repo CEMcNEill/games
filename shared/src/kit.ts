@@ -11,6 +11,8 @@ import { W, H, TOUCH, APP, PX, fitView } from './ui';
 import { BootScene, SplashScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
 import { meta, initMeta, achieve, dailySeed, randomSeed, AchievementDef, RunResult } from './meta';
 import { OverlayScene, toast, burst, floatText, shake, hitstop } from './juice';
+import { ScoresScene } from './scores';
+import type { LbMode } from './leaderboard';
 
 export interface Slot {
   id: string;
@@ -63,6 +65,14 @@ export interface KitDef {
   endSummary?: (data: EndData, result: RunResult) => string[];
   /** Achievement table; unlock with achieve(id) from '@shared/meta'. */
   achievements?: AchievementDef[];
+  /** Opt in to online leaderboards (top 20 per mode, 3-letter initials; see leaderboard.ts). The End screen offers
+   * initials entry when a run makes the board, and the 'Scores' scene shows the boards. */
+  leaderboard?: {
+    modes?: LbMode[];                                         // boards to show (default one: 'run')
+    mode?: () => string;                                      // the board the current run counts for
+    stats?: (d: EndData) => Record<string, number | string>;  // stats to keep with an entry (time is added)
+    columns?: [string, string][];                             // stat columns on the board: [key, header]
+  };
 }
 
 export interface TitleChoice { label: string; value: string | number; locked?: boolean }
@@ -186,7 +196,7 @@ export async function startKit(kit: KitDef) {
     input: { keyboard: true, gamepad: false, ...(APP ? { touch: { target: 'game' } } : {}) },
     audio: { disableWebAudio: false },
     fps: { target: 60 },
-    scene: [BootScene, SplashScene, TitleScene, HowToScene, ...kit.scenes, EndScene, OverlayScene],
+    scene: [BootScene, SplashScene, TitleScene, HowToScene, ...kit.scenes, EndScene, ScoresScene, OverlayScene],
   });
   window.addEventListener('resize', () => {
     // Scenes follow a resize through the scale manager's 'resize' event (menus re-centre, the game re-anchors its HUD).

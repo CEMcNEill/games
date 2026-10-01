@@ -32,6 +32,8 @@ countdown runs and the game starts on every device at once.
 - After each boss, P1 (the lowest seat still playing) makes the SHIPPED call: continue or cash out, for everyone.
   On CONTINUE, everyone picks their own release.
 - Chests and powerups go to whoever grabs them. Gold is team gold, and everyone banks it.
+- Merch only helps its owner: your stats, plus your own gold bonus when you bank. What it would add to shared things (team
+  XP, team gold, drops anyone can grab) is left out.
 - The || menu (ESC) doesn't stop the game. LEAVE drops you out, and the others play on.
 - **Scaling with team size:**
   - **Bugs:** spawns go up x1.55 per extra hog, and bug HP +15%.
