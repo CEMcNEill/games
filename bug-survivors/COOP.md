@@ -24,7 +24,13 @@ countdown runs and the game starts on every device at once.
   On CONTINUE, everyone picks their own release.
 - Chests and powerups go to whoever grabs them. Gold is team gold, and everyone banks it.
 - The || menu (ESC) doesn't stop the game. LEAVE drops you out, and the others play on.
-- More hogs means more bugs: spawns go up x1.55 per extra hog, bug HP +15%, and the boss is sized for the team.
+- **Scaling with team size:**
+  - **Bugs:** spawns go up x1.55 per extra hog, and bug HP +15%.
+  - **Elites:** +90% HP per extra hog.
+  - **Bosses:** the wave-1 boss gets +125% HP per extra hog and attacks faster; later bosses are sized from the team's
+    measured damage.
+  - **XP:** split evenly between the hogs, so each player levels at about a solo player's pace. Measured with bots:
+    L26-27 at the 3:30 boss with 2 or 3 hogs, against L25-33 solo; before the split it was L38 (2p) and L46 (3p).
 - Heat is the room creator's (P1's) pick on their title screen.
 
 ## How it works

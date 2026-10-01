@@ -1722,6 +1722,17 @@ export class CoopScene extends Phaser.Scene {
 
   /** More hogs, more bugs: spawn rate x1.55 per extra player (bug HP rises a little too, see addEnemy). */
   crowdMul() { return 1 + 0.55 * Math.max(0, this.present().length - 1); }
+  /** Co-op scaling by the number of hogs still in the game (1 = solo numbers). */
+  private extra() { return Math.max(0, this.present().length - 1); }
+  /** XP is split evenly between the hogs: more of them kill more bugs and sweep more of the floor for gems, and every
+   * level is a card for each of them. Measured with bots, this keeps each player near a solo player's level curve. */
+  xpShare() { return 1 + this.extra(); }
+  /** Elites and bosses are sized for the team (+90% elite HP and +125% boss HP per extra hog), so a team of hogs still
+   * has a fight on its hands. Bosses from 2.0 on are also sized from the team's measured damage (teamDps). */
+  eliteHpMul() { return 1 + 0.9 * this.extra(); }
+  bossHpMul() { return 1 + 1.25 * this.extra(); }
+  /** Bosses attack faster with more targets around. */
+  bossPaceMul() { return 1 / (1 + 0.15 * this.extra()); }
   maxEnemies() { return MAX_ENEMIES + 40 * Math.max(0, this.present().length - 1); }
 
   /** A point just outside the current hog's view; if that side is beyond the arena wall, the opposite side. */
@@ -1759,7 +1770,7 @@ export class CoopScene extends Phaser.Scene {
     else { e.s.play(anim(`enemy_${type + 1}`)); e.s.anims.setProgress(Math.random()); }
     const tint = elite ? ELITE_MODS[elite].tint : A.tint ?? null;
     const speed = A.speed * this.rfl(0.9, 1.1) * this.heatSpeed() * (elite === 'fast' ? 1.5 : 1) * Math.min(1.4, 1 + WAVE.speed * Math.max(0, this.wave - 2));
-    const hp = A.hp * this.ease(this.diff.hp) * scale * this.heatHp() * (elite ? 9 : 1) * (1 + 0.15 * Math.max(0, this.present().length - 1));
+    const hp = A.hp * this.ease(this.diff.hp) * scale * this.heatHp() * (elite ? 9 * this.eliteHpMul() : 1) * (1 + 0.15 * this.extra());
     const dmg = A.dmg * this.ease(this.diff.dmg) * this.heatDmg() * (elite ? 1.4 : 1) * this.dmgScale();
     let armour = (A.armour ?? 1) * (elite === 'shield' ? 0.45 : 1);
     if (this.waveMods.includes('enterprise') && arch !== 'crate') armour *= 0.65;
@@ -2772,7 +2783,9 @@ export class CoopScene extends Phaser.Scene {
   /** Shared XP: the grabber's growth counts; every level is a card for every hog still in the game. */
   gainXp(v: number) {
     this.sfx(this.pendingLevels ? 'gem3' : this.xp > this.xpNext * 0.6 ? 'gem2' : 'pickup', 0.4, 45);
-    this.xp += v * this.st.growth;
+    // More hogs kill more bugs (spawns x crowdMul) and every level is a card for each of them: XP is divided by the
+    // same factor so each player levels at about a solo player's pace.
+    this.xp += (v * this.st.growth) / this.xpShare();
     while (this.xp >= this.xpNext) {
       this.xp -= this.xpNext;
       this.level++;
@@ -3905,7 +3918,7 @@ export class CoopScene extends Phaser.Scene {
     const opts = pool.filter((p) => p !== this.bossLast);
     const pick = opts.length ? this.R.pick(opts) : 'ring';
     this.bossLast = pick;
-    const pace = (rage ? 0.65 : angry ? 0.8 : 1) * Math.max(0.6, 1 - 0.04 * (v - 1));
+    const pace = (rage ? 0.65 : angry ? 0.8 : 1) * Math.max(0.6, 1 - 0.04 * (v - 1)) * this.bossPaceMul();
     const tgt = this.nearestHog(b.s.x, b.s.y).player;
     const px = tgt.x, py = tgt.y;
     const dm = this.ease(this.diff.dmg) * this.dmgScale();
@@ -3956,8 +3969,8 @@ export class CoopScene extends Phaser.Scene {
     this.bossAffixes = fx;
     this.bossPlates = fx.includes('monolith') ? 4 : 0;
     this.bossPlateDmg = 0;
-    // Co-op: a bigger boss for a bigger team (x0.8 per hog, so two hogs make it 1.6x).
-    const team = Math.max(1, 0.8 * this.present().length);
+    // Co-op: a bigger boss for a bigger team.
+    const team = this.bossHpMul();
     const base = 900 * this.diff.boss * (1 + Math.min(this.level, 25) / 25) * (1 + this.heat * 0.12) * team;
     let hp = base;
     if (v >= 2) {
