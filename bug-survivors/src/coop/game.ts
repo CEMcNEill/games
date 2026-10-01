@@ -76,6 +76,9 @@ const OTHER_ALPHA = 0.5;
 const VIEW0 = { w: 480, h: 270 };
 /** A hash of the world goes to the server this often (turns); two different hashes = a desync. */
 const HASH_EVERY = 40;
+/** The axe sweep (co-op only): about once a minute a wall of axes flies through the team. Getting hit doesn't hurt; it
+ * throws the hog away from the middle of the wall, so the team splits and has to run back together. */
+const AXE = { first: 50, every: [45, 80] as const, warn: 2, speed: 260, reach: 330, toss: 380, tossT: 0.45 };
 /** Each player's colour: name tags, the teammate list, the revive ring. */
 const P_COLS = [0x3cbcfc, 0xf8b800, 0xf878f8, 0x58d854];
 
@@ -199,6 +202,8 @@ export interface Hog {
   down: boolean;                 // out of HP: waiting for a teammate (or the next wave)
   gone: boolean;                 // left the game
   reviveT: number;
+  toss: { vx: number; vy: number; t: number } | null; // thrown by the axe sweep
+  axeDodge: boolean;             // (bots) this bot dodges the current axe sweep
   wfx: Map<string, Phaser.GameObjects.Graphics>;
 }
 /** The scene fields that are really the current hog's. */
@@ -334,7 +339,7 @@ export class CoopScene extends Phaser.Scene {
   hud!: { xp: ReturnType<typeof bar>; hpBar: Phaser.GameObjects.Graphics; time: PixelText; lv: PixelText; kills: PixelText; gold: PixelText;
     risk: PixelText; waveTxt: PixelText; icons: Phaser.GameObjects.Container; bossBar: ReturnType<typeof bar> | null; bossName: PixelText | null;
     arrow: Phaser.GameObjects.Image; chestArrow: Phaser.GameObjects.Image; pu: PixelText; team: PixelText[]; wait: PixelText; net: PixelText; fail: PixelText;
-    mateG: Phaser.GameObjects.Graphics; mateTags: PixelText[] };
+    mateG: Phaser.GameObjects.Graphics; mateTags: PixelText[]; axeWarn: Phaser.GameObjects.GameObject[] };
   banners: { title: string; body: string }[] = [];
   curBanner: { title: string; body: string } | null = null;
   bannerBusy = false;
@@ -378,6 +383,11 @@ export class CoopScene extends Phaser.Scene {
   catchingUp = false;
   restoreMath: (() => void) | null = null;
   reviewTags: PixelText[] = [];
+  /** The axe sweep: when the next one comes, and the one in progress (warn: the lane flashes; fly: the axes sweep). */
+  axeAt = AXE.first;
+  axe: { phase: 'warn' | 'fly'; t: number; cx: number; cy: number; dx: number; dy: number; nx: number; ny: number; half: number;
+    pos: number; hit: Set<Hog> } | null = null;
+  axeImgs: Phaser.GameObjects.Image[] = [];
   failT = 0;             // seconds left on the "not OK to let your teammate fail" call-out (looks only)
 
   constructor() { super('Coop'); }
@@ -449,7 +459,7 @@ export class CoopScene extends Phaser.Scene {
       numBudget: 10, numAvg: 0, mergeT: 0, wave: 1, waveAt: 0, waveMods: [], hpBase: 1, funding: 0,
       toolsOpen: false, interlude: false, cashedOut: false, actOpen: -1, releasing: false, spikeT: 0, incident: null, menuOpen: false,
       tickN: 0, turnIdx: 0, sub: 0, acc: 0, timers: [], uidN: 0, sentView: '', hashFrom: 0, catchingUp: false, god: false, autopilot: false,
-      pauseObjs: [], pauseBtns: [], reviewTags: [], failT: 0, tray: null, trayAt: 0, trayTouch: false,
+      pauseObjs: [], pauseBtns: [], reviewTags: [], failT: 0, axeAt: AXE.first, axe: null, axeImgs: [], tray: null, trayAt: 0, trayTouch: false,
     });
     this.seen = new Set();
     this.grid = new Map();
@@ -562,7 +572,7 @@ export class CoopScene extends Phaser.Scene {
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {}, powerups: 0, gems: 0, hits: 0, hitsWave1: 0, aiKills: 0,
         unlocks: [], crests: [], kills: 0, downs: 0, revived: 0 },
       moat: { fill: 0, calm: 0, lv: 0 },
-      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, wfx: new Map(),
+      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, toss: null, axeDodge: true, wfx: new Map(),
     };
     this.as(h, () => {
       this.rerolls = 1 + this.shop('reroll');
@@ -1030,7 +1040,13 @@ export class CoopScene extends Phaser.Scene {
     }
     const fail = text(this, W / 2, Math.round(H / 2) - 60, "IT'S NOT OK TO LET YOUR TEAMMATE FAIL", { scale: W >= 400 ? 2 : 1, align: 'center', color: 0xf83800,
       fixed: true, depth: UI + 98, maxWidth: W - 12, maxLines: 2 }).setVisible(false);
-    this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu, team, wait, net: netT, fail, mateG, mateTags };
+    // The axe sweep warning: three axes and the words (the pixel font has no emoji).
+    if (!this.textures.exists('coop:axe')) this.makeAxeTexture();
+    const aw = 'INCOMING, WATCH OUT!', as = W >= 400 ? 2 : 1, awW = 3 * 14 * as + 6 + aw.length * 6 * as, awX = Math.round(W / 2 - awW / 2), awY = Math.round(H / 2) - 40;
+    const axeWarn: Phaser.GameObjects.GameObject[] = [0, 1, 2].map((i) => this.add.image(awX + i * 14 * as, awY, 'coop:axe').setOrigin(0, 0.15).setScale(as)
+      .setScrollFactor(0).setDepth(UI + 98).setVisible(false));
+    axeWarn.push(text(this, awX + 3 * 14 * as + 6, awY, aw, { scale: as, color: 0xf8b800, fixed: true, depth: UI + 98 }).setVisible(false));
+    this.hud = { xp, hpBar, time, lv, kills, gold, risk, waveTxt, icons, bossBar: null, bossName: null, arrow, chestArrow, pu, team, wait, net: netT, fail, mateG, mateTags, axeWarn };
   }
 
   /** [texture, frame] for a weapon / passive / release / powerup icon. */
@@ -1371,6 +1387,7 @@ export class CoopScene extends Phaser.Scene {
     for (const h of this.present()) this.as(h, () => this.hogPre(dt));
     this.runHazards(dt);
     for (const h of this.alive()) this.as(h, () => this.movePlayer(dt));
+    this.runAxes(dt);
     this.spawn(dt);
     this.buildGrid();
     this.moveEnemies(dt);
@@ -1498,8 +1515,69 @@ export class CoopScene extends Phaser.Scene {
     } else {
       this.vel.set(dx * sp, dy * sp);
     }
-    this.player.x = Phaser.Math.Clamp(this.player.x + this.vel.x * dt, 12, WORLD_W - 12);
-    this.player.y = Phaser.Math.Clamp(this.player.y + this.vel.y * dt, 12, WORLD_H - 12);
+    let vx = this.vel.x, vy = this.vel.y;
+    const toss = this.cur.toss;
+    if (toss) { // thrown by an axe: the toss carries the hog, easing off
+      const k = toss.t / AXE.tossT;
+      vx = vx * 0.3 + toss.vx * k; vy = vy * 0.3 + toss.vy * k;
+      toss.t -= dt;
+      if (toss.t <= 0) this.cur.toss = null;
+    }
+    this.player.x = Phaser.Math.Clamp(this.player.x + vx * dt, 12, WORLD_W - 12);
+    this.player.y = Phaser.Math.Clamp(this.player.y + vy * dt, 12, WORLD_H - 12);
+  }
+
+  // ---------------------------------------------------------------- the axe sweep
+  /** About once a minute (2+ hogs, mid-wave): a 2 s warning with the lane flashing, then a wall of axes as wide as the
+   * team flies through it. Hogs still inside the wall's span when it passes are thrown away from its middle line (no
+   * damage); hogs that got out of its way are left alone. Each bot decides at the warning whether to dodge. */
+  private runAxes(dt: number) {
+    const hogs = this.alive();
+    if (!this.axe) {
+      if (this.interlude || this.won || hogs.length < 2) return;
+      this.axeAt -= dt;
+      if (this.axeAt > 0) return;
+      this.axeAt = this.R.float(AXE.every[0], AXE.every[1]);
+      this.startAxes();
+      return;
+    }
+    const a = this.axe;
+    a.t += dt;
+    if (a.phase === 'warn') {
+      if (a.t < AXE.warn) return;
+      a.phase = 'fly'; a.t = 0;
+      this.sfx('charge', 0.7, 150);
+    }
+    const before = a.pos - AXE.reach;
+    a.pos += AXE.speed * dt;
+    const after = a.pos - AXE.reach;
+    for (const h of hogs) {
+      if (a.hit.has(h)) continue;
+      const rx = h.player.x - a.cx, ry = h.player.y - a.cy;
+      const along = rx * a.dx + ry * a.dy, across = rx * a.nx + ry * a.ny;
+      if (along < before || along > after || Math.abs(across) > a.half + 6) continue;
+      // Hit: thrown away from the wall's middle line (and a little along it), so the team splits two ways.
+      a.hit.add(h);
+      const side = across >= 0 ? 1 : -1, ox = a.nx * side + a.dx * 0.45, oy = a.ny * side + a.dy * 0.45, ol = Math.hypot(ox, oy);
+      h.toss = { vx: (ox / ol) * AXE.toss, vy: (oy / ol) * AXE.toss, t: AXE.tossT };
+      this.as(h, () => this.sfx('hit', 0.8, 60));
+      floatText(this, h.player.x, h.player.y - 24, 'CHOPPED!', 0xf8d878, 0.7);
+      burst(this, h.player.x, h.player.y, 0xbcbcbc, 10, { speed: 140, gravity: 0 });
+    }
+    if (a.pos > AXE.reach * 2 + 40) this.axe = null;
+  }
+
+  private startAxes() {
+    const hogs = this.alive();
+    let cx = 0, cy = 0;
+    for (const h of hogs) { cx += h.player.x; cy += h.player.y; }
+    cx /= hogs.length; cy /= hogs.length;
+    let spread = 0;
+    for (const h of hogs) spread = Math.max(spread, Math.hypot(h.player.x - cx, h.player.y - cy));
+    const ang = this.R.next() * Math.PI * 2, dx = Math.cos(ang), dy = Math.sin(ang);
+    this.axe = { phase: 'warn', t: 0, cx, cy, dx, dy, nx: -dy, ny: dx, half: Phaser.Math.Clamp(spread + 40, 70, 150), pos: 0, hit: new Set() };
+    for (const h of this.hogs) h.axeDodge = !h.bot || this.R.next() < 0.5; // bots: a coin flip
+    this.sfx('elite', 0.7, 200);
   }
 
   /** Self-Driving Mode, and the test bot: flee the local crowd, drift toward gems and pickups (and downed teammates),
@@ -1541,6 +1619,15 @@ export class CoopScene extends Phaser.Scene {
       // Get out of Hogzilla's lane.
       const off = lane.horiz ? p.y - lane.pos : p.x - lane.pos;
       if (Math.abs(off) < 60) { const push = (off >= 0 ? 1 : -1) * 0.2; if (lane.horiz) fy += push; else fx += push; }
+    }
+    // The axe sweep: a hog that means to dodge gets out of the lane sideways (bots only sometimes bother).
+    const ax = this.axe;
+    if (ax && this.cur.axeDodge && !driving) {
+      const rx = p.x - ax.cx, ry = p.y - ax.cy, across = rx * ax.nx + ry * ax.ny, along = rx * ax.dx + ry * ax.dy;
+      if (Math.abs(across) < ax.half + 24 && along > ax.pos - AXE.reach - 30) {
+        const side = across >= 0 ? 1 : -1;
+        return [ax.nx * side, ax.ny * side];
+      }
     }
     const danger = Math.hypot(fx, fy);
     // A downed teammate comes first: it's not OK to let your teammate fail (dodge only what's right on top of you).
@@ -4438,6 +4525,7 @@ export class CoopScene extends Phaser.Scene {
     this.drawDark();
     this.drawJoy();
     this.drawRevives(dtv);
+    this.drawAxes();
   }
 
   /** A hog: one pose, animated in code (bob and squash while walking, blink when hit). The others are see-through;
@@ -4490,6 +4578,41 @@ export class CoopScene extends Phaser.Scene {
     this.failT = Math.max(0, this.failT - dtv);
     const ft = this.hud.fail;
     ft.setVisible(this.failT > 0 && Math.floor(t / 180) % 2 === 0);
+  }
+
+  /** The axe sweep: the lane flashing during the warning, then the spinning wall of axes. */
+  private drawAxes() {
+    const a = this.axe, t = this.time.now;
+    const warn = !!a && a.phase === 'warn';
+    this.hud.axeWarn.forEach((o) => {
+      (o as unknown as Phaser.GameObjects.Components.Visible).setVisible(warn);
+      if (warn) (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0.65 + 0.35 * Math.sin(t / 90)); // pulses, never gone
+    });
+    if (!a) { this.axeImgs.forEach((im) => im.setVisible(false)); return; }
+    const g = this.fx, L = AXE.reach;
+    const corner = (al: number, ac: number): [number, number] => [a.cx + a.dx * al + a.nx * ac, a.cy + a.dy * al + a.ny * ac];
+    const [x1, y1] = corner(-L, -a.half), [x2, y2] = corner(L, -a.half), [x3, y3] = corner(L, a.half), [x4, y4] = corner(-L, a.half);
+    const on = a.phase === 'fly' || Math.floor(t / 160) % 2 === 0;
+    g.fillStyle(0xf83800, on ? 0.13 : 0.05).fillPoints([{ x: x1, y: y1 }, { x: x2, y: y2 }, { x: x3, y: y3 }, { x: x4, y: y4 }], true);
+    g.lineStyle(1, 0xf8b800, on ? 0.7 : 0.3).lineBetween(x1, y1, x2, y2).lineBetween(x4, y4, x3, y3);
+    const n = Math.max(5, Math.round((a.half * 2) / 18) + 1);
+    if (!this.textures.exists('coop:axe')) this.makeAxeTexture();
+    while (this.axeImgs.length < n) this.axeImgs.push(this.add.image(0, 0, 'coop:axe').setDepth(21));
+    this.axeImgs.forEach((im, i) => {
+      if (i >= n || a.phase !== 'fly') { im.setVisible(false); return; }
+      const [x, y] = corner(a.pos - L, -a.half + (i * a.half * 2) / (n - 1));
+      im.setVisible(true).setPosition(x, y).setRotation(t / 70 + i).setScale(1.4);
+    });
+  }
+
+  /** A little pixel axe (no emoji in the pixel font): grey blade, brown handle. */
+  private makeAxeTexture() {
+    const rows = ['....ggg.....', '...gwwgg....', '..gwwwggg...', '..gwwggbg...', '...gggbbg...', '.....bb.....', '....bb......', '...bb.......', '..bb........', '.bb.........', 'bb..........', 'b...........'];
+    const cols: Record<string, number> = { g: 0x7c7c7c, w: 0xd8d8d8, b: 0x8c5a2b };
+    const gr = this.add.graphics();
+    rows.forEach((r, y) => [...r].forEach((c, x) => { if (cols[c]) gr.fillStyle(cols[c], 1).fillRect(x, y, 1, 1); }));
+    gr.generateTexture('coop:axe', 12, 12);
+    gr.destroy();
   }
 
   /** Floor pickups: the hop when they drop and the bob of powerups and lore are drawn here (the sim keeps x, y). */
@@ -4630,6 +4753,7 @@ export class CoopScene extends Phaser.Scene {
       case 'down': this.hp = 0; this.knockDown(); break;
       case 'powerup': this.dropItem((a[0] as PowerId) ?? 'autopilot', this.player.x + 20, this.player.y); break;
       case 'chest': this.dropItem('chest', this.player.x + 20, this.player.y); break;
+      case 'axes': this.axeAt = 0; break;
       case 'tp': this.player.setPosition(Phaser.Math.Clamp(Number(a[0]) || 0, 12, WORLD_W - 12), Phaser.Math.Clamp(Number(a[1]) || 0, 12, WORLD_H - 12)); break;
       case 'boss': this.elapsed = Math.max(this.elapsed, this.nextBossAt); break;
       case 'killBoss':

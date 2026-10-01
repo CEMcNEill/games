@@ -21,6 +21,11 @@ countdown runs and the game starts on every device at once.
 - **Finding each other:** a teammate who is off your screen gets a marker on the screen's edge. It's in their colour,
   points from your hog toward them, and shows their seat and HP. A downed teammate's marker flashes red ("P2 DOWN")
   and its bar shows review progress. Teammates on screen have a name tag and an HP bar under them.
+- **Axe sweep:** about once a minute (2+ hogs, mid-wave), three axes and "INCOMING, WATCH OUT!" flash on screen and a
+  lane flashes across the team for 2 s. Then a wall of spinning axes, as wide as the team, flies through it. It does no
+  damage. Any hog still inside the wall's span gets thrown away from its middle line, so the team splits two ways and
+  has to run back together. Get out of the lane in time and the axes miss you. Each bot flips a coin: half dodge, half
+  get chopped.
 - **Nobody plays alone.** Out of HP (with no revives left), your hog goes down. "IT'S NOT OK TO LET YOUR TEAMMATE FAIL"
   flashes, and a teammate standing on you for 3 s reviews you back in. Downed hogs also come back at the next wave. The
   run ends when every hog is down at once.
