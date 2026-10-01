@@ -15,7 +15,7 @@ import { dailyBest, currentHog, save, syncCrestHogs } from './save';
 import { CoopScene } from './coop/game';
 import { LobbyScene, CoopEndScene } from './coop/lobby';
 
-/** Runs once per how-to screen: the SHOP title choice skips straight to the shop, CO-OP to its lobby. Module scope so
+/** Runs once per how-to screen: the MERCH title choice skips straight to the shop, CO-OP to its lobby. Module scope so
  * off() matches. */
 function toShop(this: void) {
   if (K.run.mode !== 'shop' && K.run.mode !== 'coop') return;
@@ -78,7 +78,7 @@ startKit({
     if (db > 0) parts.push(`DAILY BEST ${db}`);
     if (parts.length) text(scene, W / 2, W < DW ? 26 : 16, parts.join('   '), { align: 'center', color: 0xf8d878, depth: 10, maxWidth: W - 8, maxLines: 2 });
     if (meta.data.runs > 0) text(scene, W / 2 - 150 * k, y(202), hogName(hog).toUpperCase(), { align: 'center', color: K.ui.dimInt, depth: 10, maxWidth: Math.min(110, (W / 2 - 150 * k) * 2 - 4), maxLines: 1 });
-    // SHOP is a title choice: when the run starts in shop mode, jump from the how-to straight to the shop.
+    // MERCH is a title choice (mode 'shop'): when the run starts in shop mode, jump from the how-to straight to the shop.
     const howto = scene.scene.get('HowTo');
     howto.events.off('create', toShop);
     howto.events.once('create', toShop);
@@ -90,7 +90,7 @@ startKit({
         { label: 'RUN', value: 'standard' },
         { label: 'DAILY', value: 'daily' },
         { label: 'YOLO', value: 'yolo', locked: !yolo },
-        { label: 'SHOP', value: 'shop' },
+        { label: 'MERCH', value: 'shop' },
         { label: 'CO-OP', value: 'coop' },
       ] },
       heatRow(5),

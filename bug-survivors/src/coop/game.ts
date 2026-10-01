@@ -27,6 +27,7 @@ import {
   WeaponId, TOOL_IDS, ACT2, ACT2_SPAWN, ACT2_ELITES, ACT2_EVENTS, LATE_BASE, LATE_TRICKS, LATE_ELITES, LATE_EVENTS, POWERUPS,
   POWER_IDS, PowerId, WAVES, WAVE, WaveMod, SCALE_MODS, WAVE_MOD_TEXT, REAPER_WAVE, BOSS_AFFIX, ZERO_DAY, AFFIX_TEXT, BossAffix,
   RELEASES, ReleaseId, RELICS, RELIC_IDS, RelicId, PAGES, PATCH_MUL, MAJOR,
+  applyMerch, merchExtra,
 } from '../content';
 import { HOG32, HOG64, CREST16, CREST64, theName, productName, bossTitle } from '../game';
 import { WState, newWeapon, WEAPON_FNS, drawWeapons, aura, resetVisuals, semver, OWN } from './weapons';
@@ -78,7 +79,7 @@ const VIEW0 = { w: 480, h: 270 };
 const HASH_EVERY = 40;
 /** The axe sweep (co-op only): about once a minute a wall of axes flies through the team. Getting hit doesn't hurt; it
  * throws the hog away from the middle of the wall, so the team splits and has to run back together. */
-const AXE = { first: 50, every: [45, 80] as const, warn: 2, speed: 260, reach: 330, toss: 380, tossT: 0.45 };
+const AXE = { first: 50, every: [45, 80] as const, warn: 2, speed: 260, reach: 330, toss: 680, tossT: 0.8 };
 /** Each player's colour: name tags, the teammate list, the revive ring. */
 const P_COLS = [0x3cbcfc, 0xf8b800, 0xf878f8, 0x58d854];
 
@@ -150,6 +151,7 @@ interface Keep { sel: number; armed: boolean; at?: number }
 /** The on-screen card picker (this device only); the choice itself goes to everyone as an event. */
 interface Modal {
   kind: 'levelup' | 'act' | 'release' | 'cmdk'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number;
+  clicked?: number; // the card clicked last: clicking it again (a double-click) picks it
   at?: number;
   sent?: boolean;                             // the pick is on its way: ignore more taps
   rects?: Rect[];                             // the cards / choices, as drawn (taps and the selection frame use them)
@@ -439,7 +441,8 @@ export class CoopScene extends Phaser.Scene {
   /** Everyone's pals (ALL HANDS). */
   allPals(): string[] { const s = new Set<string>(); this.hogs.forEach((h) => (h.info.pals ?? []).forEach((p) => s.add(p))); return [...s].sort(); }
   /** A shop level of the current hog's player. */
-  shop(id: string) { return Math.max(0, Math.floor(Number(this.cur.info.shop?.[id]) || 0)); }
+  /** The current hog's store merch (copies of each), from lobby info. */
+  merch(): Record<string, number> { const m = this.cur.info.merch; return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; }
   /** Something only this device's player should see or keep (their banners, crests, saves). */
   mine() { return this.cur === this.me; }
 
@@ -575,9 +578,9 @@ export class CoopScene extends Phaser.Scene {
       move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, toss: null, axeDodge: true, wfx: new Map(),
     };
     this.as(h, () => {
-      this.rerolls = 1 + this.shop('reroll');
-      this.skips = 1 + this.shop('skip');
-      this.banishes = 1 + this.shop('skip');
+      this.rerolls = 1 + merchExtra(this.merch(), 'rerolls');
+      this.skips = 1 + merchExtra(this.merch(), 'skips');
+      this.banishes = 1 + merchExtra(this.merch(), 'banishes');
       h.player = this.add.sprite(x, y, HOG32, this.hogArtFrame()).setDepth(local ? 10 : 9.5).setOrigin(0.5, 0.72);
     });
     if (!local) {
@@ -625,12 +628,6 @@ export class CoopScene extends Phaser.Scene {
   /** Rebuild player numbers from base + shop + hoggie + passives + releases + relics (+ live effects). Runs 4x a second. */
   recalc() {
     const s = baseStats();
-    s.might *= 1 + 0.05 * this.shop('might');
-    s.maxHp += 10 * this.shop('hp');
-    s.speed *= 1 + 0.04 * this.shop('speed');
-    s.magnet *= 1 + 0.15 * this.shop('magnet');
-    s.luck *= 1 + 0.08 * this.shop('luck');
-    s.revives += this.shop('revive');
     this.passives.forEach((l, id) => PASSIVES[id].apply(s, l + 0.5 * (this.ppatch.get(id) ?? 0)));
     if (this.perk) PERKS[this.perk].apply(s);
     const hpFrac = this.st.maxHp ? Math.max(0, this.hp / this.st.maxHp) : 1;
@@ -655,6 +652,7 @@ export class CoopScene extends Phaser.Scene {
       default: break;
     }
     this.relics.forEach((r) => RELICS[r].apply(s));
+    applyMerch(this.merch(), s, { hpFrac, moving: this.moving, elapsed: this.elapsed, wave: this.wave, level: this.level, weapons: this.weapons.size, boss: !!this.boss });
     const has = (r: ReleaseId) => this.releases.has(r);
     if (has('dsp')) { s.might *= 1.5; s.maxHp *= 0.7; }
     if (has('sourcemaps')) { s.critMul = 3; s.crit += 0.1; }
@@ -847,8 +845,10 @@ export class CoopScene extends Phaser.Scene {
   private modalTap(m: Modal, x: number, y: number) {
     const i = (m.rects ?? []).findIndex((r) => inRect(r, x, y, 4));
     if (i >= 0) {
-      if (m.kind === 'act') { if (m.sel === i) this.chooseAct(i); else this.selectAct(i); }
-      else if (m.sel === i) this.pickCard(); else this.selectCard(i);
+      const again = m.clicked === i && m.sel === i;
+      m.clicked = i;
+      if (m.kind === 'act') { if (again) this.chooseAct(i); else this.selectAct(i); }
+      else if (again) this.pickCard(); else this.selectCard(i);
       return;
     }
     m.btns?.find((b) => inRect(b, x, y, 2))?.act();
@@ -907,7 +907,7 @@ export class CoopScene extends Phaser.Scene {
     if (rl) y += T(W / 2, y, `MERCH: ${rl}`, { align: 'center', color: 0xf8d878, maxWidth: bw0 - 20, maxLines: narrow ? 3 : 1 }).lineCount * 10 + 2;
     y += 6;
     const refresh = () => { this.closeMenu(); this.openMenu(); };
-    if (TOUCH) {
+    {
       const btns: [string, () => void][] = [
         ['BACK', () => this.closeMenu()],
         [`NUMBERS ${this.numbers ? 'ON' : 'OFF'}`, () => { this.numbers = !this.numbers; save().numbers = this.numbers; persist(); refresh(); }],
@@ -923,10 +923,7 @@ export class CoopScene extends Phaser.Scene {
         this.pauseBtns.push({ x: bx, y: by - 2, w: bw, h: TAP + 4, act });
       });
       y += Math.ceil(btns.length / per) * (TAP + 6) + 2;
-    } else {
-      T(W / 2, y + 4, 'ENTER back   Q leave the game', { align: 'center' });
-      T(W / 2, y + 15, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
-      y += 30;
+      if (!TOUCH) { T(W / 2, y + 2, 'ENTER back   Q leave   N numbers   M mute', { align: 'center', color: ui.dimInt }); y += 14; }
     }
     const info = [this.heat ? `HEAT ${this.heat}` : '', `WAVE ${this.wave}`, `${this.present().length} HOGS`,
       hogName(this.hog).toUpperCase(), this.funding ? `FUNDING +${Math.round((Math.pow(1 + WAVE.funding, this.funding) - 1) * 100)}%` : '']
@@ -3019,7 +3016,7 @@ export class CoopScene extends Phaser.Scene {
     const partners = partnersOf(this.build());
     const rects: Rect[] = [], btns: (Rect & { act: () => void })[] = [];
     const btnDefs: [string, () => void][] = [[`REROLL ${this.rerolls}`, () => this.reroll()], [`SKIP ${this.skips}`, () => this.skip()], [`BANISH ${this.banishes}`, () => this.banish()]];
-    const footer = TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'LEFT/RIGHT choose   ENTER pick';
+    const footer = TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'Click or LEFT/RIGHT choose   double-click or ENTER pick';
     const funding = `Funding round: +${Math.round(WAVE.funding * 100)}% damage, +${WAVE.fundingHp} max HP`;
     if (narrow) {
       // Portrait: the cards stack, each a wide row with its icon on the left; the whole block sits mid-screen.
@@ -3456,7 +3453,7 @@ export class CoopScene extends Phaser.Scene {
     const c = sel >= 0 ? p.cards[sel] : null;
     const help = banish ? (TOUCH ? 'Tap a card to banish it' : 'BANISH: press 1-3')
       : c ? (() => { const ct = this.cardText(c, cmd, partners); return `${ct.name}: ${ct.line}${ct.hint ? `. ${ct.hint}` : ''}`; })()
-        : TOUCH ? 'Tap a card to read it, tap again to pick. You keep moving' : 'Press 1, 2 or 3 to pick. You keep moving';
+        : TOUCH ? 'Tap a card to read it, tap again to pick. You keep moving' : 'Press 1, 2 or 3 (or double-click a card) to pick. You keep moving';
     const ty = (oneRow ? by : hy) - 11;
     this.trayTop = ty - 2;
     const helpT = T(W / 2, ty - (c && narrow ? 10 : 0), help, { align: 'center', color: c ? ui.textInt : ui.dimInt, maxWidth: W - 12, maxLines: c && narrow ? 2 : 1 });
@@ -3488,7 +3485,7 @@ export class CoopScene extends Phaser.Scene {
     const i = t.rects.findIndex((r) => inRect(r, x, y, 2));
     if (i < 0) return;
     if (t.banish) { this.trayBanish(i); return; }
-    if (!TOUCH || t.sel === i) { this.trayPick(i); return; }
+    if (t.sel === i) { this.trayPick(i); return; } // a second click (double-click) picks
     t.sel = i;
     this.sfx('move', 0.5);
     this.showPick();
@@ -3523,7 +3520,7 @@ export class CoopScene extends Phaser.Scene {
   private trayBanish(i = -1) {
     const t = this.tray, p = this.me.pick;
     if (!t || !p || t.sent || p.kind !== 'levelup' || this.me.banishes <= 0) { this.sfx('hurt', 0.3, 100); return; }
-    if (i < 0 && TOUCH && t.sel >= 0) i = t.sel;
+    if (i < 0 && t.sel >= 0) i = t.sel;
     if (i < 0) { t.banish = !t.banish; this.sfx('move', 0.5); this.showPick(); return; }
     const c = p.cards[i];
     if (!c || (c.kind !== 'weapon' && c.kind !== 'passive')) { this.sfx('hurt', 0.3, 100); return; }
@@ -4260,7 +4257,7 @@ export class CoopScene extends Phaser.Scene {
       ['CASH OUT', `Everyone banks ${this.gold} gold${bonus ? ` + ${bonus} bonus` : ''} and the run ends`, 0xf8d878],
     ];
     const warn = risk > 0 && this.wave >= 2 ? `${risk} gold at risk: die later, lose half. Cash out keeps it all.` : 'Keep going? Later waves have the biggest scores.';
-    const footer = TOUCH ? 'TAP a choice, TAP it again to confirm' : 'LEFT/RIGHT choose   ENTER confirm';
+    const footer = TOUCH ? 'TAP a choice, TAP it again to confirm' : 'Click or LEFT/RIGHT choose   double-click or ENTER confirm';
     const stats = `TIME ${clock(this.elapsed)}   BUGS ${this.kills}   LEVEL ${this.level}   SCORE ${this.score()}`;
     const art = (i: number, x: number, y: number) => add((i ? this.add.image(x, y + 2, spr('chest'), 0).setScale(2) : this.add.image(x, y, HOG32, hogFrame('rocket'))).setScrollFactor(0).setDepth(D + 1));
     const rects: Rect[] = [];

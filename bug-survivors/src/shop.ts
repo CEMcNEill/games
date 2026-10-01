@@ -1,25 +1,33 @@
-// Between-runs screen, reached from the title's SHOP choice: permanent upgrades and hoggie capsules bought with gold,
-// the hoggie roster (pick who to play), the crest wall (achievements) and the lore page (merch, handbook pages,
-// evolutions, totals). TAB or 1-4 switch tabs; ESC goes back to the title.
+// Between-runs screen, reached from the title's MERCH choice: the merch store (every item in PostHog's real merch store,
+// each with a strange but useful effect; owning it is wearing it, and copies stack) and hoggie capsules, bought with gold;
+// the hoggie roster (pick who to play), the crest wall (achievements) and the lore page (merch drops, handbook pages,
+// evolutions, totals). TAB or 1-4 switch tabs; ESC goes back to the title. Mouse: click to choose, click again
+// (double-click) to buy / play as; the wheel scrolls.
 import Phaser from 'phaser';
 import { K } from '@shared/kit';
 import { hooks } from '@shared/hooks';
 import { meta } from '@shared/meta';
 import { text, box, W, H, NARROW, PixelText, TOUCH } from '@shared/ui';
 import { onKeys, onTap, starfield, screen, button, inside, Rect, TAP } from '@shared/scenes';
-import { SHOP, WEAPONS, SUPER, PASSIVES, WeaponId, RELICS, RELIC_IDS, PAGES, capsulePrice } from './content';
+import { WEAPONS, SUPER, PASSIVES, WeaponId, RELICS, RELIC_IDS, PAGES, capsulePrice, MERCH, MERCH_IDS, merchPrice } from './content';
 import { productName, HOG32, HOG64, CREST64 } from './game';
 import { save, persist, rollCapsule, unlockHog, hasCrest, syncCrestHogs } from './save';
 import { HOGS, hogFrame, hogLine, sigOf, isSignature, SECRET_HOGS } from './hoggies';
 import { CREST_LIST, crestFrame, ACHIEVEMENTS } from './crests';
 
-const TABS = ['UPGRADES', 'HOGGIES', 'CRESTS', 'LORE'];
+const TABS = ['MERCH', 'HOGGIES', 'CRESTS', 'LORE'];
+const MER = 0, HOG = 1, CRE = 2, LORE = 3;
+/** The merch list: the hoggie capsule first, then the store. */
+const ROWS = ['capsule', ...MERCH_IDS];
 
 export class ShopScene extends Phaser.Scene {
   private tab = 0;
-  private row = 0;
   private sel = 0;      // grid selection (hoggies / crests)
   private scroll = 0;   // hoggie grid first row
+  private mrow = 0;     // merch selection
+  private mscroll = 0;  // merch list first row
+  private mflash = '';  // merch message
+  private lastClick = ''; // the item clicked last: a second click on it (a double-click) buys / plays as
   private lorePage = 0;
   private flash = '';
   private objs: Phaser.GameObjects.GameObject[] = [];
@@ -39,10 +47,9 @@ export class ShopScene extends Phaser.Scene {
     starfield(this, 30);
     syncCrestHogs();
     if (!data?.keep) {
-      this.row = 0;
       this.sel = Math.max(0, HOGS.findIndex((h) => h.id === save().hog));
     }
-    if (this.tab === 1) this.scrollToSel();
+    if (this.tab === HOG) this.scrollToSel();
     this.draw();
     onKeys(this, ['ArrowLeft', 'KeyA'], () => this.move(-1, 0), 120);
     onKeys(this, ['ArrowRight', 'KeyD'], () => this.move(1, 0), 120);
@@ -55,9 +62,12 @@ export class ShopScene extends Phaser.Scene {
     // Touch (and mouse): tap tabs, rows and grid cells; tap a selected item again to buy / play as; swipe the grid.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { this.downY = this.cameras.main.getWorldPoint(p.x, p.y).y; }); // world space, like onTap
     onTap(this, (x, y) => this.tap(x, y), 250);
+    // The mouse wheel scrolls whatever list is showing.
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => { if (dy) this.wheel(dy > 0 ? 1 : -1); });
     // Only shop hooks here (the setter merges the shared ones); stale game hooks must not be callable.
     hooks.debug = {
-      shopBuy: (id: string) => (id === 'capsule' ? this.buyCapsule() : this.buy(SHOP.findIndex((s) => s.id === id))),
+      shopBuy: (id: string) => this.merchAct(ROWS.indexOf(id)),
+      merch: (id: string) => this.merchAct(ROWS.indexOf(id)),
       hog: (id: string) => this.pickHog(HOGS.findIndex((h) => h.id === id)),
       hero: (id: string) => this.pickHog(HOGS.findIndex((h) => h.id === id)),
       tab: (i: number) => this.setTab(i | 0),
@@ -70,14 +80,15 @@ export class ShopScene extends Phaser.Scene {
     if (b) { b.act(); return; }
     const t = this.tabRects.find((r) => x >= r.x0 && x <= r.x1);
     if (!TOUCH && y >= L.tabY - 6 && y <= L.tabY + 10 && t) { this.setTab(t.i); return; }
-    if (this.tab === 0) {
-      for (let i = 0; i <= SHOP.length; i++) {
-        const ry = L.top + 4 + i * L.rowH - 3;
-        if (y < ry || y > ry + L.rowH - 1) continue;
-        if (this.row === i) this.act(); else { this.row = i; K.play('move', 0.5); this.draw(); }
-        return;
-      }
-    } else if (this.tab === 1) {
+    if (this.tab === MER) {
+      const swipe = y - this.downY;
+      if (Math.abs(swipe) > 24) { this.scrollMerch(-Math.round(swipe / L.mRowH)); return; }
+      const r = Math.floor((y - L.mTop + 3) / L.mRowH);
+      if (r < 0 || r >= L.mRows) return;
+      const i = this.mscroll + r;
+      if (i >= ROWS.length) return;
+      if (this.again(`m${i}`) && i === this.mrow) this.merchAct(i); else { this.mrow = i; this.mflash = ''; K.play('move', 0.5); this.draw(); }
+    } else if (this.tab === HOG) {
       const swipe = y - this.downY;
       if (Math.abs(swipe) > 24) { this.scrollHogs(-Math.round(swipe / 34)); return; }
       if (!TOUCH && x > W - 44) { this.scrollHogs(y < (L.gridY + L.detailY) / 2 ? -1 : 1); return; }
@@ -85,8 +96,8 @@ export class ShopScene extends Phaser.Scene {
       if (c < 0 || c >= L.hogCols || r < 0 || r >= L.hogRows) return;
       const i = (this.scroll + r) * L.hogCols + c;
       if (i >= HOGS.length) return;
-      if (i === this.sel) this.pickHog(i); else { this.sel = i; K.play('move', 0.5); this.draw(); }
-    } else if (this.tab === 2) {
+      if (this.again(`h${i}`) && i === this.sel) this.pickHog(i); else { this.sel = i; K.play('move', 0.5); this.draw(); }
+    } else if (this.tab === CRE) {
       const c = Math.floor((x - L.crestX) / 37), r = Math.floor((y - L.gridY) / 28);
       const i = r * L.crestCols + c;
       if (c < 0 || c >= L.crestCols || r < 0 || i >= CREST_LIST.length) return;
@@ -94,6 +105,24 @@ export class ShopScene extends Phaser.Scene {
     } else if (!TOUCH) {
       this.lorePage = 1 - this.lorePage; K.play('move', 0.5); this.draw(); // touch uses the page button
     }
+  }
+
+  private again(key: string) { const a = this.lastClick === key; this.lastClick = key; return a; }
+
+  /** The wheel: move through the list on the current tab. */
+  private wheel(d: number) {
+    if (this.tab === HOG) this.scrollHogs(d);
+    else if (this.tab === CRE) this.move(d, 0);
+    else if (this.tab === LORE) { if (this.lorePage !== (d > 0 ? 1 : 0)) this.move(0, d); }
+    else this.move(0, d);
+  }
+
+  private scrollMerch(d: number) {
+    const L = this.lay;
+    this.mscroll = Phaser.Math.Clamp(this.mscroll + d, 0, Math.max(0, ROWS.length - L.mRows));
+    this.mrow = Phaser.Math.Clamp(this.mrow, this.mscroll, this.mscroll + L.mRows - 1);
+    K.play('move', 0.5);
+    this.draw();
   }
 
   private scrollHogs(d: number) {
@@ -105,9 +134,10 @@ export class ShopScene extends Phaser.Scene {
 
   private setTab(i: number) {
     this.tab = ((i % TABS.length) + TABS.length) % TABS.length;
-    if (this.tab === 2) this.sel = Math.min(this.sel, CREST_LIST.length - 1);
-    if (this.tab === 1) this.sel = Math.max(0, HOGS.findIndex((h) => h.id === save().hog));
-    this.row = 0;
+    if (this.tab === CRE) this.sel = Math.min(this.sel, CREST_LIST.length - 1);
+    if (this.tab === HOG) this.sel = Math.max(0, HOGS.findIndex((h) => h.id === save().hog));
+    this.mflash = '';
+    this.lastClick = '';
     this.flash = '';
     K.play('move', 0.5);
     this.draw();
@@ -115,18 +145,21 @@ export class ShopScene extends Phaser.Scene {
   private moveTab(d: number) { this.setTab(this.tab + d); }
 
   private move(dx: number, dy: number) {
-    if (this.tab === 1 || this.tab === 2) {
+    if (this.tab === HOG || this.tab === CRE) {
       const L = this.lay;
-      const n = this.tab === 1 ? HOGS.length : CREST_LIST.length, cols = this.tab === 1 ? L.hogCols : L.crestCols;
+      const n = this.tab === HOG ? HOGS.length : CREST_LIST.length, cols = this.tab === HOG ? L.hogCols : L.crestCols;
       this.sel = Phaser.Math.Clamp(this.sel + dx + dy * cols, 0, n - 1);
-      if (this.tab === 1) this.scrollToSel();
-    } else if (this.tab === 3) {
+      if (this.tab === HOG) this.scrollToSel();
+    } else if (this.tab === MER) {
       if (dx) { this.moveTab(dx); return; }
-      this.lorePage = Phaser.Math.Clamp(this.lorePage + dy, 0, 1);
+      const L = this.lay;
+      this.mrow = Phaser.Math.Clamp(this.mrow + dy, 0, ROWS.length - 1);
+      if (this.mrow < this.mscroll) this.mscroll = this.mrow;
+      if (this.mrow >= this.mscroll + L.mRows) this.mscroll = this.mrow - L.mRows + 1;
+      this.mflash = '';
     } else {
       if (dx) { this.moveTab(dx); return; }
-      const n = SHOP.length + 1;
-      this.row = (this.row + dy + n) % n;
+      this.lorePage = Phaser.Math.Clamp(this.lorePage + dy, 0, 1);
     }
     K.play('move', 0.5);
     this.draw();
@@ -140,20 +173,22 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private act() {
-    if (this.tab === 0) { if (this.row < SHOP.length) this.buy(this.row); else this.buyCapsule(); }
-    else if (this.tab === 1) this.pickHog(this.sel);
+    if (this.tab === MER) this.merchAct(this.mrow);
+    else if (this.tab === HOG) this.pickHog(this.sel);
   }
 
-  buy(i: number) {
-    const s = SHOP[i];
-    if (!s) return false;
-    const sv = save();
-    const lvl = sv.shop[s.id] ?? 0;
-    const cost = s.cost[lvl];
-    if (cost === undefined || !meta.spend(cost)) { K.play('hurt', 0.4); return false; }
-    sv.shop[s.id] = lvl + 1;
+  /** Buy a row of the merch list: the capsule, or another copy of an item (copies stack, each one dearer). */
+  merchAct(i: number) {
+    const id = ROWS[i];
+    if (!id) return false;
+    this.mrow = i;
+    if (id === 'capsule') return this.buyCapsule();
+    const sv = save(), m = MERCH[id], have = sv.merch[id] ?? 0, cost = merchPrice(id, have);
+    if (!meta.spend(cost)) { K.play('hurt', 0.4); this.mflash = `${cost} gold needed`; this.draw(); return false; }
+    sv.merch[id] = have + 1;
     persist();
     K.play('levelup', 0.7);
+    this.mflash = have ? `${m.name} x${have + 1}: it stacks` : `Got ${m.name}. It works in every run`;
     this.draw();
     return true;
   }
@@ -163,12 +198,13 @@ export class ShopScene extends Phaser.Scene {
     const sv = save();
     const cost = capsulePrice(sv.hogs.length);
     const id = rollCapsule();
-    if (!id || !meta.spend(cost)) { K.play('hurt', 0.4); return false; }
+    if (!id || !meta.spend(cost)) { K.play('hurt', 0.4); this.mflash = id ? `${cost} gold needed` : 'You have every hoggie'; this.draw(); return false; }
     unlockHog(id);
     sv.capsules++;
     persist();
     K.play('evolve', 0.7);
     this.flash = id;
+    this.mflash = `NEW HOGGIE: ${HOGS[hogFrame(id)]?.name ?? id}`;
     this.draw();
     return true;
   }
@@ -191,16 +227,16 @@ export class ShopScene extends Phaser.Scene {
     const o = this.objs;
     const T = (x: number, y: number, s: string, opts: Parameters<typeof text>[4] = {}) => { const t = text(this, x, y, s, opts); o.push(t); return t; };
     o.push(box(this, L.mx, 8, W - L.mx * 2, H - 16, ui.bgInt, ui.textInt, ui.panelInt));
-    T(L.cx - 4, 16, 'SHOP', { scale: 2, color: ui.accentInt });
+    T(L.cx - 4, 16, 'MERCH', { scale: 2, color: ui.accentInt });
     T(W - L.cx + 4, 20, `GOLD ${meta.data.coins}`, { align: 'right', color: 0xf8d878 });
     // Tabs: beside the title, or on their own row when the screen is narrow. Touch gets them as buttons.
     this.tabRects = [];
     if (TOUCH) {
-      const x0 = L.narrow ? L.mx + 6 : 84, x1 = L.narrow ? W - L.mx - 6 : W - 90, gap = 3;
-      const tw = Math.min(84, Math.floor((x1 - x0 - gap * 3) / 4));
+      const x0 = L.narrow ? L.mx + 6 : 96, x1 = L.narrow ? W - L.mx - 6 : W - 90, gap = 3;
+      const tw = Math.min(84, Math.floor((x1 - x0 - gap * (TABS.length - 1)) / TABS.length));
       TABS.forEach((t, i) => this.addBtn({ x: x0 + i * (tw + gap), y: L.tabY, w: tw, h: TAP - 2 }, t, () => this.setTab(i), { on: i === this.tab }));
     } else {
-      let x = L.narrow ? L.cx - 4 : 84;
+      let x = L.narrow ? L.cx - 4 : 96;
       TABS.forEach((t, i) => {
         const on = i === this.tab;
         const s = on ? `<${t}>` : ` ${t} `;
@@ -209,16 +245,17 @@ export class ShopScene extends Phaser.Scene {
         x += (s.length + 1) * 6;
       });
     }
-    if (this.tab === 0) this.drawUpgrades(T);
-    else if (this.tab === 1) this.drawHogs(T);
-    else if (this.tab === 2) this.drawCrests(T);
+    if (this.tab === MER) this.drawMerch(T);
+    else if (this.tab === HOG) this.drawHogs(T);
+    else if (this.tab === CRE) this.drawCrests(T);
     else this.drawLore(T);
     if (TOUCH) {
       this.addBtn({ x: L.mx + 6, y: H - 14 - TAP, w: 60, h: TAP }, 'BACK', () => { K.play('select'); this.scene.start('Title'); });
-      const help = ['Tap an upgrade, then BUY', 'Tap a hoggie, then PLAY. Swipe to scroll', 'Tap a crest to read it', ''][this.tab];
+      const help = ['Tap merch, then BUY. Copies stack. Swipe to scroll', 'Tap a hoggie, then PLAY. Swipe to scroll', 'Tap a crest to read it', ''][this.tab];
       if (help) T(L.mx + 74, H - 14 - TAP + (L.narrow ? 2 : 8), help, { color: ui.dimInt, maxWidth: W - L.mx * 2 - 84, maxLines: 2 });
     } else {
-      const help = ['UP/DOWN choose   ENTER buy', 'ARROWS choose   ENTER play as', 'ARROWS look', 'UP/DOWN page'][this.tab];
+      const help = ['Click/wheel choose   double-click or ENTER buy',
+        'Click choose, wheel scrolls   double-click or ENTER play as', 'Click/wheel/arrows look', 'Wheel or UP/DOWN page'][this.tab];
       T(W / 2, H - 22, `${help}   TAB tabs   ESC back`, { align: 'center', color: ui.dimInt, maxWidth: W - 20, maxLines: 2 });
     }
   }
@@ -229,52 +266,42 @@ export class ShopScene extends Phaser.Scene {
     this.btns.push({ ...r, act });
   }
 
-  private drawUpgrades(T: (x: number, y: number, s: string, o?: any) => PixelText) {
+  private drawMerch(T: (x: number, y: number, s: string, o?: any) => PixelText) {
     const ui = K.ui, L = this.lay;
     const sv = save();
-    // A row: name, line and price; the level pips sit mid-row, or under the line on a narrow screen.
-    const row = (i: number) => L.top + 4 + i * L.rowH;
-    const hl = (y: number) => this.objs.push(this.add.rectangle(L.cx - 8, y - 3, W - (L.cx - 8) * 2, L.rowH - 1, ui.panelInt, 0.35).setOrigin(0));
-    SHOP.forEach((s, i) => {
-      const y = row(i);
-      const lvl = sv.shop[s.id] ?? 0;
-      const on = i === this.row;
-      if (on) hl(y);
-      T(L.cx, y, s.name, { color: on ? ui.accentInt : ui.textInt });
-      T(L.cx, y + 9, s.line, { color: ui.dimInt, maxWidth: L.narrow ? W - L.cx * 2 : W / 2 - 40 - L.cx, maxLines: 1 });
-      for (let k = 0; k < s.cost.length; k++) {
-        const px = L.narrow ? L.cx + k * 9 : W / 2 - 40 + k * 9, py = L.narrow ? y + 19 : y + 2;
-        this.objs.push(this.add.rectangle(px, py, 7, 7, k < lvl ? ui.accentInt : 0x3c3c3c).setOrigin(0));
-      }
-      const cost = s.cost[lvl];
-      const afford = cost !== undefined && meta.data.coins >= cost;
-      const buyNow = TOUCH && on && cost !== undefined;
-      if (buyNow) this.addBtn(this.buyRect(y), 'BUY', () => this.buy(i), { dim: !afford, color: afford ? 0xf8d878 : undefined });
-      T(W - L.cx - 2 - (buyNow ? 50 : 0), y + 2, cost === undefined ? 'MAX' : `${cost} GOLD`, { align: 'right', color: cost === undefined ? ui.dimInt : afford ? 0xf8d878 : 0x7c7c7c });
-    });
-    // Hoggie capsule
-    const y = row(SHOP.length);
-    const on = this.row === SHOP.length;
-    if (on) hl(y);
+    const kinds = MERCH_IDS.filter((id) => (sv.merch[id] ?? 0) > 0).length;
+    T(L.cx, L.top, `OWNED ${kinds}/${MERCH_IDS.length}`, { color: ui.accentInt });
+    if (!L.narrow) T(W - L.cx, L.top, 'Owned = worn, every run. Copies stack', { align: 'right', color: ui.dimInt });
+    const row = (r: number) => L.mTop + r * L.mRowH;
     const left = HOGS.filter((h) => !sv.hogs.includes(h.id) && !SECRET_HOGS.has(h.id)).length;
-    const cost = capsulePrice(sv.hogs.length);
-    T(L.cx, y, 'Hoggie Capsule', { color: on ? ui.accentInt : ui.textInt });
-    T(L.cx, y + 9, left ? `A random new hoggie (${left} left)` : 'You have them all!', { color: ui.dimInt });
-    const buyCap = TOUCH && on && !!left;
-    if (buyCap) this.addBtn(this.buyRect(y), 'BUY', () => this.buyCapsule(), { dim: meta.data.coins < cost, color: meta.data.coins >= cost ? 0xf8d878 : undefined });
-    T(W - L.cx - 2 - (buyCap ? 50 : 0), y + 2, left ? `${cost} GOLD` : 'DONE', { align: 'right', color: left && meta.data.coins >= cost ? 0xf8d878 : 0x7c7c7c });
-    if (this.flash) {
-      // The new hoggie: top right, or under the list when the screen is narrow.
-      const fx = L.narrow ? W / 2 : W - 70, fy = L.narrow ? row(SHOP.length + 1) + 30 : 44;
-      this.objs.push(this.add.image(fx, fy, HOG64, hogFrame(this.flash)));
-      T(fx, fy + 34, 'NEW!', { align: 'center', color: 0x58d854 });
+    for (let r = 0; r < L.mRows; r++) {
+      const i = this.mscroll + r, id = ROWS[i];
+      if (!id) break;
+      const y = row(r), on = i === this.mrow, cap = id === 'capsule';
+      const have = cap ? 0 : sv.merch[id] ?? 0;
+      const cost = cap ? capsulePrice(sv.hogs.length) : merchPrice(id, have);
+      const name = cap ? 'Hoggie Capsule' : MERCH[id].name, line = cap ? (left ? `A random new hoggie (${left} left)` : 'You have them all!') : MERCH[id].line;
+      const can = !cap || left > 0, afford = can && meta.data.coins >= cost;
+      if (on) this.objs.push(this.add.rectangle(L.cx - 8, y - 3, W - (L.cx - 8) * 2, L.mRowH - 1, ui.panelInt, 0.35).setOrigin(0));
+      if (have) this.objs.push(this.add.rectangle(L.cx - 6, y - 1, 2, L.mRowH - 5, 0x58d854).setOrigin(0));
+      const btn = TOUCH && on && can;
+      const rw = W - L.cx * 2 - (btn ? 56 : 70);
+      const nm = T(L.cx, y, name, { color: on ? ui.accentInt : have ? 0x58d854 : cap ? 0xf8d878 : ui.textInt, maxWidth: rw - 26, maxLines: 1 });
+      if (have) T(L.cx + nm.textWidth + 6, y, `x${have}`, { color: 0x58d854 });
+      T(L.cx, y + 9, line, { color: ui.dimInt, maxWidth: rw, maxLines: L.narrow ? 2 : 1 });
+      if (btn) this.addBtn(this.buyRect(y, L.mRowH), 'BUY', () => this.merchAct(i), { dim: !afford, color: afford ? 0xf8d878 : undefined });
+      else T(W - L.cx - 2, y + 2, can ? `${cost} GOLD` : 'DONE', { align: 'right', color: afford ? 0xf8d878 : 0x7c7c7c });
     }
+    // Scroll marks (touch: swipe; mouse: the wheel).
+    if (this.mscroll > 0) T(W - L.mx - 8, L.mTop - 2, '^', { color: ui.dimInt });
+    if (this.mscroll + L.mRows < ROWS.length) T(W - L.mx - 8, row(L.mRows) - 10, 'v', { color: ui.dimInt });
+    if (this.mflash) T(W / 2, row(L.mRows) + 1, this.mflash, { align: 'center', color: 0xf8d878, maxWidth: W - 20, maxLines: 1 });
   }
 
   /** The BUY button at the right end of an upgrade row. */
-  private buyRect(y: number): Rect {
+  private buyRect(y: number, h: number): Rect {
     const L = this.lay;
-    return { x: W - L.cx - 44, y: y - 3, w: 46, h: L.rowH - 1 };
+    return { x: W - L.cx - 44, y: y - 3, w: 46, h: h - 1 };
   }
 
   private drawHogs(T: (x: number, y: number, s: string, o?: any) => PixelText) {
@@ -388,7 +415,7 @@ export class ShopScene extends Phaser.Scene {
       else T(W - L.cx, L.top, 'DOWN: merch + more', { align: 'right', color: ui.dimInt });
       return;
     }
-    T(L.cx, L.top, `MERCH ${sv.relics.length}/${RELIC_IDS.length}`, { color: ui.accentInt });
+    T(L.cx, L.top, `MERCH DROPS ${sv.relics.length}/${RELIC_IDS.length}`, { color: ui.accentInt });
     const mcols = L.narrow ? 2 : 3, mw = L.narrow ? (W - L.cx * 2) / 2 : 145;
     RELIC_IDS.forEach((r, i) => {
       const found = sv.relics.includes(r);
@@ -440,7 +467,7 @@ function layout() {
   const hogCols = Math.max(4, Math.floor((W - cx - (TOUCH ? 40 : 30)) / 34));
   const hogRows = Math.max(2, Math.floor((detailY - gridY) / 34));
   const crestX = cx + 8, crestCols = Math.max(4, Math.floor((W - crestX - 8) / 37));
-  // Upgrade rows: as tall as fit (up to 22, or 30 when narrow) so every upgrade and the capsule show.
-  const rowH = Math.min(narrow ? 30 : 22, Math.floor((bottom - top - 4) / (SHOP.length + 1)));
-  return { narrow, mx, cx, tabY, top, gridY, bottom, detailY, hogCols, hogRows, crestX, crestCols, rowH };
+  // Merch rows: a fixed height, as many as fit above the message line; the rest scroll.
+  const mTop = gridY, mRowH = narrow ? 31 : 21, mRows = Math.max(3, Math.floor((bottom - 10 - mTop) / mRowH));
+  return { narrow, mx, cx, tabY, top, gridY, bottom, detailY, hogCols, hogRows, crestX, crestCols, mTop, mRowH, mRows };
 }

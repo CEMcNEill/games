@@ -24,7 +24,7 @@ function myInfo(): { name: string; info: HogInfo } {
   const hog = currentHog();
   const name = hogName(hog).slice(0, 16);
   const pals = [...sv.hogs].sort().slice(0, 12);
-  return { name, info: { hog, name, shop: { ...sv.shop }, pals, heat: Math.max(0, Math.min(5, K.run.heat | 0)) } };
+  return { name, info: { hog, name, merch: { ...sv.merch }, pals, heat: Math.max(0, Math.min(5, K.run.heat | 0)) } };
 }
 
 export class LobbyScene extends Phaser.Scene {

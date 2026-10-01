@@ -165,7 +165,8 @@ Phones get a fractional zoom that fills the screen, the page blocks scrolling an
 phone sideways", and Android goes fullscreen on the first tap. The mouse drives the same joystick and taps on desktop.
 
 ## Title menu, meta and modes
-- Title rows: `RUN  DAILY  YOLO  SHOP` and `HEAT 0-5`. Enter = RUN heat 0. YOLO unlocks by reaching wave 6.
+- Title rows: `RUN  DAILY  YOLO  MERCH  CO-OP` and `HEAT 0-5`. Enter (or a double-click on a choice) = start; the wheel
+  changes the choice. Enter = RUN heat 0. YOLO unlocks by reaching wave 6.
   Heat n unlocks by winning heat n-1 (a win = clearing wave 1). The title shows gold, best wave, hoggie count and
   today's daily best, and the current hoggie.
 - **Heat (stacking):** 1 more bugs, 2 faster bugs, 3 elites early, 4 no regen + half food, 5 boss rage + an extra boss
@@ -173,11 +174,13 @@ phone sideways", and Android goes fullscreen on the first tap. The mouse drives 
   Gold x(1 + 0.1 heat), score x(1 + 0.2 heat).
 - **YOLO (`--dangerously-skip-permissions`):** x3 spawns, XP and gold, x2 damage both ways, 90 s waves, no level-up
   pauses (PostHog AI picks your cards and releases, with commentary), a powerup every 6 s, ALL HANDS at every boss.
-- **SHOP** (title choice; TAB or 1-4 switch tabs): UPGRADES (might, max HP, speed, magnet, luck, reroll, skip+banish,
-  rollback, Hoggie Capsule), HOGGIES (the roster grid; ENTER plays as), CRESTS (the wall, with what each unlocks), LORE
-  (handbook pages, merch, evolution codex, lifetime totals).
+- **MERCH** (title choice, the shop scene; TAB or 1-4 switch tabs): MERCH (the Hoggie Capsule, then all 57 items in
+  PostHog's real merch store, `MERCH` in content.ts, each with a strange but useful effect; anything owned works in every
+  run, and copies stack, each costing x1.6 the last), HOGGIES (the roster grid; ENTER plays as), CRESTS (the wall, with
+  what each unlocks), LORE (handbook pages, merch drops, evolution codex, lifetime totals). Mouse: click selects, a
+  second click (double-click) buys / plays as, the wheel scrolls. The old upgrade levels were refunded as gold.
 - **Daily:** today's seed fixes the start weapon, spawn order, events, drops and cards; always the default hoggie.
-- Save: shared meta blob per slug + kit (`meta.data.kit`: shop, hog, hogs, capsules, lifetime totals, best wave,
+- Save: shared meta blob per slug + kit (`meta.data.kit`: merch (copies owned), hog, hogs, capsules, lifetime totals, best wave,
   collections, codex, daily best, damage-number setting). Blocked storage = first run, never a crash.
 
 ## Analytics (optional PostHog capture, unchanged transport)

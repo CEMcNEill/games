@@ -20,11 +20,12 @@ import {
   WeaponId, ToolId, TOOL_IDS, ACT2, ACT2_SPAWN, ACT2_ELITES, ACT2_EVENTS, LATE_BASE, LATE_TRICKS, LATE_ELITES, LATE_EVENTS, POWERUPS,
   POWER_IDS, PowerId, WAVES, WAVE, WaveMod, SCALE_MODS, WAVE_MOD_TEXT, REAPER_WAVE, BOSS_AFFIX, ZERO_DAY, AFFIX_TEXT, BossAffix,
   RELEASES, ReleaseId, RELICS, RELIC_IDS, RelicId, PAGES, PATCH_MUL, MAJOR, YOLO, YOLO_SNARK,
+  applyMerch, merchExtra,
 } from './content';
 import { WState, newWeapon, WEAPON_FNS, drawWeapons, aura, resetVisuals, semver, OWN } from './weapons';
 import { TOOL_FNS, drawTools, batchTag } from './tools';
 import { Card, Build, drawCards, drawRelease, botRank, partnersOf } from './cards';
-import { save, persist, shopLevel, today, currentHog, unlockHog, rollCapsule, earnCrest, hasCrest } from './save';
+import { save, persist, today, currentHog, unlockHog, rollCapsule, earnCrest, hasCrest } from './save';
 import { hogFrame, hogName, sigOf, perkOf, PERKS, SigDef, Trait, Perk, EVOLVING_FORMS, HOGS, isSignature, SIGNATURE } from './hoggies';
 import { crestFrame, CREST_BY_ID } from './crests';
 import { SysState, newSys, tickSystems, drawSystems, onLevelUpSys, startDriveBy, allHands, spawnReaper, selfDrivingPr, VOID } from './systems';
@@ -122,6 +123,7 @@ interface Keep { sel: number; armed: boolean; at?: number }
 interface Modal {
   kind: 'levelup' | 'chest' | 'act' | 'release' | 'cmdk' | 'reveal'; objs: Phaser.GameObjects.GameObject[]; armed: boolean; cards: Card[]; sel: number;
   at?: number;
+  clicked?: number;                           // the card clicked last: clicking it again (a double-click) picks it
   rects?: Rect[];                             // the cards / choices, as drawn (taps and the selection frame use them)
   btns?: (Rect & { act: () => void })[];      // buttons under them
   rebuild?: (keep: Keep) => void;             // lay the modal out again for a new screen size
@@ -158,6 +160,7 @@ export class GameScene extends Phaser.Scene {
   banished = new Set<string>();
   releases = new Map<ReleaseId, number>();
   relics = new Set<RelicId>();
+  merch: Record<string, number> = {}; // store merch owned (worn) this run
   level = 1;
   xp = 0;
   xpNext = 5;
@@ -317,9 +320,10 @@ export class GameScene extends Phaser.Scene {
     this.RC = rng(seed ^ 0x85ebca6b);
     const sv = save();
     this.numbers = sv.numbers;
-    this.rerolls = 1 + shopLevel('reroll');
-    this.skips = 1 + shopLevel('skip');
-    this.banishes = 1 + shopLevel('skip');
+    this.merch = { ...sv.merch };
+    this.rerolls = 1 + merchExtra(this.merch, 'rerolls');
+    this.skips = 1 + merchExtra(this.merch, 'skips');
+    this.banishes = 1 + merchExtra(this.merch, 'banishes');
     // Daily runs are fair: everyone plays the default hoggie.
     this.hog = this.mode === 'daily' ? 'im-the-driver' : currentHog();
     this.sig = sigOf(this.hog);
@@ -367,7 +371,9 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', this.onDown, this);
     this.input.on('pointermove', this.onMove, this);
     this.input.on('pointerup', this.onUp, this);
+    this.input.on('wheel', this.onWheel, this);
     this.events.once('shutdown', () => {
+      this.input.off('wheel', this.onWheel, this);
       kb.off('keydown', this.onKey, this);
       this.input.off('pointerdown', this.onDown, this);
       this.input.off('pointermove', this.onMove, this);
@@ -443,12 +449,6 @@ export class GameScene extends Phaser.Scene {
   /** Rebuild player numbers from base + shop + hoggie + passives + releases + relics (+ live effects). Runs 4x a second. */
   recalc() {
     const s = baseStats();
-    s.might *= 1 + 0.05 * shopLevel('might');
-    s.maxHp += 10 * shopLevel('hp');
-    s.speed *= 1 + 0.04 * shopLevel('speed');
-    s.magnet *= 1 + 0.15 * shopLevel('magnet');
-    s.luck *= 1 + 0.08 * shopLevel('luck');
-    s.revives += shopLevel('revive');
     this.passives.forEach((l, id) => PASSIVES[id].apply(s, l + 0.5 * (this.ppatch.get(id) ?? 0)));
     if (this.perk) PERKS[this.perk].apply(s);
     const hpFrac = this.st.maxHp ? Math.max(0, this.hp / this.st.maxHp) : 1;
@@ -473,6 +473,7 @@ export class GameScene extends Phaser.Scene {
       default: break;
     }
     this.relics.forEach((r) => RELICS[r].apply(s));
+    applyMerch(this.merch, s, { hpFrac, moving: this.moving, elapsed: this.elapsed, wave: this.wave, level: this.level, weapons: this.weapons.size, boss: !!this.boss });
     const has = (r: ReleaseId) => this.releases.has(r);
     if (has('dsp')) { s.might *= 1.5; s.maxHp *= 0.7; }
     if (has('sourcemaps')) { s.critMul = 3; s.crit += 0.1; }
@@ -660,11 +661,22 @@ export class GameScene extends Phaser.Scene {
     if (m.kind === 'chest' || m.kind === 'reveal') { this.closeModal(); return; }
     const i = (m.rects ?? []).findIndex((r) => inRect(r, x, y, 4));
     if (i >= 0) {
-      if (m.kind === 'act') { if (m.sel === i) this.chooseAct(i); else this.selectAct(i); }
-      else if (m.sel === i) this.pickCard(); else this.selectCard(i);
+      const again = m.clicked === i && m.sel === i;
+      m.clicked = i;
+      if (m.kind === 'act') { if (again) this.chooseAct(i); else this.selectAct(i); }
+      else if (again) this.pickCard(); else this.selectCard(i);
       return;
     }
     m.btns?.find((b) => inRect(b, x, y, 2))?.act();
+  }
+
+  /** The mouse wheel moves the selection on an open modal. */
+  private onWheel(_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) {
+    const m = this.modal;
+    if (!m || !dy || this.paused) return;
+    const d = dy > 0 ? 1 : -1;
+    if (m.kind === 'act') this.selectAct(m.sel === 0 ? 1 : 0);
+    else if (m.cards.length) this.selectCard(((m.sel < 0 ? (d > 0 ? -1 : 0) : m.sel) + d + m.cards.length) % m.cards.length);
   }
 
   private pauseTap(x: number, y: number) {
@@ -715,8 +727,8 @@ export class GameScene extends Phaser.Scene {
     const rl = [...this.relics].map((r) => RELICS[r].name).join(' ');
     if (rl) y += T(W / 2, y, `MERCH: ${rl}`, { align: 'center', color: 0xf8d878, maxWidth: bw0 - 20, maxLines: narrow ? 3 : 1 }).lineCount * 10 + 2;
     y += 6;
-    if (TOUCH) {
-      // Buttons instead of keys: resume, damage numbers, sound, quit.
+    {
+      // Buttons (clickable on desktop too, where the keys still work): resume, damage numbers, sound, quit.
       const btns: [string, () => void][] = [
         ['RESUME', () => this.resume()],
         [`NUMBERS ${this.numbers ? 'ON' : 'OFF'}`, () => { this.numbers = !this.numbers; save().numbers = this.numbers; persist(); this.resume(); this.pause(); }],
@@ -732,10 +744,7 @@ export class GameScene extends Phaser.Scene {
         this.pauseBtns.push({ x: bx, y: by - 2, w: bw, h: TAP + 4, act });
       });
       y += Math.ceil(btns.length / per) * (TAP + 6) + 2;
-    } else {
-      T(W / 2, y + 4, 'ENTER resume   Q quit', { align: 'center' });
-      T(W / 2, y + 15, `N damage numbers: ${this.numbers ? 'ON' : 'OFF'}   M mute`, { align: 'center', color: ui.dimInt });
-      y += 30;
+      if (!TOUCH) { T(W / 2, y + 2, 'ENTER resume   Q quit   N numbers   M mute', { align: 'center', color: ui.dimInt }); y += 14; }
     }
     const info = [this.heat ? `HEAT ${this.heat}` : '', this.mode !== 'standard' ? this.mode.toUpperCase() : '', `WAVE ${this.wave}`,
       hogName(this.hog).toUpperCase(), this.funding ? `FUNDING +${Math.round(((1 + WAVE.funding) ** this.funding - 1) * 100)}%` : '']
@@ -2381,8 +2390,9 @@ export class GameScene extends Phaser.Scene {
     const sub = rel ? `Wave ${this.wave + 1}: ${this.waveName(this.wave + 1)} is next. Pick one, free` : cmd ? 'Run any powerup' : 'Pick a PostHog product or upgrade';
     const partners = partnersOf(this.build());
     const rects: Rect[] = [], btns: (Rect & { act: () => void })[] = [];
-    const btnDefs: [string, () => void][] = [[`REROLL ${this.rerolls}`, () => this.reroll()], [`SKIP ${this.skips}`, () => this.skip()], [`BANISH ${this.banishes}`, () => this.banish()]];
-    const footer = TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'LEFT/RIGHT choose   ENTER pick';
+    const kh = (k: string) => (TOUCH ? '' : `${k} `); // desktop: the key on the button
+    const btnDefs: [string, () => void][] = [[`${kh('R')}REROLL ${this.rerolls}`, () => this.reroll()], [`${kh('X')}SKIP ${this.skips}`, () => this.skip()], [`${kh('B')}BANISH ${this.banishes}`, () => this.banish()]];
+    const footer = TOUCH ? 'TAP a card to choose, TAP it again to pick' : 'Click or LEFT/RIGHT choose   double-click or ENTER pick';
     const funding = `Funding round: +${Math.round(WAVE.funding * 100)}% damage, +${WAVE.fundingHp} max HP`;
     if (narrow) {
       // Portrait: the cards stack, each a wide row with its icon on the left; the whole block sits mid-screen.
@@ -2405,7 +2415,7 @@ export class GameScene extends Phaser.Scene {
         y += ch + gap;
       });
       y += 2;
-      if (kind === 'levelup' && TOUCH) {
+      if (kind === 'levelup') {
         const bw = (cw - 12) / 3;
         btnDefs.forEach(([label, act], i) => {
           const bx = x + i * (bw + 6);
@@ -2414,8 +2424,6 @@ export class GameScene extends Phaser.Scene {
           btns.push({ x: bx, y, w: bw, h: TAP, act });
         });
         y += TAP + 8;
-      } else if (kind === 'levelup') {
-        y += T(W / 2, y, `R REROLL ${this.rerolls}  X SKIP ${this.skips}  B BANISH ${this.banishes}`, { align: 'center', color: ui.textInt, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 6;
       } else if (rel) {
         y += T(W / 2, y, funding, { align: 'center', color: 0x3cbcfc, maxWidth: cw, maxLines: 2 }).lineCount * 10 + 6;
       }
@@ -2444,7 +2452,7 @@ export class GameScene extends Phaser.Scene {
         rects.push({ x, y, w: cw, h: 156 });
       });
       add(this.add.graphics().setScrollFactor(0).setDepth(UI + 103));
-      if (kind === 'levelup' && TOUCH) {
+      if (kind === 'levelup') {
         // Touch: three buttons, with Drake on either side.
         add(this.add.image(W / 2 - 166, 224 + my, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
         add(this.add.image(W / 2 + 166, 224 + my, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
@@ -2454,15 +2462,10 @@ export class GameScene extends Phaser.Scene {
           T(cx, 223 + my, label, { align: 'center', color: ui.textInt });
           btns.push({ x: cx - 49, y: 214 + my, w: 98, h: 25, act });
         });
-      } else if (kind === 'levelup') {
-        // Drake says nah to a reroll, yah to a banish.
-        add(this.add.image(W / 2 - 128, 226 + my, HOG32, hogFrame('drake-nah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-        add(this.add.image(W / 2 + 126, 226 + my, HOG32, hogFrame('drake-yah')).setScale(0.5).setScrollFactor(0).setDepth(UI + 102));
-        T(W / 2, 222 + my, `R REROLL ${this.rerolls}    X SKIP ${this.skips}    B BANISH ${this.banishes}`, { align: 'center', color: ui.textInt, depth: UI + 101 });
       } else if (rel) {
         T(W / 2, 222 + my, funding, { align: 'center', color: 0x3cbcfc, depth: UI + 101 });
       }
-      T(W / 2, (kind === 'levelup' && TOUCH ? 243 : 240) + my, footer, { align: 'center', color: ui.dimInt, depth: UI + 101 });
+      T(W / 2, (kind === 'levelup' ? 243 : 240) + my, footer, { align: 'center', color: ui.dimInt, depth: UI + 101 });
     }
     const m: Modal = { kind, cards: hand, sel: 0, objs, armed: false, rects, btns, rebuild: (k) => this.openLevelUp(hand, kind, k) };
     m.at = keep?.at ?? this.time.now;
@@ -3341,7 +3344,7 @@ export class GameScene extends Phaser.Scene {
       ['CASH OUT', `Bank ${this.gold} gold${bonus ? ` + ${bonus} cash-out bonus` : ''} and end the run`, 0xf8d878],
     ];
     const warn = risk > 0 && this.wave >= 2 ? `${risk} gold at risk: die later, lose half. Cash out keeps it all.` : 'Keep going? Later waves have the biggest scores.';
-    const footer = TOUCH ? 'TAP a choice, TAP it again to confirm' : 'LEFT/RIGHT choose   ENTER confirm';
+    const footer = TOUCH ? 'TAP a choice, TAP it again to confirm' : 'Click or LEFT/RIGHT choose   double-click or ENTER confirm';
     const stats = `TIME ${clock(this.elapsed)}   BUGS ${this.kills}   LEVEL ${this.level}   SCORE ${this.score()}`;
     const art = (i: number, x: number, y: number) => add((i ? this.add.image(x, y + 2, spr('chest'), 0).setScale(2) : this.add.image(x, y, HOG32, hogFrame('rocket'))).setScrollFactor(0).setDepth(D + 1));
     const rects: Rect[] = [];
@@ -3718,8 +3721,8 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: nm, alpha: 1, duration: 200, delay: 250 * i + 200 });
     });
     const fy = NARROW() ? gy((rowsN - 1) * cols) + 56 : 240;
-    if (ids.length > 8) objs.push(text(this, W / 2, fy, `+${ids.length - 8} more in the SHOP`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
-    objs.push(text(this, W / 2, fy + 12, `Pick one in SHOP > HOGGIES.   ${TOUCH ? 'TAP' : 'ENTER'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1, maxWidth: W - 12, maxLines: 2 }));
+    if (ids.length > 8) objs.push(text(this, W / 2, fy, `+${ids.length - 8} more in MERCH > HOGGIES`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1 }));
+    objs.push(text(this, W / 2, fy + 12, `Pick one in MERCH > HOGGIES.   ${TOUCH ? 'TAP' : 'ENTER'}`, { align: 'center', color: ui.dimInt, fixed: true, depth: D + 1, maxWidth: W - 12, maxLines: 2 }));
     this.shiftObjs(objs, 0, NARROW() ? Math.max(0, Math.round(H / 2 - (fy + 24) / 2)) : MY());
     this.revealing = true; // onKey lets the reveal's ENTER through while the run is over
     const m: Modal = { kind: 'reveal', cards: [], sel: 0, objs, armed: false };

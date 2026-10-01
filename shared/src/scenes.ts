@@ -230,7 +230,7 @@ export class TitleScene extends Phaser.Scene {
     if (!touchUi()) {
       const press = text(this, W / 2, vy(rows.length ? 204 : 214, 1), 'PRESS ENTER', { scale: 2, align: 'center', color: ui.textInt, depth: 10 });
       blink(this, press, 500);
-      text(this, W / 2, H - 14, rows.length ? 'Arrows choose   Enter start   M mute' : 'Arrows/WASD move   Enter select   M mute',
+      text(this, W / 2, H - 14, rows.length ? 'Arrows/wheel choose   Enter or double-click start   M mute' : 'Arrows/WASD move   Enter select   M mute',
         { align: 'center', color: ui.dimInt, depth: 10 });
     }
     // Returning players see their record; a first visit shows nothing extra.
@@ -249,7 +249,8 @@ export class TitleScene extends Phaser.Scene {
       this.scene.start('HowTo');
     };
     onKeys(this, ['Enter', 'Space', 'NumpadEnter'], go, 150);
-    // Touch: tap a choice to select it, START to start; a tap anywhere else does nothing. Mouse: a click off the choices starts.
+    // Touch: tap a choice to select it, tap it again or START to start; a tap anywhere else does nothing.
+    // Mouse: click a choice to select it, click it again (double-click) or click off the choices to start.
     onTap(this, (x, y) => {
       startMusic(this);
       const hit = menu.tap(x, y);
@@ -349,11 +350,11 @@ export class EndScene extends Phaser.Scene {
     if (fresh.length) extra.push(`NEW: ${fresh.map((a) => a.name).join(', ')}`);
     y += extra.length ? 4 : 0;
     for (const l of extra) {
-      if (y > H - (touchUi() ? 84 : 64)) break;
+      if (y > H - 96) break; // above the buttons
       const t = text(this, W / 2, y, l, { align: 'center', color: ui.accentInt, maxWidth: W - (narrow ? 24 : 60), maxLines: narrow ? 2 : 1 });
       y += t.lineCount * 10 + 1;
     }
-    if (!touchUi()) blink(this, text(this, W / 2, H - 50, 'ENTER: ONE MORE RUN   ESC: TITLE', { align: 'center', color: ui.textInt }), 500);
+
     text(this, W / 2, H - 22, theme.text.credits, { align: 'center', maxWidth: W - 40, maxLines: 2, color: ui.dimInt });
     const again = () => {
       beginRun();
@@ -362,12 +363,12 @@ export class EndScene extends Phaser.Scene {
     };
     onKeys(this, ['Enter', 'Space', 'NumpadEnter', 'KeyR'], again, 800);
     onKeys(this, ['Escape'], () => this.scene.start('Title'), 800);
-    if (touchUi()) {
-      // Two buttons above the credits; a stray tap does nothing.
+    {
+      // Two buttons above the credits (keys: ENTER and ESC); a stray tap does nothing.
       const bw = Math.min(150, Math.floor((W - 22) / 2)), by = H - 60 - TAP;
       const more: Rect = { x: Math.round(W / 2 - bw - 3), y: by, w: bw, h: TAP + 4 }, title: Rect = { x: Math.round(W / 2 + 3), y: by, w: bw, h: TAP + 4 };
-      button(this, more, 'ONE MORE RUN', { color: ui.accentInt });
-      button(this, title, 'TITLE');
+      button(this, more, touchUi() ? 'ONE MORE RUN' : 'ENTER  ONE MORE RUN', { color: ui.accentInt });
+      button(this, title, touchUi() ? 'TITLE' : 'ESC  TITLE');
       onTap(this, (x, y) => { if (inside(more, x, y)) again(); else if (inside(title, x, y)) this.scene.start('Title'); }, 800);
     }
   }
@@ -397,7 +398,7 @@ function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
     const i = lastPick[r.key];
     return i !== undefined && r.choices[i] && !r.choices[i].locked ? i : firstOpen(r);
   });
-  let row = 0;
+  let row = 0, clicked = '';
   let drawn: PixelText[] = [];
   let cellsAt: { ri: number; ci: number; x0: number; x1: number; y: number }[] = [];
   const draw = () => {
@@ -447,9 +448,19 @@ function titleMenu(scene: Phaser.Scene, rows: TitleRow[], y0: number) {
   const tap = (x: number, y: number): 'choice' | 'start' | null => {
     const c = cellsAt.find((k) => x >= k.x0 && x <= k.x1 && Math.abs(y - k.y) <= 7);
     if (!c) return null;
-    if (!rows[c.ri].choices[c.ci].locked) { row = c.ri; sel[c.ri] = c.ci; lastPick[rows[c.ri].key] = c.ci; K.play('move', 0.5); draw(); }
+    if (rows[c.ri].choices[c.ci].locked) return 'choice';
+    const again = clicked === `${c.ri}:${c.ci}` && sel[c.ri] === c.ci; // a second click on it (a double-click) starts
+    clicked = `${c.ri}:${c.ci}`;
+    if (again) return 'start';
+    row = c.ri; sel[c.ri] = c.ci; lastPick[rows[c.ri].key] = c.ci; K.play('move', 0.5); draw();
     return 'choice';
   };
+  // The mouse wheel changes the choice on the active row.
+  if (rows.length) {
+    const wheel = (_p: unknown, _o: unknown, _dx: number, dy: number) => { if (dy) move(dy > 0 ? 1 : -1); };
+    scene.input.on('wheel', wheel);
+    scene.events.once('shutdown', () => scene.input.off('wheel', wheel));
+  }
   return { pick, tap };
 }
 
@@ -477,7 +488,7 @@ function titleButtons(scene: Phaser.Scene, rows: TitleRow[]) {
     ? { x: Math.round(W / 2 - startW / 2), y: bottom - startH, w: startW, h: startH }
     : { x: Math.round(W / 2 + blockW / 2 - startW), y: bottom - startH, w: startW, h: startH };
   const cells: (Rect & { ri: number; ci: number })[] = [];
-  let drawn: Phaser.GameObjects.GameObject[] = [];
+  let drawn: Phaser.GameObjects.GameObject[] = [], clicked = '';
   const draw = () => {
     drawn.forEach((o) => o.destroy());
     drawn = [];
@@ -505,7 +516,11 @@ function titleButtons(scene: Phaser.Scene, rows: TitleRow[]) {
     if (inside(start, x, y)) return 'start';
     const c = cells.find((k) => inside(k, x, y, 1));
     if (!c) return null;
-    if (!rows[c.ri].choices[c.ci].locked) { sel[c.ri] = c.ci; lastPick[rows[c.ri].key] = c.ci; K.play('move', 0.5); draw(); }
+    if (rows[c.ri].choices[c.ci].locked) return 'choice';
+    const again = clicked === `${c.ri}:${c.ci}` && sel[c.ri] === c.ci; // tapping it again starts, like START
+    clicked = `${c.ri}:${c.ci}`;
+    if (again) return 'start';
+    sel[c.ri] = c.ci; lastPick[rows[c.ri].key] = c.ci; K.play('move', 0.5); draw();
     return 'choice';
   };
   return { pick, tap };
