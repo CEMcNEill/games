@@ -5,13 +5,14 @@ import { hash32 } from '@shared/meta';
 import { K } from '@shared/kit';
 
 /** Bump when anything in the co-op sim changes: players on different versions can't share a room (they'd desync). */
-export const SIM_VERSION = 'coop-6';
+export const SIM_VERSION = 'coop-7';
 const PROTO = 1;
 
 export interface HogInfo {
   hog: string;                      // hoggie id
   name: string;                     // what the others see
-  shop: Record<string, number>;     // shop levels (they change the hog's numbers)
+  shop?: Record<string, number>;    // (old builds: upgrade levels; unused)
+  merch?: Record<string, number>;   // store merch owned, copies of each (they change the hog's numbers)
   pals: string[];                   // a few unlocked hoggies (Hedgehog Mode pals, ALL HANDS)
   heat: number;                     // the room's first player sets the heat
   bot?: boolean;                    // a bot seat (rooms ZZZ1-ZZZ4), added by the server

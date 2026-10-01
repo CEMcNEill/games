@@ -23,7 +23,7 @@ countdown runs and the game starts on every device at once.
   and its bar shows review progress. Teammates on screen have a name tag and an HP bar under them.
 - **Axe sweep:** about once a minute (2+ hogs, mid-wave), three axes and "INCOMING, WATCH OUT!" flash on screen and a
   lane flashes across the team for 2 s. Then a wall of spinning axes, as wide as the team, flies through it. It does no
-  damage. Any hog still inside the wall's span gets thrown away from its middle line, so the team splits two ways and
+  damage. Any hog still inside the wall's span gets thrown about 270 px away from its middle line, so the team splits two ways and
   has to run back together. Get out of the lane in time and the axes miss you. Each bot flips a coin: half dodge, half
   get chopped.
 - **Nobody plays alone.** Out of HP (with no revives left), your hog goes down. "IT'S NOT OK TO LET YOUR TEAMMATE FAIL"
@@ -69,7 +69,7 @@ For that to hold, the co-op sim must not depend on anything outside the turns:
 - **Time:** sim timers count ticks (`later()`), never milliseconds. Tweens only move looks. Pickups keep their own
   x/y, and their bob is drawn.
 - **This device:** views (for "on screen" rules like spawns and hotfix) come from each player's `view` event.
-  Loadouts (hoggie, shop levels, pals) and heat come from lobby info, never from the local save. Saves, crests, banners
+  Loadouts (hoggie, merch owned, pals) and heat come from lobby info, never from the local save. Saves, crests, banners
   and sounds that belong to one player only happen on that player's device (`mine()`).
 
 Every 40 turns each client sends a hash of the world. If two clients differ, the server flags the room and the HUD shows

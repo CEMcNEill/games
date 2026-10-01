@@ -1,12 +1,12 @@
 // Kit save data (shop levels, hoggies, lifetime totals, collections, daily best, evolution codex) on top of the
 // shared meta blob. Everything is defensive: a broken or blocked store reads as a first run.
 import { meta, achieve } from '@shared/meta';
-import { SHOP, RELIC_IDS, PAGES } from './content';
+import { RELIC_IDS, PAGES, MERCH } from './content';
 import { HOGS, HOG_INDEX, DEFAULT_HOG, STARTERS, SECRET_HOGS, SIGNATURE, EVOLVING_FORMS } from './hoggies';
 import { LEGACY, LEGACY_HEROES, CREST_BY_ID } from './crests';
 
 export interface KitSave {
-  shop: Record<string, number>;
+  shop: Record<string, number>; // the old upgrade levels (refunded as gold when merch replaced them)
   hero: string;           // legacy hero id (pre-hoggies)
   hog: string;            // selected hoggie
   hogs: string[];         // unlocked hoggies
@@ -21,6 +21,7 @@ export interface KitSave {
   bestWave: number;       // highest wave reached (any mode but daily)
   cleared1: string[];     // hoggies that have cleared wave 1 (client-libraries crest)
   relics: string[];       // merch collected
+  merch: Record<string, number>; // merch owned: copies of each (they stack)
   pages: number[];        // handbook pages found
   codex: string[];        // evolution names found
   daily: { date: string; best: number };
@@ -29,7 +30,7 @@ export interface KitSave {
 }
 
 const defaults = (): KitSave => ({ shop: {}, hero: 'max', hog: DEFAULT_HOG, hogs: [], capsules: 0, kills: 0, gold: 0, chests: 0, elites: 0,
-  revives: 0, aiKills: 0, dailies: 0, bestWave: 0, cleared1: [], relics: [], pages: [], codex: [], daily: { date: '', best: 0 }, numbers: true,
+  revives: 0, aiKills: 0, dailies: 0, bestWave: 0, cleared1: [], relics: [], merch: {}, pages: [], codex: [], daily: { date: '', best: 0 }, numbers: true,
   migrated: 0 });
 
 const n = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -43,12 +44,15 @@ export function save(): KitSave {
   try { k = meta.kitData(defaults() as unknown as Record<string, unknown>); } catch { return defaults(); }
   if (!k || typeof k !== 'object') return defaults();
   if (!k.shop || typeof k.shop !== 'object' || Array.isArray(k.shop)) k.shop = {};
-  for (const s of SHOP) k.shop[s.id] = Math.max(0, Math.min(s.cost.length, Math.floor(n(k.shop[s.id]))));
+  refundShop(k);
   for (const f of ['kills', 'gold', 'chests', 'elites', 'revives', 'aiKills', 'dailies', 'bestWave', 'capsules', 'migrated']) k[f] = Math.max(0, n(k[f]));
   k.codex = strs(k.codex, 60);
   k.hogs = strs(k.hogs, 400).filter((h: string) => HOG_INDEX.has(h));
   k.cleared1 = strs(k.cleared1, 400);
   k.relics = strs(k.relics, 20).filter((r: string) => (RELIC_IDS as string[]).includes(r));
+  if (!k.merch || typeof k.merch !== 'object' || Array.isArray(k.merch)) k.merch = {};
+  for (const id of Object.keys(k.merch)) if (!(id in MERCH)) delete k.merch[id]; else k.merch[id] = Math.max(0, Math.min(50, Math.floor(n(k.merch[id]))));
+  delete k.wear;
   k.pages = Array.isArray(k.pages) ? k.pages.filter((p: unknown) => typeof p === 'number' && p >= 0 && p < PAGES.length) : [];
   if (typeof k.hero !== 'string') k.hero = 'max';
   if (typeof k.hog !== 'string' || !HOG_INDEX.has(k.hog)) k.hog = DEFAULT_HOG;
@@ -87,7 +91,22 @@ export function persist() {
   try { meta.save(); } catch { /* memory copy is enough */ }
 }
 
-export const shopLevel = (id: string) => save().shop[id] ?? 0;
+export const merchOwned = (id: string) => save().merch[id] ?? 0;
+
+/** The upgrade shop's old prices: levels bought there come back as gold, once, now that the shop sells merch. */
+const OLD_SHOP: Record<string, number[]> = {
+  might: [30, 60, 100, 150, 220], hp: [25, 50, 90, 140, 200], speed: [40, 90, 160], magnet: [30, 70, 130],
+  luck: [40, 100, 180], reroll: [50, 120, 220], skip: [60, 150], revive: [400],
+};
+function refundShop(k: KitSave) {
+  let gold = 0;
+  for (const [id, costs] of Object.entries(OLD_SHOP)) {
+    const lvl = Math.max(0, Math.min(costs.length, Math.floor(n(k.shop[id]))));
+    for (let i = 0; i < lvl; i++) gold += costs[i];
+  }
+  k.shop = {};
+  if (gold > 0) { try { meta.bank(gold); } catch { /* ignore */ } persist(); }
+}
 
 export const today = () => new Date().toISOString().slice(0, 10);
 

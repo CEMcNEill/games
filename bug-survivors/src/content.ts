@@ -408,19 +408,153 @@ export const HEAT: HeatDef[] = [
 
 // ---------------------------------------------------------------- shop
 
-export interface ShopDef { id: string; name: string; line: string; cost: number[] }
-export const SHOP: ShopDef[] = [
-  { id: 'might', name: 'Might', line: '+5% damage', cost: [30, 60, 100, 150, 220] },
-  { id: 'hp', name: 'Max HP', line: '+10 max HP', cost: [25, 50, 90, 140, 200] },
-  { id: 'speed', name: 'Speed', line: '+4% move speed', cost: [40, 90, 160] },
-  { id: 'magnet', name: 'Magnet', line: '+15% pickup range', cost: [30, 70, 130] },
-  { id: 'luck', name: 'Luck', line: '+8% luck', cost: [40, 100, 180] },
-  { id: 'reroll', name: 'Reroll', line: '+1 reroll per run', cost: [50, 120, 220] },
-  { id: 'skip', name: 'Skip + Banish', line: '+1 skip and banish', cost: [60, 150] },
-  { id: 'revive', name: 'Rollback', line: 'Revive once per run', cost: [400] },
-];
 /** Hoggie capsule price: rises with every hoggie you own. */
-export const capsulePrice = (owned: number) => 60 + 8 * owned;
+export const capsulePrice = (owned: number) => 90 + 12 * owned;
+
+// ---------------------------------------------------------------- merch store
+// SHOP is the merch store: every item in PostHog's real merch store, each with a strange but useful effect. Owning it is
+// wearing it. Items stack: each copy applies the effect again and costs more than the last (MERCH_STACK). `apply` runs in
+// recalc (4x a second) with the hog's live state; in co-op that state is the sim's, so it stays deterministic.
+export interface MerchCtx { hpFrac: number; moving: boolean; elapsed: number; wave: number; level: number; weapons: number; boss: boolean }
+export interface MerchDef {
+  name: string; line: string; cost: number;
+  apply?: (s: Stats, c: MerchCtx) => void;
+  rerolls?: number; skips?: number; banishes?: number; // extra per run, per copy
+}
+/** Each copy costs this much more than the one before. */
+export const MERCH_STACK = 1.6;
+export const merchPrice = (id: string, owned: number) => Math.round((MERCH[id].cost * Math.pow(MERCH_STACK, owned)) / 10) * 10;
+const still = (c: MerchCtx) => !c.moving;
+export const MERCH: Record<string, MerchDef> = {
+  pad: { name: 'dangerously_skip.pad', line: 'Skip the boring bits: +1 skip and +1 banish per run', cost: 260, skips: 1, banishes: 1 },
+  owala: { name: 'posthog_owala.waterbottle', line: 'Sip on the move: +1 HP/s regen while moving', cost: 300,
+    apply: (s, c) => { if (c.moving) s.regen += 1; } },
+  cards: { name: 'posthog_playing.cards', line: 'Shuffle up: +1 reroll per run, +4% luck', cost: 240, rerolls: 1,
+    apply: (s) => { s.luck *= 1.04; } },
+  burncap: { name: 'token.burning_cap', line: 'Burns tokens: +7% damage, weapons 2% slower', cost: 220,
+    apply: (s) => { s.might *= 1.07; s.cd *= 1.02; } },
+  duffel: { name: 'retired-billboard.duffel', line: 'Hauls loot: +15% gold, +15% pickup range', cost: 280,
+    apply: (s) => { s.gold *= 1.15; s.magnet *= 1.15; } },
+  sleeve: { name: 'PostHog Laptop Sleeve', line: 'Padded: +12% armour while standing still', cost: 260,
+    apply: (s, c) => { if (still(c)) s.armour += 0.12; } },
+  home: { name: 'slimfit_home.jersey', line: 'Home advantage: +12% damage in waves 1-3', cost: 300,
+    apply: (s, c) => { if (c.wave <= 3) s.might *= 1.12; } },
+  away: { name: 'slimfit_away.jersey', line: 'Plays better away: +12% damage from wave 4 on', cost: 360,
+    apply: (s, c) => { if (c.wave >= 4) s.might *= 1.12; } },
+  tote: { name: 'tote.bag', line: 'Carries everything: +40% pickup range, -4% speed', cost: 200,
+    apply: (s) => { s.magnet *= 1.4; s.speed *= 0.96; } },
+  cycling: { name: 'cycling.shirt', line: 'Aerodynamic: +10% speed, -10 max HP', cost: 280,
+    apply: (s) => { s.speed *= 1.1; s.maxHp -= 10; } },
+  socks: { name: 'summer.socks', line: 'Fresh feet: +5% speed, +0.3 HP/s regen', cost: 240,
+    apply: (s) => { s.speed *= 1.05; s.regen += 0.3; } },
+  windbreaker: { name: 'windbreaker.jacket', line: 'Bugs bounce off: +8% armour, +6% speed while moving', cost: 380,
+    apply: (s, c) => { s.armour += 0.08; if (c.moving) s.speed *= 1.06; } },
+  wshorts: { name: 'womens.shorts', line: 'Long stride: +6% speed, +6% XP', cost: 300,
+    apply: (s) => { s.speed *= 1.06; s.growth *= 1.06; } },
+  mshorts: { name: 'mens.shorts', line: 'Knees out: +6% speed, +4% crit', cost: 300,
+    apply: (s) => { s.speed *= 1.06; s.crit += 0.04; } },
+  cap2020: { name: '2020.cap', line: 'Hindsight is 20/20: +10% luck, +8% XP', cost: 320,
+    apply: (s) => { s.luck *= 1.1; s.growth *= 1.08; } },
+  crossbody: { name: 'crossbody.bag', line: 'Room for options: +1 skip per run, +10% pickup range', cost: 300, skips: 1,
+    apply: (s) => { s.magnet *= 1.1; } },
+  canvas: { name: 'heavy_canvas.jacket', line: 'Built like a tent: +25 max HP, -6% speed', cost: 320,
+    apply: (s) => { s.maxHp += 25; s.speed *= 0.94; } },
+  camo: { name: 'camo.cap', line: 'Hard to spot when hurt: +18% armour below half HP', cost: 340,
+    apply: (s, c) => { if (c.hpFrac < 0.5) s.armour += 0.18; } },
+  wtee: { name: 'womens.tee', line: 'Comfy fit: +8% max HP, +3% speed', cost: 280,
+    apply: (s) => { s.maxHp *= 1.08; s.speed *= 1.03; } },
+  quilted: { name: 'womens_quilted.jacket', line: 'Cosy: +0.6 HP/s regen, +10 max HP', cost: 360,
+    apply: (s) => { s.regen += 0.6; s.maxHp += 10; } },
+  mug: { name: 'posthog_ceramic_art.mug', line: 'Caffeine: weapons 8% faster, -12 max HP (jitters)', cost: 420,
+    apply: (s) => { s.cd *= 0.92; s.maxHp -= 12; } },
+  calendar: { name: 'organizer_2026.cal', line: 'Time-boxed: weapons 1% faster per minute (max 12%)', cost: 400,
+    apply: (s, c) => { s.cd *= 1 - Math.min(0.12, Math.floor(c.elapsed / 60) * 0.01); } },
+  quickcall: { name: 'quick.call', line: 'Got a sec? Weapons 10% faster in boss fights', cost: 380,
+    apply: (s, c) => { if (c.boss) s.cd *= 0.9; } },
+  lightmode: { name: 'light_mode.shirt', line: 'Blinding: bugs take 5% more damage, +8% weapon size', cost: 440,
+    apply: (s) => { s.vuln += 0.05; s.area *= 1.08; } },
+  tracksuit: { name: 'posthog_track.suit', line: 'Warmed up: +12% speed above half HP', cost: 300,
+    apply: (s, c) => { if (c.hpFrac > 0.5) s.speed *= 1.12; } },
+  supabase: { name: 'supabase_posthog.shirt', line: 'Better together: +8% damage and XP with 3+ weapons', cost: 400,
+    apply: (s, c) => { if (c.weapons >= 3) { s.might *= 1.08; s.growth *= 1.08; } } },
+  plush: { name: 'max.hedgehog', line: 'Emotional support: +1 revive per run, -10% damage', cost: 700,
+    apply: (s) => { s.revives += 1; s.might *= 0.9; } },
+  deskhog: { name: 'DeskHog Kit', line: 'Soldered on: +1 projectile, -15% weapon size', cost: 800,
+    apply: (s) => { s.amount += 1; s.area *= 0.85; } },
+  theo: { name: 'Theo mode t-shirt', line: 'Streamer mode: +18% XP while moving', cost: 360,
+    apply: (s, c) => { if (c.moving) s.growth *= 1.18; } },
+  backpack: { name: 'PostHog Timbuk2 Backpack', line: 'Pockets everywhere: +1 reroll, +1 skip, -5% speed', cost: 420, rerolls: 1, skips: 1,
+    apply: (s) => { s.speed *= 0.95; } },
+  keycaps: { name: 'posthog_caps.key', line: 'Clicky: +6% crit, +25% crit damage', cost: 440,
+    apply: (s) => { s.crit += 0.06; s.critMul += 0.25; } },
+  thirsty: { name: 'Thirsty for business t-shirt', line: 'Thirsty: +50% pickup range below half HP, +8% gold', cost: 280,
+    apply: (s, c) => { if (c.hpFrac < 0.5) s.magnet *= 1.5; s.gold *= 1.08; } },
+  growing: { name: "How's it growing? t-shirt", line: 'Green thumb: +20% XP, -8% damage', cost: 340,
+    apply: (s) => { s.growth *= 1.2; s.might *= 0.92; } },
+  runtime: { name: 'Runtime error t-shirt', line: 'Fails loudly: +40% crit damage, -4% crit', cost: 340,
+    apply: (s) => { s.critMul += 0.4; s.crit -= 0.04; } },
+  candle: { name: 'Candle by PostHog', line: 'Burns at both ends: +16% damage, -15% max HP', cost: 440,
+    apply: (s) => { s.might *= 1.16; s.maxHp *= 0.85; } },
+  college: { name: 'College t-shirt', line: 'Studied hard: +1% damage per level (max 20%)', cost: 460,
+    apply: (s, c) => { s.might *= 1 + Math.min(0.2, 0.01 * c.level); } },
+  scrabble: { name: 'Scrabble t-shirt', line: 'Triple word score: +25% damage every 3rd minute', cost: 380,
+    apply: (s, c) => { if (Math.floor(c.elapsed / 60) % 3 === 2) s.might *= 1.25; } },
+  hogzilla: { name: 'Hogzilla t-shirt', line: 'Size up: +18% weapon size, -4% speed', cost: 380,
+    apply: (s) => { s.area *= 1.18; s.speed *= 0.96; } },
+  watch: { name: 'Popular name brand watch t-shirt', line: 'Always on time: weapons 2% faster per wave (max 10%)', cost: 400,
+    apply: (s, c) => { s.cd *= 1 - Math.min(0.1, 0.02 * c.wave); } },
+  tactical: { name: 'Tactical black t-shirt', line: 'Operator: +5% speed, +5% armour', cost: 360,
+    apply: (s) => { s.speed *= 1.05; s.armour += 0.05; } },
+  danger: { name: 'Danger t-shirt', line: 'Cornered: +25% damage below 30% HP', cost: 360,
+    apply: (s, c) => { if (c.hpFrac < 0.3) s.might *= 1.25; } },
+  diffstickers: { name: 'The different sticker pack', line: 'Think different: +1 projectile below half HP', cost: 620,
+    apply: (s, c) => { if (c.hpFrac < 0.5) s.amount += 1; } },
+  memes: { name: 'PostHog meme sticker pack', line: 'Stick them on everything: +25% gold', cost: 260,
+    apply: (s) => { s.gold *= 1.25; } },
+  friends: { name: 'Hogzilla & friends sticker pack', line: 'Bring friends: +10% weapon size, +10% pickup range', cost: 300,
+    apply: (s) => { s.area *= 1.1; s.magnet *= 1.1; } },
+  darkls: { name: 'Dark mode long sleeve shirt', line: 'Eyes adjusted: +10% armour after 5 minutes', cost: 340,
+    apply: (s, c) => { if (c.elapsed >= 300) s.armour += 0.1; } },
+  hedgetee: { name: 'Hedgehog t-shirt', line: 'Spiky: +5% armour, +0.4 HP/s regen', cost: 340,
+    apply: (s) => { s.armour += 0.05; s.regen += 0.4; } },
+  hedgehoodie: { name: 'Hedgehog hoodie', line: 'Curl up: +1.5 HP/s regen while standing still', cost: 380,
+    apply: (s, c) => { if (still(c)) s.regen += 1.5; } },
+  warehouse: { name: 'Data warehouse t-shirt', line: 'Hoarder: +3% damage per weapon you own', cost: 420,
+    apply: (s, c) => { s.might *= 1 + 0.03 * c.weapons; } },
+  pastatee: { name: 'Copy/pasta t-shirt', line: 'Ctrl+C: +1 projectile, weapons 12% slower', cost: 680,
+    apply: (s) => { s.amount += 1; s.cd *= 1.12; } },
+  pastahoodie: { name: 'Copy/Pasta Hoodie', line: 'Ctrl+V: powerups last 40% longer', cost: 320,
+    apply: (s) => { s.dur *= 1.4; } },
+  darkhoodie: { name: 'PostHog Dark Mode Hoodie', line: 'Night shift: +10% damage, +8% armour after 10 minutes', cost: 420,
+    apply: (s, c) => { if (c.elapsed >= 600) { s.might *= 1.1; s.armour += 0.08; } } },
+  carhartt: { name: 'PostHog Carhartt cap', line: 'Workwear: +15 max HP, +4% armour', cost: 340,
+    apply: (s) => { s.maxHp += 15; s.armour += 0.04; } },
+  sticker: { name: 'PostHog sticker', line: 'Cheap and cheerful: +3% damage, +3% XP', cost: 120,
+    apply: (s) => { s.might *= 1.03; s.growth *= 1.03; } },
+  startups: { name: 'PostHog for Startups Kit', line: 'Runway: +15% gold and XP in waves 1-2', cost: 360,
+    apply: (s, c) => { if (c.wave <= 2) { s.gold *= 1.15; s.growth *= 1.15; } } },
+  yc: { name: 'PostHog YC kit', line: 'Demo day: +15% damage in boss fights', cost: 420,
+    apply: (s, c) => { if (c.boss) s.might *= 1.15; } },
+  newhire: { name: 'PostHog New Hire Kit', line: 'Onboarding: +30% XP for the first 3 minutes', cost: 280,
+    apply: (s, c) => { if (c.elapsed < 180) s.growth *= 1.3; } },
+  birthday: { name: 'PostHog Birthday Gift', line: 'Surprise! +12% luck, +6% gold', cost: 300,
+    apply: (s) => { s.luck *= 1.12; s.gold *= 1.06; } },
+};
+export const MERCH_IDS = Object.keys(MERCH);
+export type MerchOwned = Readonly<Record<string, number>>;
+const copies = (owned: MerchOwned, id: string) => Math.max(0, Math.min(50, Math.floor(Number(owned[id]) || 0)));
+/** Everything owned, every copy: stats now (MERCH_IDS order, so co-op peers agree); rerolls etc. are read at run start. */
+export function applyMerch(owned: MerchOwned, s: Stats, c: MerchCtx) {
+  for (const id of MERCH_IDS) {
+    const m = MERCH[id], n = copies(owned, id);
+    if (m.apply) for (let i = 0; i < n; i++) m.apply(s, c);
+  }
+  s.maxHp = Math.max(20, s.maxHp);
+  s.speed = Math.max(40, s.speed);
+  s.crit = Math.max(0, s.crit);
+}
+export const merchExtra = (owned: MerchOwned, k: 'rerolls' | 'skips' | 'banishes') =>
+  MERCH_IDS.reduce((n, id) => n + (MERCH[id][k] ?? 0) * copies(owned, id), 0);
 
 // ---------------------------------------------------------------- arena hazards
 
