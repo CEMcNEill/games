@@ -13,6 +13,10 @@ countdown runs and the game starts on every device at once.
   R/X/B reroll, skip and banish. TAB (LATER) banks the hand for a quieter moment, and levels queue up ("LEVEL UP x3").
   While the tray is open your hog is in code review: a shield bubble means no damage, you walk at 70% speed, and it
   lasts 8 s per hand. The camera shifts so your hog stays above the tray. A hand left for 20 s is picked for you.
+- **Fewer hands:** most levels don't ask at all. A hand only opens when it offers a real choice: a new weapon, or the
+  passive that evolves one you own. Any other level applies its best card on its own with a pop-up ("+ Session Replay
+  v0.4"). Right after you pick from a hand, your next level is always automatic, so at most every other level asks
+  (measured with bots: half the levels ask, half apply themselves).
   Only the between-wave choices (the SHIPPED call and releases) hold the world.
 - **Finding each other:** a teammate who is off your screen gets a marker on the screen's edge. It's in their colour,
   points from your hog toward them, and shows their seat and HP. A downed teammate's marker flashes red ("P2 DOWN")
@@ -32,6 +36,14 @@ countdown runs and the game starts on every device at once.
   - **XP:** split evenly between the hogs, so each player levels at about a solo player's pace. Measured with bots:
     L26-27 at the 3:30 boss with 2 or 3 hogs, against L25-33 solo; before the split it was L38 (2p) and L46 (3p).
 - Heat is the room creator's (P1's) pick on their title screen.
+
+## Playtesting alone: bot rooms
+
+The codes **ZZZ1**, **ZZZ2** and **ZZZ3** open a room with 1, 2 or 3 bots. Bots are always ready, so you ready up
+and play. They move and pick cards on their own (the game plays them identically on every device), keep their distance
+from you, and come to review you back in when you're down. Friends can still join the same code. When the room is full,
+a bot gives its seat to the friend. The bot rooms are shared by everyone who types that code, so use a normal code for a
+private game.
 
 ## How it works
 

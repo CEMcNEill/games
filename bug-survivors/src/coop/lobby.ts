@@ -9,7 +9,10 @@ import { text, box, fitScale, W, H, NARROW, TOUCH, PixelText } from '@shared/ui'
 import { HOG32 } from '../game';
 import { hogFrame, hogName } from '../hoggies';
 import { save, currentHog } from '../save';
-import { net, CODE_LETTERS, randomCode, HogInfo } from './net';
+import { net, CODE_LETTERS, randomCode, validCode, HogInfo } from './net';
+
+/** Keypad: the code letters, plus 1-3 for the bot rooms (ZZZ1-ZZZ3). */
+const KEYS = `${CODE_LETTERS}123`;
 import type { CoopResult } from './game';
 
 const P_COLS = [0x3cbcfc, 0xf8b800, 0xf878f8, 0x58d854];
@@ -31,6 +34,7 @@ export class LobbyScene extends Phaser.Scene {
   status: PixelText | null = null;
   cdText: PixelText | null = null;
   drawnFor = '';
+  bad = false; // the typed code isn't one the server takes
 
   constructor() { super('Lobby'); }
 
@@ -60,8 +64,8 @@ export class LobbyScene extends Phaser.Scene {
       if (e.code === 'Escape') { this.scene.start('Title'); return; }
       if (e.code === 'Backspace') { this.type(''); return; }
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { this.join(); return; }
-      const ch = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : '';
-      if (ch && CODE_LETTERS.includes(ch)) this.type(ch);
+      const ch = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^(Digit|Numpad)[1-3]$/.test(e.code) ? e.code.slice(-1) : '';
+      if (ch && KEYS.includes(ch)) this.type(ch);
     };
     window.addEventListener('keydown', onKey);
     this.events.once('shutdown', () => window.removeEventListener('keydown', onKey));
@@ -90,12 +94,13 @@ export class LobbyScene extends Phaser.Scene {
   private type(ch: string) {
     if (!ch) this.code = this.code.slice(0, -1);
     else if (this.code.length < 4) this.code += ch;
+    this.bad = false;
     K.play('move', 0.5);
     this.redraw(true);
   }
 
   private join() {
-    if (this.code.length !== 4) { K.play('hurt', 0.4); return; }
+    if (!validCode(this.code)) { K.play('hurt', 0.4); this.bad = true; this.redraw(true); return; }
     lastCode = this.code;
     K.play('select');
     const me = myInfo();
@@ -167,21 +172,23 @@ export class LobbyScene extends Phaser.Scene {
     // The keypad: 24 letters (no I or O), DEL.
     const cols = narrow ? 6 : 12, kw = narrow ? Math.min(40, Math.floor((W - 16 - (cols - 1) * 4) / cols)) : Math.min(34, Math.floor((W - 16 - (cols - 1) * 4) / cols));
     const kh = TOUCH ? TAP : 20, kx0 = W / 2 - (cols * kw + (cols - 1) * 4) / 2;
-    [...CODE_LETTERS].forEach((ch, i) => {
+    [...KEYS].forEach((ch, i) => {
       const r = { x: kx0 + (i % cols) * (kw + 4), y: y + Math.floor(i / cols) * (kh + 4), w: kw, h: kh };
       this.btn(r, ch, () => this.type(ch));
     });
-    y += Math.ceil(CODE_LETTERS.length / cols) * (kh + 4) + 4;
+    y += Math.ceil(KEYS.length / cols) * (kh + 4) + 4;
     const bh = TOUCH ? TAP + 4 : 22, n = 4, bwid = Math.min(96, Math.floor((W - 16 - (n - 1) * 6) / n)), bx0 = W / 2 - (n * bwid + (n - 1) * 6) / 2;
     const row = (i: number) => ({ x: bx0 + i * (bwid + 6), y, w: bwid, h: bh });
     this.btn(row(0), 'BACK', () => this.scene.start('Title'));
     this.btn(row(1), 'DEL', () => this.type(''));
     this.btn(row(2), 'NEW CODE', () => { this.code = randomCode(); K.play('select'); this.redraw(true); });
-    this.btn(row(3), 'JOIN', () => this.join(), { color: this.code.length === 4 ? ui.accentInt : ui.dimInt, on: this.code.length === 4 });
+    const ok = validCode(this.code);
+    this.btn(row(3), 'JOIN', () => this.join(), { color: ok ? ui.accentInt : ui.dimInt, on: ok });
     y += bh + 8;
     const msg = net.status === 'error' ? net.error : net.status === 'connecting' ? 'Connecting...'
-      : TOUCH ? 'Tap the letters, then JOIN' : 'Type the code, ENTER to join, ESC back';
-    this.status = this.T(W / 2, Math.min(y, H - 14), msg, { align: 'center', color: net.status === 'error' ? 0xf87858 : ui.dimInt, maxWidth: W - 12, maxLines: 2 });
+      : this.bad ? 'Codes are 4 letters. Numbers only for bot rooms: ZZZ1, ZZZ2, ZZZ3'
+        : `${TOUCH ? 'Tap the letters, then JOIN' : 'Type the code, ENTER to join, ESC back'}. Playtest alone: ZZZ1-ZZZ3 adds 1-3 bots`;
+    this.status = this.T(W / 2, Math.min(y, H - 22), msg, { align: 'center', color: net.status === 'error' || this.bad ? 0xf87858 : ui.dimInt, maxWidth: W - 12, maxLines: 2 });
   }
 
   /** In a room: who's here, who's ready, READY and LEAVE. */
@@ -198,11 +205,11 @@ export class LobbyScene extends Phaser.Scene {
       const p = r.players[i];
       this.keep(box(this, rx, y, rw, rh, ui.bgInt, p ? (i === r.you ? ui.accentInt : ui.textInt) : ui.panelInt, ui.panelInt).setDepth(10));
       if (p) {
-        const hog = p.info?.hog ?? 'im-the-driver';
+        const hog = p.info?.hog || 'robot';
         this.keep(this.add.image(rx + 16, y + rh / 2, HOG32, hogFrame(hog)).setDisplaySize(24, 24).setDepth(11).setAlpha(p.on ? 1 : 0.4));
         this.T(rx + 32, y + 5, `P${i + 1} ${p.name.toUpperCase()}${i === r.you ? ' (YOU)' : ''}`, { color: P_COLS[i], maxWidth: rw - 110, maxLines: 1 });
-        this.T(rx + 32, y + 15, hogName(hog), { color: ui.dimInt, maxWidth: rw - 110, maxLines: 1 });
-        this.T(rx + rw - 8, y + 9, !p.on ? 'OFFLINE' : p.ready ? 'READY' : 'NOT READY', { align: 'right', color: !p.on ? 0xf87858 : p.ready ? 0x58d854 : ui.dimInt });
+        this.T(rx + 32, y + 15, p.bot ? 'Plays itself' : hogName(hog), { color: ui.dimInt, maxWidth: rw - 110, maxLines: 1 });
+        this.T(rx + rw - 8, y + 9, p.bot ? 'BOT' : !p.on ? 'OFFLINE' : p.ready ? 'READY' : 'NOT READY', { align: 'right', color: p.bot ? 0x3cbcfc : !p.on ? 0xf87858 : p.ready ? 0x58d854 : ui.dimInt });
       } else {
         this.T(W / 2, y + 9, 'waiting for a hog...', { align: 'center', color: ui.panelInt });
       }
@@ -210,7 +217,7 @@ export class LobbyScene extends Phaser.Scene {
     }
     y += 4;
     const me = r.players[r.you];
-    const all = r.players.length >= 2 && r.players.every((p) => p.ready);
+    const all = r.players.length >= 2 && r.players.every((p) => p.ready || p.bot);
     if (r.phase === 'playing') {
       this.T(W / 2, y + 2, 'The last game is still finishing for someone...', { align: 'center', color: ui.dimInt, maxWidth: W - 16, maxLines: 2 });
       y += 20;
@@ -218,7 +225,8 @@ export class LobbyScene extends Phaser.Scene {
       this.cdText = this.T(W / 2, y, 'STARTING IN 3', { scale: 2, align: 'center', color: 0xf8d878 });
       y += 20;
     } else {
-      const msg = r.players.length < 2 ? 'Waiting for at least one more hog to join' : all ? 'Starting...' : 'Everyone readies up, then a 3 s countdown';
+      const msg = r.players.length < 2 ? 'Waiting for at least one more hog to join' : all ? 'Starting...'
+        : r.players.some((p) => p.bot) ? 'Ready up to play with the bots. Friends can still join' : 'Everyone readies up, then a 3 s countdown';
       this.T(W / 2, y + 2, msg, { align: 'center', color: ui.textInt, maxWidth: W - 16, maxLines: 2 });
       y += 20;
     }

@@ -173,6 +173,7 @@ export interface Hog {
   id: number;                    // seat 0-3 (0 made the room: their heat, their call at the SHIPPED screen)
   name: string;
   local: boolean;                // this device's player
+  bot: boolean;                  // played by the sim itself (rooms ZZZ1-3): it moves and picks on every client alike
   info: HogInfo;
   player: Phaser.GameObjects.Sprite;
   tag: PixelText | null;
@@ -193,6 +194,7 @@ export interface Hog {
   view: { w: number; h: number };// what this player's screen shows of the world
   pick: Pick | null;             // an open card choice (level-ups: a tray, the world keeps going; releases: the world waits)
   trayOpen: boolean;             // the level-up tray is showing (not banked for later)
+  autoNext: boolean;             // the hog just chose from a hand: its next level upgrades something it owns, no prompt
   shieldT: number;               // code-review shield seconds left for the open hand
   down: boolean;                 // out of HP: waiting for a teammate (or the next wave)
   gone: boolean;                 // left the game
@@ -404,7 +406,7 @@ export class CoopScene extends Phaser.Scene {
   /** A hog in the fight, picked by the sim's dice (events and spawns go around it). */
   someHog(): Hog { const a = this.alive(); return a.length ? a[Math.floor(this.R.next() * a.length)] : this.nearestHog(0, 0); }
   /** The player who makes the SHIPPED call: the lowest seat still in the game. */
-  decider(): Hog { return this.present()[0] ?? this.hogs[0]; }
+  decider(): Hog { return this.present().find((h) => !h.bot) ?? this.present()[0] ?? this.hogs[0]; }
 
   /** The world rectangle the current hog's screen shows (the sim's "on screen": spawns just outside it, hotfix clears it). */
   viewOf(h: Hog = this.cur) {
@@ -542,10 +544,12 @@ export class CoopScene extends Phaser.Scene {
   private newHog(i: number, name: string, info: HogInfo, local: boolean, n: number, seed: number): Hog {
     const a = (i / Math.max(1, n)) * Math.PI * 2 - Math.PI / 2;
     const x = WORLD_W / 2 + (n > 1 ? Math.cos(a) * 40 : 0), y = WORLD_H / 2 + (n > 1 ? Math.sin(a) * 28 : 0);
-    const hogId = HOGS.some((hh) => hh.id === info?.hog) ? info.hog : 'im-the-driver';
+    // A bot gets a hoggie from the seed (the same on every client); a player brings their own.
+    const hogId = info?.bot ? HOGS[(Math.imul(seed ^ (i * 0x9e3779b1), 2654435761) >>> 8) % HOGS.length].id
+      : HOGS.some((hh) => hh.id === info?.hog) ? info.hog : 'im-the-driver';
     const sig = sigOf(hogId);
     const h: Hog = {
-      id: i, name: name || `P${i + 1}`, local, info: info ?? { hog: hogId, name, shop: {}, pals: [], heat: 0 },
+      id: i, name: name || `P${i + 1}`, local, bot: !!info?.bot, info: info ?? { hog: hogId, name, shop: {}, pals: [], heat: 0 },
       player: null as unknown as Phaser.GameObjects.Sprite, tag: null,
       hog: hogId, sig, trait: sig?.trait ?? 'none', perk: sig ? null : perkOf(hogId),
       st: baseStats(), hp: 100, invuln: 0, facing: new Phaser.Math.Vector2(1, 0), moving: false, vel: new Phaser.Math.Vector2(0, 0),
@@ -558,7 +562,7 @@ export class CoopScene extends Phaser.Scene {
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {}, powerups: 0, gems: 0, hits: 0, hitsWave1: 0, aiKills: 0,
         unlocks: [], crests: [], kills: 0, downs: 0, revived: 0 },
       moat: { fill: 0, calm: 0, lv: 0 },
-      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, shieldT: 0, down: false, gone: false, reviveT: 0, wfx: new Map(),
+      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, wfx: new Map(),
     };
     this.as(h, () => {
       this.rerolls = 1 + this.shop('reroll');
@@ -1470,6 +1474,7 @@ export class CoopScene extends Phaser.Scene {
     const m = this.cur.move;
     let dx = 0, dy = 0, analog = 1;
     if (m) { const a = moveAngle(m); dx = Math.cos(a); dy = Math.sin(a); analog = moveMag(m); }
+    if (this.cur.bot) { [dx, dy] = this.autopilotDir(); analog = 1; } // bots steer in the sim
     const driving = this.pu.autopilot > 0;
     // Self-Driving Mode: the stick is ignored and the hog steers itself toward gems and away from crowds.
     if (driving) [dx, dy] = this.autopilotDir(true);
@@ -1521,6 +1526,13 @@ export class CoopScene extends Phaser.Scene {
     for (const q of this.puddles) {
       const dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy) || 1;
       if (d < q.r + 20) { fx += (dx / d) * 0.02; fy += (dy / d) * 0.02; }
+    }
+    // Keep some room from teammates: hogs piled on one spot share the same bugs and gems (and look like one hog).
+    for (const h of this.hogs) {
+      if (h === this.cur || h.down || h.gone) continue;
+      const dx = p.x - h.player.x, dy = p.y - h.player.y, d2 = dx * dx + dy * dy;
+      if (d2 < 80 * 80 && d2 > 0.01) { const d = Math.sqrt(d2); fx += (dx / d) * 0.004 * (80 - d) / 80; fy += (dy / d) * 0.004 * (80 - d) / 80; }
+      else if (d2 <= 0.01) { fx += Math.cos(this.cur.id * 2.1) * 0.004; fy += Math.sin(this.cur.id * 2.1) * 0.004; }
     }
     const lane = this.xs.drive;
     if (lane && lane.t < 1.6) {
@@ -2803,17 +2815,54 @@ export class CoopScene extends Phaser.Scene {
     if (h.local) floatText(this, p.x, p.y - 22, 'LEVEL UP!', K.ui.accentInt, 0.9);
   }
 
-  /** A fresh hand for every hog in the fight with a level to spend and no cards up. */
+  /** Every hog in the fight with a level to spend and no cards up spends it. */
   private openLevelUps() {
     for (const h of this.alive()) {
       if (h.pendingLevels <= 0 || h.pick) continue;
       this.levelFanfare(h);
-      this.openPick(h, 'levelup');
+      this.nextLevel(h);
     }
   }
 
+  /** A card worth stopping for: a weapon the hog doesn't have, or the passive that evolves one it does. */
+  private isNewCard(h: Hog, c: Card, partners: Set<string>) {
+    if (c.kind === 'weapon') return !h.weapons.has(c.id as WeaponId);
+    return c.kind === 'passive' && !h.passives.has(c.id as PassiveId) && partners.has(c.id);
+  }
+
+  /** Spend h's banked levels. Each draws a hand as usual. Only a hand with a real choice in it (a new weapon, or the
+   * passive that evolves one h owns) opens the tray; any other hand applies its best card on the spot, with a small
+   * pop-up and no prompt. */
+  private nextLevel(h: Hog) {
+    while (h.pendingLevels > 0 && !h.pick && !h.down && !h.gone && !this.over) {
+      const cards = this.as(h, () => { this.pendingLevels--; return drawCards(this.build(), () => this.RC.next()); });
+      const partners = this.as(h, () => partnersOf(this.build()));
+      const owned = cards.filter((c) => !this.isNewCard(h, c, partners));
+      // Right after a hand, the next level is always an upgrade (when the draw has one): at most every other level asks.
+      const ask = cards.some((c) => this.isNewCard(h, c, partners)) && !(h.autoNext && owned.length);
+      h.autoNext = false;
+      if (ask) { this.openPick(h, 'levelup', cards); return; }
+      this.as(h, () => {
+        const b = this.build();
+        const c = owned.reduce((a, x) => (botRank(x, b) > botRank(a, b) ? x : a));
+        this.applyCard(c);
+        this.onLevelApplied();
+        if (h.local) this.autoNote(c);
+      });
+    }
+  }
+
+  /** The pop-up for an upgrade that applied itself: "+ Session Replay v0.4". */
+  private autoNote(c: Card) {
+    const w = c.kind === 'weapon' || c.kind === 'major' ? this.weapons.get(c.id as WeaponId) : null;
+    const lv = w ? ` ${semver(w)}` : c.kind === 'passive' ? ` LV ${this.passives.get(c.id as PassiveId) ?? ''}` : '';
+    const p = this.player;
+    floatText(this, p.x, p.y - 30, `+ ${this.cardName(c)}${lv}`, 0x58d854, 0.9);
+    this.sfx('select', 0.4, 150);
+  }
+
   /** A card choice for hog h (drawn with h's own dice, so every client draws the same hand). The world waits for it. */
-  openPick(h: Hog, kind: Pick['kind'], cards?: Card[]) {
+  openPick(h: Hog, kind: Pick['kind'], cards?: Card[], botNow = true) {
     this.as(h, () => {
       if (!cards) {
         this.pendingLevels--;
@@ -2823,6 +2872,7 @@ export class CoopScene extends Phaser.Scene {
       // A new hand pops the tray open with a fresh shield. (While a hand is banked no new one opens; the levels queue.)
       if (kind !== 'release') { h.shieldT = SHIELD_S; h.trayOpen = true; }
     });
+    if (h.bot) { if (botNow) this.as(h, () => this.botPick()); return; } // bots decide on the spot
     if (h.local) this.showPick();
   }
   /** Identifies one open choice, so a late or doubled pick can't land on the next one. */
@@ -3075,8 +3125,9 @@ export class CoopScene extends Phaser.Scene {
     if (p.kind === 'cmdk') { this.activatePowerup(c.id as PowerId); return; }
     this.applyCard(c);
     if (p.kind === 'levelup') {
+      h.autoNext = true;
       this.onLevelApplied();
-      if (h.pendingLevels > 0 && !h.down) this.openPick(h, 'levelup'); // more levels banked: straight to the next hand
+      if (h.pendingLevels > 0 && !h.down) this.nextLevel(h); // more levels banked: straight to the next one
     }
     if (p.kind === 'release') this.releaseDone();
   }
@@ -3095,7 +3146,7 @@ export class CoopScene extends Phaser.Scene {
     this.gold += 3;
     h.pick = null;
     if (h.local) { this.closeModal(); this.clearTray(); }
-    if (h.pendingLevels > 0 && !h.down) this.openPick(h, 'levelup');
+    if (h.pendingLevels > 0 && !h.down) this.nextLevel(h);
   }
   private simBanish(i: number, k?: string) {
     const h = this.cur, p = h.pick;
@@ -4204,9 +4255,10 @@ export class CoopScene extends Phaser.Scene {
     for (const h of this.present()) {
       this.reviveHog(h, 1);
       this.as(h, () => this.recalc());
-      this.openPick(h, 'release', this.as(h, () => drawRelease(this.build(), () => this.RC.next())));
+      this.openPick(h, 'release', this.as(h, () => drawRelease(this.build(), () => this.RC.next())), false);
     }
     this.releasing = true;
+    for (const h of this.present()) if (h.bot && h.pick) this.as(h, () => this.botPick());
     this.releaseDone();
   }
 
