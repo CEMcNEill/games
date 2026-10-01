@@ -1,8 +1,9 @@
-// The co-op connection: one WebSocket to the room's Durable Object at play.funglass.es/mp (see mp-server/). It carries
+// The co-op connection: one WebSocket to the room's Durable Object at the site.json relay (see mp-server/). It carries
 // the lobby (room state, ready, countdown) and then the game's turns. It lives outside the scenes, so the lobby, the
 // game and the end screen share it, and it reconnects by itself (same token = same seat) when a phone drops off.
 import { hash32 } from '@shared/meta';
 import { K } from '@shared/kit';
+import { relayWs } from '@shared/site';
 
 /** Bump when anything in the co-op sim changes: players on different versions can't share a room (they'd desync). */
 export const SIM_VERSION = 'coop-8';
@@ -31,7 +32,7 @@ export type SimEvent =
   | { t: 'tray'; open: boolean }
   | { t: 'dbg'; c: string; a?: unknown[] };
 
-/** Where the relay lives: play.funglass.es/mp, or ?mp=ws://localhost:8787/mp for a local `wrangler dev`. */
+/** Where the relay lives: site.json's relay (as ws/wss), or ?mp=ws://localhost:8787/mp for a local `wrangler dev`. */
 export function serverUrl() {
   try {
     const q = new URLSearchParams(location.search).get('mp');
@@ -39,7 +40,7 @@ export function serverUrl() {
     const ls = localStorage.getItem('bs-mp-url');
     if (ls) return ls;
   } catch { /* no storage */ }
-  return 'wss://play.funglass.es/mp';
+  return relayWs();
 }
 
 /** Letters for room codes: no I or O (they read as 1 and 0). */

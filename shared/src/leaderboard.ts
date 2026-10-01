@@ -1,5 +1,5 @@
 // Leaderboards: top 20 per game and mode, 3-letter initials, no accounts. The server is the Durable Object relay at
-// play.funglass.es/mp/lb (mp-server/src/board.ts). A board is "<game slug>:<mode>", so a game built from a template
+// <site.json relay>/lb (mp-server/src/board.ts). A board is "<game slug>:<mode>", so a game built from a template
 // gets its own boards (nerdy-bug-survivors:run...) with nothing to set up.
 //
 // Kits opt in with KitDef.leaderboard. It's on wherever the game is hosted (the server allows any origin) and in the
@@ -8,13 +8,14 @@
 // it off anywhere.
 import { K } from './kit';
 import { meta } from './meta';
+import { SITE } from './site';
 
 export interface LbEntry { id: number; name: string; score: number; stats: Record<string, number | string>; at: number }
 export interface LbMode { id: string; label: string }
 export interface LbSubmit { rank: number | null; id: number; top: LbEntry[] }
 
 export const LB_SIZE = 20;
-const PROD = 'https://play.funglass.es/mp/lb';
+const PROD = `${SITE.relay.replace(/\/$/, '')}/lb`;
 const LOCAL = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|0\.0\.0\.0|)$/;
 
 function override(): string | null {

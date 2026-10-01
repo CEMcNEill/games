@@ -1,5 +1,6 @@
 // Bug Survivors co-op relay. Deploy: `wrangler deploy` from this folder (needs `wrangler login` once).
 // Local: `wrangler dev` -> ws://localhost:8787/mp/ws/ABCD
+// The route must match "relay" in the repo's site.json (that's where the games look for it).
 {
   "name": "bug-survivors-mp",
   "main": "src/index.ts",

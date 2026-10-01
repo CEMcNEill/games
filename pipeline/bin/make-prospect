@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Make a prospect game end to end with no questions asked: research -> brief -> theme -> sprites -> logo -> build -> check.
+
+    make-prospect "<Company>" <domain> [--template KIT|auto] [--about TEXT] [--pains TEXT] [--products LIST]
+                  [--audience TEXT] [--tone TEXT] [--notes TEXT] [--brief FILE.yaml]
+                  [--logo auto|posthog|URL|FILE] [--quick] [--model M] [--budget USD]
+
+Only the company and its domain are required: Claude reads their website for the rest and notes what it guessed.
+It runs headless Claude Code (`claude -p`) on pipeline/prompts/make-prospect.md, then checks the result itself:
+the built game exists and its game check passed. Nothing is deployed.
+
+  --logo auto      find their logo and pick the most legible pixel option (default); falls back to the PostHog splash
+  --logo posthog   PostHog splash, no company logo
+  --logo URL|FILE  use this as their logo
+  --quick          skip custom sprites (kit defaults in their colours): faster and cheaper
+  --budget USD     stop Claude if the run costs more than this
+
+Writes prospects/<name>.yaml, -themes/, -art/, -result.json, -run.jsonl (the full transcript) and the game in out/.
+Exit code 0 only if the game was built and passed its check.
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+PROMPT = os.path.join(REPO, "pipeline", "prompts", "make-prospect.md")
+ASSETS = os.environ.get("ASSETS", os.path.expanduser("~/games/assets"))
+TOOLS = "Bash Read Write Edit Glob Grep WebFetch WebSearch"
+NOT_GIVEN = "not given: research it"
+
+
+def kits():
+    return sorted(d for d in os.listdir(REPO) if os.path.exists(os.path.join(REPO, d, "kit.json")))
+
+
+def art_text(slug, quick):
+    if quick:
+        return "Skip custom sprites (the rep asked for a quick run): every slot uses the kit default in the theme's colours."
+    if not os.path.isdir(ASSETS):
+        return (f"The CC0 art packs aren't downloaded ({ASSETS} is missing), so skip custom sprites: every slot uses "
+                "the kit default in the theme's colours. Note this in `decisions`.")
+    return (f"Draw the company-specific sprites: for each slot in `<kit>/slots.json` that has a `prompt`, follow "
+            f"shared/prompts/sprite-style.md (CC0 packs are in {ASSETS}; pass it to pixel.py as needed) and look at every "
+            f"review image. Put the .sprite files in `prospects/{slug}-art/<kit>/`.")
+
+
+def logo_text(slug, logo):
+    if logo == "posthog":
+        return "Use the PostHog splash (the default): don't make or copy a logo."
+    source = (f"Their logo is at {logo}: download or copy it to `prospects/{slug}-logo.<ext>` and use that."
+              if logo != "auto" else "Find their real logo on their site.")
+    return (f"{source} Follow shared/prompts/logo.md with `prospects/{slug}-logo-options` as the options folder. "
+            "Nobody can be asked which option they want, so look at logo-options.png and pick the most legible one "
+            "yourself (step 3's rule), copy it in as logo.sprite, and say which and why in `decisions`. If you can't find "
+            "a usable logo, or no option is legible, use the PostHog splash instead and say so.")
+
+
+def say(line):
+    print(line, flush=True)
+
+
+def show(event):
+    """One short progress line per tool call, so the rep can see it working."""
+    if event.get("type") != "assistant":
+        return
+    for c in event.get("message", {}).get("content", []):
+        if c.get("type") != "tool_use":
+            continue
+        i = c.get("input", {})
+        what = i.get("description") or i.get("command") or i.get("file_path") or i.get("url") or i.get("query") \
+            or i.get("pattern") or ""
+        what = " ".join(str(what).split())
+        say(f"  · {c.get('name')}: {what[:100]}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("name")
+    ap.add_argument("domain")
+    ap.add_argument("--template", default="auto")
+    ap.add_argument("--about")
+    ap.add_argument("--pains")
+    ap.add_argument("--products")
+    ap.add_argument("--audience")
+    ap.add_argument("--tone")
+    ap.add_argument("--notes")
+    ap.add_argument("--brief", help="a brief you already wrote (prospect-examples/ shape); Claude fills in what's missing")
+    ap.add_argument("--logo", default="auto")
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--model")
+    ap.add_argument("--budget", type=float)
+    a = ap.parse_args()
+
+    for tool in ("claude", "uv", "node"):
+        if not shutil.which(tool):
+            raise SystemExit(f"{tool} isn't installed; see README.md, 'Set up once'")
+    if a.template != "auto" and a.template not in kits():
+        raise SystemExit(f"no template {a.template!r}; templates: {', '.join(kits())} or auto")
+    if a.brief and not os.path.exists(a.brief):
+        raise SystemExit(f"no brief at {a.brief}")
+    domain = re.sub(r"^https?://", "", a.domain).strip("/")
+
+    slug = re.sub(r"[^a-z0-9]+", "-", a.name.lower()).strip("-")
+    result_path = os.path.join(REPO, "prospects", f"{slug}-result.json")
+    log_path = os.path.join(REPO, "prospects", f"{slug}-run.jsonl")
+    os.makedirs(os.path.dirname(result_path), exist_ok=True)
+    if os.path.exists(result_path):
+        os.remove(result_path)  # a stale result must never pass for this run's
+
+    fields = {
+        "name": a.name, "domain": domain, "slug": slug,
+        "about": a.about or NOT_GIVEN, "pains": a.pains or NOT_GIVEN, "products": a.products or NOT_GIVEN,
+        "audience": a.audience or NOT_GIVEN, "tone": a.tone or NOT_GIVEN, "notes": a.notes or "none",
+        "template": a.template,
+        "brief_line": f"- Brief file: {os.path.abspath(a.brief)}" if a.brief else "",
+        "art": art_text(slug, a.quick), "logo": logo_text(slug, a.logo),
+    }
+    prompt = open(PROMPT).read().split("\n", 3)[3]  # drop the file's own header
+    prompt = re.sub(r"\{\{(\w+)\}\}", lambda m: fields[m.group(1)], prompt)
+
+    # No MCP servers (nothing to deploy with), only the tools the loop needs, edits auto-accepted.
+    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--strict-mcp-config",
+           "--permission-mode", "acceptEdits", "--allowedTools", TOOLS]
+    if os.path.isdir(ASSETS):
+        cmd += ["--add-dir", ASSETS]
+    if a.model:
+        cmd += ["--model", a.model]
+    if a.budget:
+        cmd += ["--max-budget-usd", str(a.budget)]
+
+    say(f"making a game for {a.name} ({domain}): template {a.template}, logo {a.logo}{', quick' if a.quick else ''}")
+    say(f"full transcript: {os.path.relpath(log_path)}")
+    final = {}
+    with open(log_path, "w") as log, subprocess.Popen(cmd, cwd=REPO, stdout=subprocess.PIPE, text=True) as p:
+        for line in p.stdout:
+            log.write(line)
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            show(ev)
+            if ev.get("type") == "result":
+                final = ev
+    cost = final.get("total_cost_usd")
+    if final.get("result"):
+        say("\n" + final["result"].strip())
+
+    # Trust the files, not the reply.
+    problems = []
+    if p.returncode or final.get("is_error"):
+        problems.append(f"claude stopped with an error ({final.get('subtype') or p.returncode})")
+    res = json.load(open(result_path)) if os.path.exists(result_path) else None
+    if not res:
+        problems.append(f"no result file at {os.path.relpath(result_path)}")
+    else:
+        out = os.path.join(REPO, res.get("out") or "-")
+        report = os.path.join(REPO, res.get("check") or "-", "report.json")
+        if not os.path.exists(os.path.join(out, "index.html")):
+            problems.append(f"no game at {res.get('out')}")
+        elif not os.path.exists(report) or not json.load(open(report)).get("passed"):
+            problems.append(f"the game check didn't pass ({os.path.relpath(report)})")
+        problems += [f"Claude flagged: {x}" for x in res.get("problems") or []]
+
+    say("\n" + "-" * 60)
+    if res:
+        say(f"game:      {res.get('out')}  ({res.get('kit')})")
+        say(f"screens:   {res.get('check')}/contact.png")
+        say(f"logo:      {res.get('logo')}" + (f"  (all options: {res['logo_options']})" if res.get("logo_options") else ""))
+        for d in res.get("decisions") or []:
+            say(f"decided:   {d}")
+        say(f"play it:   python3 -m http.server -d {res.get('out')} 8000   ->  http://localhost:8000/")
+    if cost is not None:
+        say(f"cost:      ${cost:.2f}")
+    for x in problems:
+        say(f"PROBLEM:   {x}")
+    hard = [x for x in problems if not x.startswith("Claude flagged")]
+    say("result:    " + ("FAILED" if hard else "OK, play it before you share it"))
+    sys.exit(1 if hard else 0)
+
+
+if __name__ == "__main__":
+    main()

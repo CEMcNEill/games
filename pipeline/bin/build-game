@@ -3,11 +3,11 @@
 
     build-game <kit> <theme.json> [--brief brief.yaml] [--art DIR] [--music FILE.ogg] [--out DIR] [--no-check]
 
-1. builds the kit if <kit>/dist is missing (npm install + node build-kits.mjs <kit>)
+1. builds the kit if <kit>/dist is missing or was built for another site.json (npm install + node build-kits.mjs <kit>)
 2. checks a copy of the theme: kit schema always; with --brief also the content filter, and the
    brief's name/domain/colours are applied to the copy (your file is never rewritten)
 3. copies <kit>/dist to the output folder and writes theme/theme.json
-4. renders every sprite slot from the kit's default art in the theme's colours
+4. writes theme/manifest.json (analytics key from site.json) and renders every sprite slot from the kit's default art in the theme's colours
 5. installs your own sprites from --art DIR (<slot>.sprite files, see shared/prompts/sprite-style.md)
 6. runs the headless game check (pipeline/tools/game_check.py; needs uv + playwright + chromium)
 
@@ -52,8 +52,11 @@ def main():
     if not os.path.exists(os.path.join(kdir, "kit.json")):
         kits = sorted(d for d in os.listdir(REPO) if os.path.exists(os.path.join(REPO, d, "kit.json")))
         raise SystemExit(f"no kit {a.kit!r}; kits: {', '.join(kits)}")
-    if not os.path.exists(os.path.join(kdir, "dist", "index.html")):
-        print(f"building kit {a.kit}...")
+    site = json.load(open(os.path.join(REPO, "site.json")))
+    stamp = os.path.join(kdir, "dist", "site.json")
+    built_for = json.load(open(stamp)) if os.path.exists(stamp) else None
+    if not os.path.exists(os.path.join(kdir, "dist", "index.html")) or built_for != site:
+        print(f"building kit {a.kit}{' (site.json changed)' if built_for and built_for != site else ''}...")
         if not os.path.isdir(os.path.join(REPO, "node_modules")):
             subprocess.run(["npm", "install"], cwd=REPO, check=True)
         subprocess.run(["node", "build-kits.mjs", a.kit], cwd=REPO, check=True)
@@ -93,7 +96,7 @@ def main():
     if a.music:
         shutil.copy(a.music, os.path.join(tdir, "music.ogg"))
         music = "theme/music.ogg"
-    manifest = {"slug": slug, "kit": a.kit, "music": music, "posthog": None, "draft": False,
+    manifest = {"slug": slug, "kit": a.kit, "music": music, "posthog": site.get("posthog"), "draft": False,
                 "sprites": {s: f"theme/sprites/{s}.png" for s in slots if os.path.exists(os.path.join(tdir, "sprites", f"{s}.png"))}}
     json.dump(manifest, open(os.path.join(tdir, "manifest.json"), "w"), indent=1)
     if a.art:

@@ -49,8 +49,30 @@ uv run --with playwright playwright install chromium      # headless browser for
 pipeline/assets/fetch-assets.sh                           # optional: CC0 art packs for custom sprites (~120 MB)
 ```
 
-### 2. Ask Claude
-Open the repo in **Claude Code** (or Claude Desktop with the folder attached) and paste this, filled in:
+### 2. Make it: one command
+```sh
+pipeline/bin/make-prospect "Acme Rockets" acmerockets.com
+```
+That's all it needs. Claude reads their website for the rest (what they do, brand colours, likely pains, which PostHog
+products and template fit), writes the brief and theme, draws the sprites, turns their logo into a splash screen,
+builds the game and checks it, without asking anything. At the end it prints where the game is, the screenshots to
+look at, and every guess it made (guessed pains, chosen template, logo pick) so you can check them. Add what you
+know to steer it:
+
+```sh
+pipeline/bin/make-prospect "Acme Rockets" acmerockets.com --template bug-survivors \
+    --pains "slow releases; finding out about bugs from customers" --audience "CTO, very technical" \
+    --tone "nothing violent" --notes "champion loves retro games" --logo auto
+```
+`--brief file.yaml` starts from a brief you wrote; `--logo posthog` keeps the PostHog splash; `--quick` skips
+custom sprites; `--budget 15` caps the spend in USD. Run `pipeline/bin/make-prospect -h` for all options. It runs
+Claude Code headless (`claude -p`), so you need to be logged in to `claude` once. It never deploys anything.
+
+To change the logo pick afterwards: copy the `logo-X.sprite` you want from `prospects/<name>-logo-options/` over
+`prospects/<name>-art/<kit>/logo.sprite`, then run the `rebuild` command in `prospects/<name>-result.json`.
+
+### 2b. Or ask Claude yourself
+To stay in the loop (pick the logo yourself, give feedback as it goes), open the repo in **Claude Code** (or Claude Desktop with the folder attached) and paste this, filled in:
 
 ```text
 Make a prospect game in this repo. Read README.md and pipeline/README.md first and follow them.
@@ -77,7 +99,7 @@ draws 5-15 custom sprites on top of public-domain pixel art, turns the company's
 options for the opening splash screen (you pick one, or keep the 8-bit PostHog logo), builds the game
 and runs a headless playthrough to check it. The result is a folder in `out/<company>-<template>/`.
 Bug Survivors games also come with online co-op (2-4 players, a room code, no accounts) and their own top-20
-leaderboards; both run on the relay at play.funglass.es/mp, wherever the game itself is hosted.
+leaderboards; both run on the relay named in `site.json` (play.funglass.es/mp), wherever the game itself is hosted.
 
 ### 3. Play it, then share it
 ```sh
@@ -113,22 +135,26 @@ notes: Champion is a rocket nerd and loves retro games. Small team, very technic
 </details>
 
 ### Good to know
+- `site.json` says where the games live: the site, the co-op/leaderboard relay, and an optional PostHog
+  analytics key (`{"key": "phc_...", "host": "https://us.i.posthog.com"}`) that every new game then reports to.
+  To move hosts, edit it and rebuild; `build-game` rebuilds the template by itself when `site.json` changed.
 - `prospects/` and `out/` are git-ignored: customer briefs and builds stay on your machine.
 - The theme checker rejects competitor names, profanity and emoji, and pins the company's name,
   domain and colours to the brief.
 - Keep real people out unless they've said yes; the games use invented characters by default.
 - Bug Survivors' leaderboards are per game (keyed by the theme's slug) and per mode, so every prospect game starts
   with empty boards of its own. They're off on localhost, so local checks never post scores.
-- Optional analytics: set `"posthog": {"key": "phc_...", "host": "https://us.i.posthog.com"}` in the
-  built game's `theme/manifest.json` to capture game_opened / game_started / game_finished.
+- Analytics: with a `posthog` key in `site.json` (or set by hand in a built game's `theme/manifest.json`) games
+  capture game_opened / game_started / game_finished.
 
 ## Repo layout
 ```
 <template>/        one folder per game template (source, default theme, examples, sprites, KIT.md)
 shared/            engine every template uses, sprite workbench (pixel.py), drawing style guide
-pipeline/          build-game, theme checker, sprite tools, example briefs, asset catalog
+pipeline/          make-prospect, build-game, theme checker, sprite tools, example briefs, asset catalog
+site.json          where the games and the relay live (+ optional analytics key)
 tests/accept.py    acceptance test every template must pass
-mp-server/         Cloudflare Worker at play.funglass.es/mp: Bug Survivors co-op relay + leaderboards
+mp-server/         Cloudflare Worker at play.funglass.es/mp (site.json's relay): Bug Survivors co-op relay + leaderboards
 bug-survivors-android/  the Android app (a WebView around the Bug Survivors build)
 docs/              DEVELOPING.md (changing or adding a template), screenshots
 ```
