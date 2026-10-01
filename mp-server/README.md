@@ -6,7 +6,8 @@ then relays the game's input turns (20 a second) to everyone in the room. It nev
 `../bug-survivors/COOP.md`.
 
 - `GET /mp/health` returns `ok`
-- `GET /mp/ws/<CODE>` opens a WebSocket into room CODE (4 letters)
+- `GET /mp/ws/<CODE>` opens a WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots, which give their seats
+  to real players who join)
 
 ## Run and deploy
 

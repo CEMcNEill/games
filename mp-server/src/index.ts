@@ -5,7 +5,7 @@
 //
 // Routes (behind play.funglass.es/mp/*):
 //   GET /mp/health           -> "ok"
-//   GET /mp/ws/<CODE>        -> WebSocket into room CODE (4 letters)
+//   GET /mp/ws/<CODE>        -> WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots)
 
 export interface Env { ROOMS: DurableObjectNamespace }
 
@@ -16,14 +16,16 @@ const TICKS_PER_TURN = 3;   // the game steps at 60 Hz
 const COUNTDOWN_MS = 3000;
 const IDLE_INPUT_MS = 1500; // no input for this long: the player stands still
 const GONE_MS = 20000;      // disconnected this long mid-game: the player leaves the game
-const CODE_RE = /^[A-Z]{4}$/;
+const CODE_RE = /^([A-Z]{4}|ZZZ[1-3])$/;
+/** Playtest rooms: ZZZ1-ZZZ3 start with 1-3 bots, which make room for real players who join. */
+const botCount = (code: string) => (/^ZZZ[1-3]$/.test(code) ? +code[3] : 0);
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/mp/, '');
     if (path === '/health' || path === '/health/') return new Response('ok', { headers: cors() });
-    const m = path.match(/^\/ws\/([A-Za-z]{4})\/?$/);
+    const m = path.match(/^\/ws\/([A-Za-z0-9]{4})\/?$/);
     if (m) {
       if (req.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('expected a websocket', { status: 426 });
       const code = m[1].toUpperCase();
@@ -47,6 +49,7 @@ interface Player {
   goneAt: number;      // ms when the socket dropped mid-game (0 = connected)
   left: boolean;       // out of the current game for good
   over: boolean;       // said the game is over
+  bot: boolean;        // a bot seat: always ready, played by the game itself on every client
 }
 
 type Phase = 'lobby' | 'countdown' | 'playing';
@@ -128,21 +131,38 @@ export class Room {
       return back;
     }
     if (this.phase !== 'lobby') { this.refuse(ws, 'That game already started. Pick another code'); return null; }
-    if (this.players.length >= MAX_PLAYERS) { this.refuse(ws, `That room is full (${MAX_PLAYERS} players)`); return null; }
-    if (this.players.length && this.key && key !== this.key) { this.refuse(ws, 'That code is in use by a different game or version'); return null; }
-    if (!this.players.length) this.key = key;
+    if (this.humans().length && this.key && key !== this.key) { this.refuse(ws, 'That code is in use by a different game or version'); return null; }
+    if (!this.humans().length) { this.key = key; this.players = []; }
+    if (this.players.length >= MAX_PLAYERS) {
+      // A bot gives its seat to a real player.
+      const bot = [...this.players].reverse().find((q) => q.bot);
+      if (!bot) { this.refuse(ws, `That room is full (${MAX_PLAYERS} players)`); return null; }
+      this.players = this.players.filter((q) => q !== bot);
+    }
     const p: Player = { ws, token: token || crypto.randomUUID(), name: String(msg.name ?? 'Hog').slice(0, 24), info: msg.info ?? null,
-      ready: false, slot: -1, move: 0, moveAt: 0, goneAt: 0, left: false, over: false };
+      ready: false, slot: -1, move: 0, moveAt: 0, goneAt: 0, left: false, over: false, bot: false };
     this.players.push(p);
+    if (this.players.length === 1) this.addBots();
     this.broadcastRoom();
     return p;
+  }
+
+  private humans() { return this.players.filter((p) => !p.bot); }
+
+  /** A playtest room's bots (ZZZ1-ZZZ3), after its first player. */
+  private addBots() {
+    for (let i = 1; i <= botCount(this.code) && this.players.length < MAX_PLAYERS; i++) {
+      const name = `BOT ${i}`;
+      this.players.push({ ws: null, token: `bot-${i}`, name, info: { bot: true, hog: '', name, shop: {}, pals: [], heat: 0 }, ready: true, slot: -1,
+        move: 0, moveAt: 0, goneAt: 0, left: false, over: false, bot: true });
+    }
   }
 
   private roomInfo(me: Player) {
     return {
       code: this.code, phase: this.phase, you: this.players.indexOf(me), token: me.token,
       cd: this.phase === 'countdown' ? Math.max(0, this.countdownAt - Date.now()) : 0,
-      players: this.players.map((p) => ({ name: p.name, info: p.info, ready: p.ready, on: !!p.ws })),
+      players: this.players.map((p) => ({ name: p.name, info: p.info, ready: p.ready, on: !!p.ws || p.bot, bot: p.bot })),
     };
   }
 
@@ -185,7 +205,7 @@ export class Room {
       case 'over':
         if (this.phase !== 'playing') return;
         me.over = true;
-        if (this.players.every((p) => p.over || p.left || !p.ws)) this.endGame();
+        if (this.humans().every((p) => p.over || p.left || !p.ws)) this.endGame();
         return;
       case 'leave':
         this.leave(me);
@@ -197,7 +217,7 @@ export class Room {
   }
 
   private checkStart() {
-    const all = this.players.length >= 2 && this.players.every((p) => p.ready && p.ws);
+    const all = this.players.length >= 2 && this.humans().length >= 1 && this.players.every((p) => p.bot || (p.ready && p.ws));
     if (this.phase === 'lobby' && all) {
       this.phase = 'countdown';
       this.countdownAt = Date.now() + COUNTDOWN_MS;
@@ -235,13 +255,13 @@ export class Room {
         this.events.push([p.slot, { t: 'leave' }]);
       }
     }
-    const m = this.players.map((p) => (p.left || !p.ws || now - p.moveAt > IDLE_INPUT_MS ? 0 : p.move));
+    const m = this.players.map((p) => (p.bot || p.left || !p.ws || now - p.moveAt > IDLE_INPUT_MS ? 0 : p.move));
     const turn: { n: number; m: number[]; e?: [number, unknown][] } = { n: this.turn++, m };
     if (this.events.length) { turn.e = this.events; this.events = []; }
     const s = JSON.stringify(turn);
     this.turns.push(s);
     this.broadcast(`{"t":"turn",${s.slice(1)}`);
-    if (this.players.every((p) => p.left)) this.endGame();
+    if (this.humans().every((p) => p.left)) this.endGame();
   }
 
   private broadcast(msg: unknown) {
@@ -256,8 +276,9 @@ export class Room {
     this.turns = [];
     this.start = null;
     // Players who left the game (or never came back) leave the room; the rest are back in the lobby, not ready.
-    this.players = this.players.filter((p) => p.ws && !p.left);
-    this.players.forEach((p) => { p.ready = false; p.slot = -1; });
+    this.players = this.players.filter((p) => p.bot || (p.ws && !p.left));
+    if (!this.humans().length) this.players = [];
+    this.players.forEach((p) => { p.ready = p.bot; p.slot = -1; p.over = false; p.left = false; });
     this.key = this.players.length ? this.key : '';
     this.broadcastRoom();
   }
@@ -267,10 +288,10 @@ export class Room {
     me.ws = null;
     if (this.phase === 'playing') {
       if (!me.left) { me.left = true; this.events.push([me.slot, { t: 'leave' }]); }
-      if (this.players.every((p) => p.left || p.over)) this.endGame();
+      if (this.humans().every((p) => p.left || p.over)) this.endGame();
     } else {
       this.players = this.players.filter((p) => p !== me);
-      if (!this.players.length) this.key = '';
+      if (!this.humans().length) { this.players = []; this.key = ''; }
       this.checkStart();
       this.broadcastRoom();
     }
@@ -282,12 +303,12 @@ export class Room {
     me.ws = null;
     if (this.phase === 'playing') {
       me.goneAt = Date.now();
-      if (this.players.every((p) => !p.ws)) this.endGame();
+      if (this.humans().every((p) => !p.ws)) this.endGame();
       return;
     }
     // In the lobby a dropped player is gone (a reload comes back with the same token and rejoins).
     this.players = this.players.filter((p) => p !== me);
-    if (!this.players.length) this.key = '';
+    if (!this.humans().length) { this.players = []; this.key = ''; }
     this.checkStart();
     this.broadcastRoom();
   }
