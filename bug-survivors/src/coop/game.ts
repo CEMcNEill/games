@@ -1528,10 +1528,12 @@ export class CoopScene extends Phaser.Scene {
       if (d < q.r + 20) { fx += (dx / d) * 0.02; fy += (dy / d) * 0.02; }
     }
     // Keep some room from teammates: hogs piled on one spot share the same bugs and gems (and look like one hog).
+    // A following bot (ZZZ4) only keeps a little elbow room: it sticks with the squad.
+    const follow = this.cur.bot && !!this.cur.info.follow, room = follow ? 24 : 80;
     for (const h of this.hogs) {
       if (h === this.cur || h.down || h.gone) continue;
       const dx = p.x - h.player.x, dy = p.y - h.player.y, d2 = dx * dx + dy * dy;
-      if (d2 < 80 * 80 && d2 > 0.01) { const d = Math.sqrt(d2); fx += (dx / d) * 0.004 * (80 - d) / 80; fy += (dy / d) * 0.004 * (80 - d) / 80; }
+      if (d2 < room * room && d2 > 0.01) { const d = Math.sqrt(d2); fx += (dx / d) * 0.004 * (room - d) / room; fy += (dy / d) * 0.004 * (room - d) / room; }
       else if (d2 <= 0.01) { fx += Math.cos(this.cur.id * 2.1) * 0.004; fy += Math.sin(this.cur.id * 2.1) * 0.004; }
     }
     const lane = this.xs.drive;
@@ -1552,6 +1554,20 @@ export class CoopScene extends Phaser.Scene {
       if (md < 6) return [0, 0];
       const mx = (mate.player.x - p.x) / md, my = (mate.player.y - p.y) / md, dl0 = danger || 1, f = Math.min(0.6, danger * 40);
       return [mx * (1 - f) + (fx / dl0) * f, my * (1 - f) + (fy / dl0) * f];
+    }
+    // ZZZ4: a following bot stays within ~45 px of its player (the nearest one up), only dodging what's on top of it.
+    if (follow && !driving) {
+      let lead: Hog | null = null, ld = Infinity;
+      for (const h of this.hogs) {
+        if (h.bot || h.down || h.gone) continue;
+        const d = Phaser.Math.Distance.Between(p.x, p.y, h.player.x, h.player.y);
+        if (d < ld) { ld = d; lead = h; }
+      }
+      if (lead && ld > 45) {
+        const lx = (lead.player.x - p.x) / ld, ly = (lead.player.y - p.y) / ld, dl0 = danger || 1;
+        const f = ld > 90 ? 0.15 : Math.min(0.5, danger * 40); // far behind: just catch up
+        return [lx * (1 - f) + (fx / dl0) * f, ly * (1 - f) + (fy / dl0) * f];
+      }
     }
     // Targets: chests and hotfixes first, food when hurt, then the nearest gem.
     let gx = 0, gy = 0, best = 1e9;

@@ -5,7 +5,7 @@ import { hash32 } from '@shared/meta';
 import { K } from '@shared/kit';
 
 /** Bump when anything in the co-op sim changes: players on different versions can't share a room (they'd desync). */
-export const SIM_VERSION = 'coop-4';
+export const SIM_VERSION = 'coop-5';
 const PROTO = 1;
 
 export interface HogInfo {
@@ -14,7 +14,8 @@ export interface HogInfo {
   shop: Record<string, number>;     // shop levels (they change the hog's numbers)
   pals: string[];                   // a few unlocked hoggies (Hedgehog Mode pals, ALL HANDS)
   heat: number;                     // the room's first player sets the heat
-  bot?: boolean;                    // a bot seat (rooms ZZZ1-ZZZ3), added by the server
+  bot?: boolean;                    // a bot seat (rooms ZZZ1-ZZZ4), added by the server
+  follow?: boolean;                 // a bot that sticks close to its player (room ZZZ4)
 }
 export interface RoomPlayer { name: string; info: HogInfo | null; ready: boolean; on: boolean; bot?: boolean }
 export interface RoomState { code: string; phase: 'lobby' | 'countdown' | 'playing'; you: number; token: string; cd: number; players: RoomPlayer[] }
@@ -42,8 +43,8 @@ export function serverUrl() {
 
 /** Letters for room codes: no I or O (they read as 1 and 0). */
 export const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-/** A code the server takes: 4 letters, or ZZZ1-ZZZ3 (a playtest room with 1-3 bots). */
-export const validCode = (c: string) => /^[A-HJ-NP-Z]{4}$/.test(c) || /^ZZZ[1-3]$/.test(c);
+/** A code the server takes: 4 letters, or ZZZ1-ZZZ4 (a playtest room with 1-3 bots; ZZZ4 = 3 that stick close). */
+export const validCode = (c: string) => /^[A-HJ-NP-Z]{4}$/.test(c) || /^ZZZ[1-4]$/.test(c);
 export const randomCode = () => Array.from({ length: 4 }, () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)]).join('');
 
 function deviceToken() {

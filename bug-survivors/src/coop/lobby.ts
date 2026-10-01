@@ -11,8 +11,8 @@ import { hogFrame, hogName } from '../hoggies';
 import { save, currentHog } from '../save';
 import { net, CODE_LETTERS, randomCode, validCode, HogInfo } from './net';
 
-/** Keypad: the code letters, plus 1-3 for the bot rooms (ZZZ1-ZZZ3). */
-const KEYS = `${CODE_LETTERS}123`;
+/** Keypad: the code letters, plus 1-4 for the bot rooms (ZZZ1-ZZZ4). */
+const KEYS = `${CODE_LETTERS}1234`;
 import type { CoopResult } from './game';
 
 const P_COLS = [0x3cbcfc, 0xf8b800, 0xf878f8, 0x58d854];
@@ -64,7 +64,7 @@ export class LobbyScene extends Phaser.Scene {
       if (e.code === 'Escape') { this.scene.start('Title'); return; }
       if (e.code === 'Backspace') { this.type(''); return; }
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { this.join(); return; }
-      const ch = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^(Digit|Numpad)[1-3]$/.test(e.code) ? e.code.slice(-1) : '';
+      const ch = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^(Digit|Numpad)[1-4]$/.test(e.code) ? e.code.slice(-1) : '';
       if (ch && KEYS.includes(ch)) this.type(ch);
     };
     window.addEventListener('keydown', onKey);
@@ -186,8 +186,8 @@ export class LobbyScene extends Phaser.Scene {
     this.btn(row(3), 'JOIN', () => this.join(), { color: ok ? ui.accentInt : ui.dimInt, on: ok });
     y += bh + 8;
     const msg = net.status === 'error' ? net.error : net.status === 'connecting' ? 'Connecting...'
-      : this.bad ? 'Codes are 4 letters. Numbers only for bot rooms: ZZZ1, ZZZ2, ZZZ3'
-        : `${TOUCH ? 'Tap the letters, then JOIN' : 'Type the code, ENTER to join, ESC back'}. Playtest alone: ZZZ1-ZZZ3 adds 1-3 bots`;
+      : this.bad ? 'Codes are 4 letters. Numbers only for bot rooms: ZZZ1 to ZZZ4'
+        : `${TOUCH ? 'Tap the letters, then JOIN' : 'Type the code, ENTER to join, ESC back'}. Playtest alone: ZZZ1-ZZZ3 adds 1-3 bots, ZZZ4 a squad of 3`;
     this.status = this.T(W / 2, Math.min(y, H - 22), msg, { align: 'center', color: net.status === 'error' || this.bad ? 0xf87858 : ui.dimInt, maxWidth: W - 12, maxLines: 2 });
   }
 
@@ -208,7 +208,7 @@ export class LobbyScene extends Phaser.Scene {
         const hog = p.info?.hog || 'robot';
         this.keep(this.add.image(rx + 16, y + rh / 2, HOG32, hogFrame(hog)).setDisplaySize(24, 24).setDepth(11).setAlpha(p.on ? 1 : 0.4));
         this.T(rx + 32, y + 5, `P${i + 1} ${p.name.toUpperCase()}${i === r.you ? ' (YOU)' : ''}`, { color: P_COLS[i], maxWidth: rw - 110, maxLines: 1 });
-        this.T(rx + 32, y + 15, p.bot ? 'Plays itself' : hogName(hog), { color: ui.dimInt, maxWidth: rw - 110, maxLines: 1 });
+        this.T(rx + 32, y + 15, p.bot ? (p.info?.follow ? 'Sticks with you' : 'Plays itself') : hogName(hog), { color: ui.dimInt, maxWidth: rw - 110, maxLines: 1 });
         this.T(rx + rw - 8, y + 9, p.bot ? 'BOT' : !p.on ? 'OFFLINE' : p.ready ? 'READY' : 'NOT READY', { align: 'right', color: p.bot ? 0x3cbcfc : !p.on ? 0xf87858 : p.ready ? 0x58d854 : ui.dimInt });
       } else {
         this.T(W / 2, y + 9, 'waiting for a hog...', { align: 'center', color: ui.panelInt });
