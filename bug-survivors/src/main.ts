@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { startKit, K, spr, anim, heatRow } from '@shared/kit';
 import { meta } from '@shared/meta';
+import { lb } from '@shared/leaderboard';
 import { text, W, DW, vy, TOUCH } from '@shared/ui';
 import schema from '../theme.schema.json';
 import defaultTheme from '../themes/default.json';
@@ -11,16 +12,17 @@ import { ShopScene } from './shop';
 import { HEAT, YOLO } from './content';
 import { ACHIEVEMENTS } from './crests';
 import { HOGS, hogFrame, hogName } from './hoggies';
-import { dailyBest, currentHog, save, syncCrestHogs } from './save';
+import { currentHog, save, syncCrestHogs } from './save';
 import { CoopScene } from './coop/game';
 import { LobbyScene, CoopEndScene } from './coop/lobby';
 
-/** Runs once per how-to screen: the MERCH title choice skips straight to the shop, CO-OP to its lobby. Module scope so
- * off() matches. */
+/** Runs once per how-to screen: the MERCH title choice skips straight to the shop, CO-OP to its lobby, SCORES to the
+ * leaderboards. Module scope so off() matches. */
 function toShop(this: void) {
-  if (K.run.mode !== 'shop' && K.run.mode !== 'coop') return;
+  const to = ({ shop: 'Shop', coop: 'Lobby', scores: 'Scores' } as Record<string, string>)[K.run.mode];
+  if (!to) return;
   const howto = (window as any).__phaser?.scene?.getScene('HowTo') as Phaser.Scene | undefined;
-  howto?.scene.start(K.run.mode === 'coop' ? 'Lobby' : 'Shop');
+  howto?.scene.start(to, to === 'Scores' ? { from: 'title' } : undefined);
 }
 
 startKit({
@@ -51,7 +53,6 @@ startKit({
     ];
     if (K.run.heat > 0) lines.push(`HEAT ${K.run.heat}: ${HEAT.slice(1, K.run.heat + 1).map((h) => h.desc).join(', ')}.`);
     else if (K.run.mode === 'yolo') lines.push('YOLO: --dangerously-skip-permissions. x3 everything, no pauses, Max picks your cards.');
-    else if (K.run.mode === 'daily') lines.push("DAILY: everyone gets today's weapon, bug waves and events, and the same hoggie.");
     return lines;
   },
   titleArt: (scene: Phaser.Scene) => {
@@ -68,14 +69,12 @@ startKit({
       scene.add.sprite(W / 2 + (70 + i * 26) * k + 8 * (1 - k), y(170 + (i % 2) * 10), spr(`enemy_${i + 1}`)).setScale(2).setFlipX(true)
         .play(anim(`enemy_${i + 1}`));
     });
-    // Returning players: gold, best wave, hoggie count and today's daily best.
+    // Returning players: gold, best wave and hoggie count.
     const sv = save();
     const parts: string[] = [];
     if (meta.data.coins > 0) parts.push(`GOLD ${meta.data.coins}`);
     if (sv.bestWave >= 2) parts.push(`BEST WAVE ${sv.bestWave}`);
     if (meta.data.runs > 0) parts.push(`HOGGIES ${sv.hogs.length}/${HOGS.length}`);
-    const db = dailyBest();
-    if (db > 0) parts.push(`DAILY BEST ${db}`);
     if (parts.length) text(scene, W / 2, W < DW ? 26 : 16, parts.join('   '), { align: 'center', color: 0xf8d878, depth: 10, maxWidth: W - 8, maxLines: 2 });
     if (meta.data.runs > 0) text(scene, W / 2 - 150 * k, y(202), hogName(hog).toUpperCase(), { align: 'center', color: K.ui.dimInt, depth: 10, maxWidth: Math.min(110, (W / 2 - 150 * k) * 2 - 4), maxLines: 1 });
     // MERCH is a title choice (mode 'shop'): when the run starts in shop mode, jump from the how-to straight to the shop.
@@ -88,15 +87,26 @@ startKit({
     return [
       { key: 'mode', choices: [
         { label: 'RUN', value: 'standard' },
-        { label: 'DAILY', value: 'daily' },
         { label: 'YOLO', value: 'yolo', locked: !yolo },
         { label: 'MERCH', value: 'shop' },
         { label: 'CO-OP', value: 'coop' },
+        ...(lb.enabled() ? [{ label: 'SCORES', value: 'scores' }] : []),
       ] },
       heatRow(5),
     ];
   },
   endSummary: () => lastRun.lines.slice(0, 2),
+  // Online top 20s (shared/src/leaderboard.ts): one board for normal runs (any heat; heat already scales the score), one
+  // for YOLO. Co-op has none yet.
+  leaderboard: {
+    modes: [{ id: 'run', label: 'RUN' }, { id: 'yolo', label: 'YOLO' }],
+    mode: () => (K.run.mode === 'yolo' ? 'yolo' : 'run'),
+    stats: (d) => {
+      const p = (d.props ?? {}) as Record<string, unknown>, num = (v: unknown) => (typeof v === 'number' ? v : 0);
+      return { wave: num(p.wave), level: num(p.level), kills: num(p.kills), heat: K.run.heat, hog: hogName(String(p.hog ?? '')).slice(0, 24) };
+    },
+    columns: [['wave', 'WAVE'], ['time', 'TIME'], ['level', 'LV'], ['hog', 'HOGGIE']],
+  },
   achievements: ACHIEVEMENTS,
   postSanitize: (t, issues) => {
     // The starting weapon must be one of the featured products.

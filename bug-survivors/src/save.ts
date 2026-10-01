@@ -17,7 +17,8 @@ export interface KitSave {
   elites: number;
   revives: number;
   aiKills: number;
-  dailies: number;
+  dailies: number;        // (the daily mode is gone; kept for old saves)
+  coops: number;          // co-op games finished
   bestWave: number;       // highest wave reached (any mode but daily)
   cleared1: string[];     // hoggies that have cleared wave 1 (client-libraries crest)
   relics: string[];       // merch collected
@@ -30,7 +31,7 @@ export interface KitSave {
 }
 
 const defaults = (): KitSave => ({ shop: {}, hero: 'max', hog: DEFAULT_HOG, hogs: [], capsules: 0, kills: 0, gold: 0, chests: 0, elites: 0,
-  revives: 0, aiKills: 0, dailies: 0, bestWave: 0, cleared1: [], relics: [], merch: {}, pages: [], codex: [], daily: { date: '', best: 0 }, numbers: true,
+  revives: 0, aiKills: 0, dailies: 0, coops: 0, bestWave: 0, cleared1: [], relics: [], merch: {}, pages: [], codex: [], daily: { date: '', best: 0 }, numbers: true,
   migrated: 0 });
 
 const n = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -45,7 +46,7 @@ export function save(): KitSave {
   if (!k || typeof k !== 'object') return defaults();
   if (!k.shop || typeof k.shop !== 'object' || Array.isArray(k.shop)) k.shop = {};
   refundShop(k);
-  for (const f of ['kills', 'gold', 'chests', 'elites', 'revives', 'aiKills', 'dailies', 'bestWave', 'capsules', 'migrated']) k[f] = Math.max(0, n(k[f]));
+  for (const f of ['kills', 'gold', 'chests', 'elites', 'revives', 'aiKills', 'dailies', 'coops', 'bestWave', 'capsules', 'migrated']) k[f] = Math.max(0, n(k[f]));
   k.codex = strs(k.codex, 60);
   k.hogs = strs(k.hogs, 400).filter((h: string) => HOG_INDEX.has(h));
   k.cleared1 = strs(k.cleared1, 400);

@@ -205,6 +205,7 @@ export interface Hog {
   gone: boolean;                 // left the game
   reviveT: number;
   toss: { vx: number; vy: number; t: number } | null; // thrown by the axe sweep
+  mx: { gold: number; growth: number; luck: number }; // this hog's merch-only multipliers (merch is the owner's alone)
   axeDodge: boolean;             // (bots) this bot dodges the current axe sweep
   wfx: Map<string, Phaser.GameObjects.Graphics>;
 }
@@ -575,7 +576,7 @@ export class CoopScene extends Phaser.Scene {
       run: { elites: 0, chests: 0, evolutions: [], hotfixes: 0, crits: 0, hurtBy: {}, powerups: 0, gems: 0, hits: 0, hitsWave1: 0, aiKills: 0,
         unlocks: [], crests: [], kills: 0, downs: 0, revived: 0 },
       moat: { fill: 0, calm: 0, lv: 0 },
-      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, toss: null, axeDodge: true, wfx: new Map(),
+      move: 0, view: { ...VIEW0 }, pick: null, trayOpen: false, autoNext: false, shieldT: 0, down: false, gone: false, reviveT: 0, toss: null, mx: { gold: 1, growth: 1, luck: 1 }, axeDodge: true, wfx: new Map(),
     };
     this.as(h, () => {
       this.rerolls = 1 + merchExtra(this.merch(), 'rerolls');
@@ -652,7 +653,13 @@ export class CoopScene extends Phaser.Scene {
       default: break;
     }
     this.relics.forEach((r) => RELICS[r].apply(s));
-    applyMerch(this.merch(), s, { hpFrac, moving: this.moving, elapsed: this.elapsed, wave: this.wave, level: this.level, weapons: this.weapons.size, boss: !!this.boss });
+    const mctx = { hpFrac, moving: this.moving, elapsed: this.elapsed, wave: this.wave, level: this.level, weapons: this.weapons.size, boss: !!this.boss };
+    applyMerch(this.merch(), s, mctx);
+    // Merch belongs to its owner: what it adds to shared things (team XP, team gold, drops anyone can grab) is taken back
+    // out there, using these merch-only factors; the owner banks their own gold bonus at the end.
+    const mb = baseStats();
+    applyMerch(this.merch(), mb, mctx);
+    this.cur.mx = { gold: mb.gold, growth: mb.growth, luck: mb.luck };
     const has = (r: ReleaseId) => this.releases.has(r);
     if (has('dsp')) { s.might *= 1.5; s.maxHp *= 0.7; }
     if (has('sourcemaps')) { s.critMul = 3; s.crit += 0.1; }
@@ -771,9 +778,12 @@ export class CoopScene extends Phaser.Scene {
     if (this.menuOpen && e.code === 'KeyQ') this.quitRun();
   }
 
+  /** The team's gold this device banks, plus this player's own merch gold bonus (merch is the owner's alone). */
+  private myGold(team: number) { return Math.round(team * Math.max(1, this.me.mx.gold)); }
+
   /** Leaving mid-game: the others play on without you; you keep the team's safe gold. */
   private quitRun() {
-    const keep = this.keptGold(false);
+    const keep = this.myGold(this.keptGold(false));
     try { meta.bank(keep); const sv = save(); sv.gold += keep; persist(); } catch { /* ignore */ }
     this.over = true;
     net.leave();
@@ -2436,7 +2446,7 @@ export class CoopScene extends Phaser.Scene {
       this.dropItem('chest', e.s.x, e.s.y);
       for (let k = 0; k < 4; k++) this.dropItem('coin', e.s.x + this.rint(-12, 12), e.s.y + this.rint(-12, 12));
       this.maybePowerup(e.s.x + 14, e.s.y, this.wave >= 2 ? 0.5 : 0.15);
-      if (this.wave >= 3 && this.RD.next() < 0.03 * this.st.luck) this.dropRelic(e.s.x - 12, e.s.y);
+      if (this.wave >= 3 && this.RD.next() < 0.03 * this.worldLuck()) this.dropRelic(e.s.x - 12, e.s.y);
       if (this.hasMod(e, 'dlq')) for (let k = 0; k < 5; k++) this.addEnemy('swarmer', e.s.x + this.rint(-16, 16), e.s.y + this.rint(-16, 16));
     } else if (crit && big) {
       hitstop(this, 35);
@@ -2497,7 +2507,7 @@ export class CoopScene extends Phaser.Scene {
   private crateLoot(x: number, y: number) {
     burst(this, x, y, 0xac7c00, 12, { colours: [0x503000, 0xf8d878] });
     this.sfx('hit', 0.6);
-    const r = this.RD.next() / this.st.luck;
+    const r = this.RD.next() / this.worldLuck();
     const heal = this.heat >= 4 ? 0.5 : 1;
     if (this.wave >= 6 && this.RD.next() < 0.03) { this.dropPage(x, y); return; }
     if (r < 0.4 * heal) this.dropItem('food', x, y);
@@ -2561,8 +2571,11 @@ export class CoopScene extends Phaser.Scene {
     }
   }
 
+  /** Luck for things the whole team gets (drops, team gold): the current hog's, without its merch. */
+  private worldLuck() { return this.st.luck / this.cur.mx.luck; }
+
   private dropLoot(e: Enemy) {
-    const R = this.RD, L = this.st.luck;
+    const R = this.RD, L = this.worldLuck();
     this.dropGem(e.s.x, e.s.y, e.xp * this.xpScale());
     const healMul = this.heat >= 4 ? 0.5 : 1;
     const small = e.arch === 'swarmer' || e.arch === 'mini' || e.arch === 'runner';
@@ -2601,7 +2614,7 @@ export class CoopScene extends Phaser.Scene {
   }
 
   private maybePowerup(x: number, y: number, chance: number) {
-    if (this.powerCount() < 2 && this.RD.next() < chance * this.st.luck) this.dropItem(this.rollPowerup(), x, y);
+    if (this.powerCount() < 2 && this.RD.next() < chance * this.worldLuck()) this.dropItem(this.rollPowerup(), x, y);
   }
 
   activatePowerup(kind: PowerId) {
@@ -2817,7 +2830,7 @@ export class CoopScene extends Phaser.Scene {
     const p = this.player;
     switch (it.kind) {
       case 'coin': {
-        const v = Math.max(1, Math.round((1 + this.heat * 0.1) * this.st.gold * (it.big ? 10 : 1)));
+        const v = Math.max(1, Math.round((1 + this.heat * 0.1) * (this.st.gold / this.cur.mx.gold) * (it.big ? 10 : 1))); // team gold: no merch
         this.goldGrabbed += v;
         if (this.trait === 'burning' || this.releases.has('burning')) {
           // Burning Money: the coin becomes a fireball.
@@ -2897,7 +2910,7 @@ export class CoopScene extends Phaser.Scene {
     this.sfx(this.pendingLevels ? 'gem3' : this.xp > this.xpNext * 0.6 ? 'gem2' : 'pickup', 0.4, 45);
     // More hogs kill more bugs (spawns x crowdMul) and every level is a card for each of them: XP is divided by the
     // same factor so each player levels at about a solo player's pace.
-    this.xp += (v * this.st.growth) / this.xpShare();
+    this.xp += (v * (this.st.growth / this.cur.mx.growth)) / this.xpShare(); // shared XP: no merch
     while (this.xp >= this.xpNext) {
       this.xp -= this.xpNext;
       this.level++;
@@ -3608,7 +3621,7 @@ export class CoopScene extends Phaser.Scene {
       }
       if (!lines.length) { this.hp = this.st.maxHp; lines.push(['Full heal', 'Back to full HP', 0x58d854]); }
     }
-    const g = Math.round((big ? 40 : 10 + R.int(0, 12)) * this.st.luck * (1 + this.heat * 0.1) * (1 + 0.3 * (this.wave - 1)));
+    const g = Math.round((big ? 40 : 10 + R.int(0, 12)) * this.worldLuck() * (1 + this.heat * 0.1) * (1 + 0.3 * (this.wave - 1)));
     if (this.trait !== 'burning' && !this.releases.has('burning')) {
       this.gold += g;
       lines.push([`+${g} gold`, '', 0xf8d878]);
@@ -4685,7 +4698,7 @@ export class CoopScene extends Phaser.Scene {
     this.won = won;
     const score = this.score();
     const me = this.me;
-    const kept = me.gone && !this.cashedOut ? this.keptGold(false) : this.keptGold(this.cashedOut);
+    const kept = this.myGold(me.gone && !this.cashedOut ? this.keptGold(false) : this.keptGold(this.cashedOut));
     this.as(me, () => {
       const sv = save();
       sv.kills += me.run.kills;
@@ -4695,6 +4708,10 @@ export class CoopScene extends Phaser.Scene {
       try { meta.bank(kept); } catch { /* storage trouble: the gold is lost, the game goes on */ }
       persist();
       this.earn('onboarding');
+      sv.coops++;
+      persist();
+      this.earn('customer-success-eu');
+      if (sv.coops >= 7) this.earn('customer-success-na');
       if (sv.kills >= 100000) this.earn('clickhouse');
       if (sv.gold >= 1000) this.earn('billing');
       if (sv.elites >= 50) this.earn('customer-analytics');

@@ -6,8 +6,12 @@
 // Routes (behind play.funglass.es/mp/*):
 //   GET /mp/health           -> "ok"
 //   GET /mp/ws/<CODE>        -> WebSocket into room CODE (4 letters; ZZZ1-ZZZ3 = a room with 1-3 bots, ZZZ4 = 3 bots that stick close)
+//   /mp/lb/<board>[/<id>]    -> leaderboards (see board.ts)
 
-export interface Env { ROOMS: DurableObjectNamespace }
+import { Board, BOARD_RE } from './board';
+export { Board };
+
+export interface Env { ROOMS: DurableObjectNamespace; BOARDS: DurableObjectNamespace; LB_ADMIN?: string }
 
 const PROTO = 1;
 const MAX_PLAYERS = 4;
@@ -26,6 +30,14 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/mp/, '');
     if (path === '/health' || path === '/health/') return new Response('ok', { headers: cors() });
+    const lb = path.match(/^\/lb\/([^/]+)(\/\d+)?\/?$/);
+    if (lb) {
+      if (req.method === 'OPTIONS') return new Response(null, { headers: { ...cors(), 'Access-Control-Allow-Methods': 'GET, POST, DELETE',
+        'Access-Control-Allow-Headers': 'Content-Type, x-admin-key', 'Access-Control-Max-Age': '86400' } });
+      const board = decodeURIComponent(lb[1]).toLowerCase();
+      if (!BOARD_RE.test(board)) return new Response('bad board', { status: 400, headers: cors() });
+      return env.BOARDS.get(env.BOARDS.idFromName(board)).fetch(req);
+    }
     const m = path.match(/^\/ws\/([A-Za-z0-9]{4})\/?$/);
     if (m) {
       if (req.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('expected a websocket', { status: 426 });
