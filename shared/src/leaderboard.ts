@@ -2,9 +2,10 @@
 // play.funglass.es/mp/lb (mp-server/src/board.ts). A board is "<game slug>:<mode>", so a game built from a template
 // gets its own boards (nerdy-bug-survivors:run...) with nothing to set up.
 //
-// Kits opt in with KitDef.leaderboard. It's on at play.funglass.es and in the Android app; anywhere else (local dev,
-// tests) it's off unless the page has ?lb=<endpoint> (e.g. ?lb=http://127.0.0.1:8787/mp/lb for `wrangler dev`), so test
-// runs never post to the real boards.
+// Kits opt in with KitDef.leaderboard. It's on wherever the game is hosted (the server allows any origin) and in the
+// Android app, but off on localhost / file pages (local dev, tests, game checks) unless the page has ?lb=<endpoint>
+// (e.g. ?lb=http://127.0.0.1:8787/mp/lb for `wrangler dev`), so test runs never post to the real boards. ?lb=off turns
+// it off anywhere.
 import { K } from './kit';
 import { meta } from './meta';
 
@@ -14,7 +15,7 @@ export interface LbSubmit { rank: number | null; id: number; top: LbEntry[] }
 
 export const LB_SIZE = 20;
 const PROD = 'https://play.funglass.es/mp/lb';
-const HOSTS = ['play.funglass.es', 'appassets.androidplatform.net'];
+const LOCAL = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|0\.0\.0\.0|)$/;
 
 function override(): string | null {
   try { return new URLSearchParams(location.search).get('lb'); } catch { return null; }
@@ -26,7 +27,7 @@ export const lb = {
     if (!K.kit?.leaderboard) return false;
     const o = override();
     if (o !== null) return o !== '' && o !== 'off';
-    try { return HOSTS.includes(location.hostname); } catch { return false; }
+    try { return location.protocol.startsWith('http') && !LOCAL.test(location.hostname); } catch { return false; }
   },
   endpoint(): string { return (override() || PROD).replace(/\/$/, ''); },
   modes(): LbMode[] { return K.kit?.leaderboard?.modes ?? [{ id: 'run', label: 'TOP 20' }]; },

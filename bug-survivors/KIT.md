@@ -181,7 +181,7 @@ phone sideways", and Android goes fullscreen on the first tap. The mouse drives 
   second click (double-click) buys / plays as, the wheel scrolls. The old upgrade levels were refunded as gold.
 - **Leaderboards** (`shared/src/leaderboard.ts`, `scores.ts`; server `mp-server/src/board.ts`): top 20 per game slug and
   mode (RUN, YOLO), 3-letter initials. A run that makes the board gets NEW HIGH SCORE on the End screen (or type a letter).
-  On at play.funglass.es and in the Android app; elsewhere only with `?lb=<endpoint>`. Co-op has no board yet.
+  On wherever the game is hosted and in the Android app; off on localhost unless `?lb=<endpoint>`. Co-op has no board yet.
 - The daily mode is gone (its code is dormant); its two crests now come from finishing co-op games (1 and 7).
 - Save: shared meta blob per slug + kit (`meta.data.kit`: merch (copies owned), hog, hogs, capsules, lifetime totals, best wave,
   collections, codex, daily best, damage-number setting). Blocked storage = first run, never a crash.

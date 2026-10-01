@@ -30,4 +30,11 @@ the writing and drawing. No local models, no servers.
    real logo and run `pixel.py logo` to get 4 pixel options (`logo-options.png`). Show the person 2-4 good ones and copy
    the chosen `logo-X.sprite` to `<sprite dir>/logo.sprite`.
 6. **Build**: `bin/build-game <kit> <theme> --brief <brief> --art <sprite dir>`; read the check's
-   `contact.png` (it includes the splash screen); play it locally; host the `out/` folder.
+   `contact.png` (it includes the splash screen); play it locally.
+7. **Host**: the `out/<company>-<kit>/` folder is a static site. On play.funglass.es each game is a folder at the site
+   root (e.g. `/nerdy/`), deployed with the rest of the site as one archive (Hostinger static deploy). Public: add it
+   and link it from the site's index if wanted. Private: don't link it; put an `.htaccess` (HTTP Basic Auth pointing at
+   the folder's `.htpasswd`, plus `Header always set Cache-Control "private, no-store"` and
+   `Header always set CDN-Cache-Control "no-store"`, or Cloudflare caches the files for everyone) and an `.htpasswd`
+   in the folder, and give the person the URL, user and passphrase. Bug Survivors' co-op and leaderboards need nothing
+   extra: they use play.funglass.es/mp (`mp-server/`) from any host, and each game gets its own boards.

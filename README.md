@@ -9,7 +9,7 @@ then turned into a custom game for any company in minutes by Claude. No code cha
 | | |
 |---|---|
 | ![Bug Survivors](docs/screenshots/bug-survivors-play.png) | ![HogShop](docs/screenshots/hogshop-play.png) |
-| **Bug Survivors**: survive swarms of bugs named after the company's pains; every weapon is a PostHog product. Every boss is a release: cash out, or climb the wave ladder for 15 PostHog tools, 171 hoggies to unlock and 55 crests. | **HogShop**: run the back room of a shop; pack orders off conveyor belts and ship them to the right door before customers lose patience. |
+| **Bug Survivors**: survive swarms of bugs named after the company's pains; every weapon is a PostHog product. Every boss is a release: cash out, or climb the wave ladder for 15 PostHog tools, 171 hoggies to unlock and 55 crests. Spend gold on real PostHog merch, play online co-op, and chase the top 20. Also an Android app. | **HogShop**: run the back room of a shop; pack orders off conveyor belts and ship them to the right door before customers lose patience. |
 | ![Data Inspector](docs/screenshots/data-inspector-play.png) | ![Hogtopia](docs/screenshots/hogtopia-play.png) |
 | **Data Inspector**: approve or flag the company's events against a growing rulebook (Papers, Please style). | **Hogtopia**: a small 4X strategy game; grow cities and out-research a rival named after the company's biggest problem. |
 | ![Hog Saga](docs/screenshots/hog-saga-play.png) | ![Hog Quest](docs/screenshots/hog-quest-play.png) |
@@ -63,18 +63,21 @@ Who will play it: <role, how technical>
 Tone and things to avoid: <e.g. friendly, nothing violent, no jokes about privacy>
 Template: <one from the table, or "pick the best one">
 Splash: <"their logo" (Claude finds it on their site), a logo URL, or "PostHog">
+Hosting: <"public on play.funglass.es", "private on play.funglass.es with a passphrase", or "I'll host it">
 
 Write the brief to prospects/<name>.yaml, write the theme and check it until OK, draw the
 company-specific sprites following shared/prompts/sprite-style.md (look at every review image),
 make the splash logo options following shared/prompts/logo.md and let me pick one,
 build with pipeline/bin/build-game, read the check screenshots, fix anything that looks off,
-then tell me how to play it.
+host it as asked (pipeline/README.md step 7), then tell me how to play it.
 ```
 
 Claude writes a short brief, writes the theme (all the game's words, colours and difficulty),
 draws 5-15 custom sprites on top of public-domain pixel art, turns the company's logo into 2-4 pixel
 options for the opening splash screen (you pick one, or keep the 8-bit PostHog logo), builds the game
 and runs a headless playthrough to check it. The result is a folder in `out/<company>-<template>/`.
+Bug Survivors games also come with online co-op (2-4 players, a room code, no accounts) and their own top-20
+leaderboards; both run on the relay at play.funglass.es/mp, wherever the game itself is hosted.
 
 ### 3. Play it, then share it
 ```sh
@@ -114,6 +117,8 @@ notes: Champion is a rocket nerd and loves retro games. Small team, very technic
 - The theme checker rejects competitor names, profanity and emoji, and pins the company's name,
   domain and colours to the brief.
 - Keep real people out unless they've said yes; the games use invented characters by default.
+- Bug Survivors' leaderboards are per game (keyed by the theme's slug) and per mode, so every prospect game starts
+  with empty boards of its own. They're off on localhost, so local checks never post scores.
 - Optional analytics: set `"posthog": {"key": "phc_...", "host": "https://us.i.posthog.com"}` in the
   built game's `theme/manifest.json` to capture game_opened / game_started / game_finished.
 
@@ -123,6 +128,8 @@ notes: Champion is a rocket nerd and loves retro games. Small team, very technic
 shared/            engine every template uses, sprite workbench (pixel.py), drawing style guide
 pipeline/          build-game, theme checker, sprite tools, example briefs, asset catalog
 tests/accept.py    acceptance test every template must pass
+mp-server/         Cloudflare Worker at play.funglass.es/mp: Bug Survivors co-op relay + leaderboards
+bug-survivors-android/  the Android app (a WebView around the Bug Survivors build)
 docs/              DEVELOPING.md (changing or adding a template), screenshots
 ```
 Each template's `KIT.md` explains its theme fields and how a run plays. To change or add a

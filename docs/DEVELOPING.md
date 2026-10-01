@@ -29,14 +29,17 @@ shared/            engine every kit uses (never edited per prospect)
   src/palette.ts   36-colour master palette, brand snapping, deriveUi() screen colours
   src/zzfx.ts      in-browser sound effects (ZzFX parameters)
   src/ui.ts        PixelText (wrap/cut + warnings), box, bar, fitScale
-  src/scenes.ts    Boot (sprite slots with fallback), Title, HowTo, End
+  src/scenes.ts    Boot (sprite slots with fallback), Splash, Title, HowTo, End
+  src/leaderboard.ts, scores.ts  online top 20 (KitDef.leaderboard opts in): client + the Scores scene;
+                   server: mp-server/src/board.ts. Off on localhost unless ?lb=<endpoint>
   src/hooks.ts     window.__game: state, score, stats, fallbacks, themeIssues, textWarnings, debug, meta, run
   src/meta.ts      between-runs save per slug+kit (localStorage, never throws): meta.recordRun/bank/spend/unlock/
                    has/heatUnlocked/kitData, achieve(id) + toast, dailySeed(), rng(seed) (mulberry32)
   src/juice.ts     feel: shake, hitstop (+hitstopped/setJuiceSpeed), flash, punch, burst, floatText, toast
   KitDef extras    optional titleMenu (mode/HEAT rows -> K.run {mode, heat, seed, daily, number, choices}; Enter
                    still starts with the defaults; heatRow() helper), endSummary(data, result) lines, achievements
-                   table. EndScene records the run (finishRun), shows NEW BEST / BEST, R or Enter = one more run.
+                   table, leaderboard {modes, mode(), stats(d), columns}. EndScene records the run (finishRun), shows
+                   NEW BEST / BEST, R or Enter = one more run (buttons too), NEW HIGH SCORE when the run made the board.
                    Shared debug hooks: resetMeta, unlockAll, meta(patch), reducedMotion, kitDef, goto, juiceTest
   tools/meta_shots.py  screenshots of title/menu/juice/end with fake meta and blocked storage
   sprites.py       renders default art: <kit>/sprites/*.sprite (pixel.py, @1-@5 brand tokens) or art.py grids

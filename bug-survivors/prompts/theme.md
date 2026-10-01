@@ -5,7 +5,8 @@ Bug Survivors is a Vampire Survivors-style game. A PostHog hoggie stands in the 
 product. After 3:30 a boss arrives; beating it wins the game (about 4 minutes). Players can then cash
 out or climb the wave ladder, where the same boss returns as "<boss name> 2.0", "3.0" and so on, so
 pick a boss name that still reads well with a version number after it. Returning players get heat
-levels, a shop, hoggies to unlock, crests, YOLO mode and a daily run; none of that needs theme text.
+levels, a merch store, hoggies to unlock, crests, YOLO mode, online co-op and top-20 leaderboards; none of that needs
+theme text.
 
 What you write, and where the player sees it:
 - title (max 30): the game's name on the title screen. Work in the prospect's name or world if it
