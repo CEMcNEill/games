@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { startKit, K, spr, anim, heatRow } from '@shared/kit';
 import { meta } from '@shared/meta';
 import { lb } from '@shared/leaderboard';
-import { text, W, DW, vy, TOUCH } from '@shared/ui';
+import { text, W, DW, vy, TOUCH, NARROW } from '@shared/ui';
 import schema from '../theme.schema.json';
 import defaultTheme from '../themes/default.json';
 import slots from '../slots.json';
@@ -15,10 +15,16 @@ import { HOGS, hogFrame, hogName } from './hoggies';
 import { currentHog, save, syncCrestHogs } from './save';
 import { CoopScene } from './coop/game';
 import { LobbyScene, CoopEndScene } from './coop/lobby';
+import { openGuide } from './guide';
 
 /** Runs once per how-to screen: the MERCH title choice skips straight to the shop, CO-OP to its lobby, SCORES to the
- * leaderboards. Module scope so off() matches. */
+ * leaderboards, GUIDE back to the title with the player's guide open over it. Module scope so off() matches. */
 function toShop(this: void) {
+  if (K.run.mode === 'guide') {
+    (window as any).__phaser?.scene?.getScene('HowTo')?.scene.start('Title');
+    openGuide();
+    return;
+  }
   const to = ({ shop: 'Shop', coop: 'Lobby', scores: 'Scores' } as Record<string, string>)[K.run.mode];
   if (!to) return;
   const howto = (window as any).__phaser?.scene?.getScene('HowTo') as Phaser.Scene | undefined;
@@ -90,7 +96,8 @@ startKit({
         { label: 'YOLO', value: 'yolo', locked: !yolo },
         { label: 'MERCH', value: 'shop' },
         { label: 'CO-OP', value: 'coop' },
-        ...(lb.enabled() ? [{ label: 'SCORES', value: 'scores' }] : []),
+        ...(lb.enabled() ? [{ label: NARROW() ? 'TOP' : 'SCORES', value: 'scores' }] : []), // 6 buttons: a portrait phone fits 5 letters
+        { label: 'GUIDE', value: 'guide' },
       ] },
       heatRow(5),
     ];
