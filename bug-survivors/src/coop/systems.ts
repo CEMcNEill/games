@@ -246,7 +246,7 @@ export function spawnReaper(g: GameScene) {
   const e = g.addEnemy('tank', x, y);
   if (!e) return;
   e.s.stop().setTexture(HOG64, hogFrame('reaper')).setScale(0.75).setDepth(21); // above the fx layer its void is drawn on
-  const hp = Math.max(1e6, g.dps() * 240);
+  const hp = Math.max(1e6, g.teamDps() * 240); // sized for the whole team
   Object.assign(e, { reaper: true, hp, maxHp: hp, speed: 60, dmg: g.st.maxHp * 0.5, r: 16, armour: 1, kb: 0, tint: null, xp: 0 });
   e.s.setTintFill(VOID);
   g.banner('NOHOG.', 'The void has come for this release');
