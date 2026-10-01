@@ -8,7 +8,7 @@ the writing and drawing. No local models, no servers.
 | `bin/build-game` | kit + theme (+ brief, + your sprites) -> checked static site in `out/` |
 | `tools/check_theme.py` | validate a theme: kit schema, content filter (competitors, blocklist, emoji), brief-fixed fields |
 | `tools/theme_rules.py` | the rules behind check_theme (shared by any theme author) |
-| `tools/pixel.py` (-> `shared/pixel.py`) | sprite workbench: browse a pack, grab a base, render a review sheet, lint |
+| `tools/pixel.py` (-> `shared/pixel.py`) | sprite workbench: browse a pack, grab a base, render a review sheet, lint; `logo` turns the prospect's logo into 4 splash-screen options |
 | `tools/install_sprites.py` | put `<slot>.sprite` files into a built game (build-game calls it for `--art`) |
 | `tools/game_check.py` | headless check: title, how-to, real keys, bot run to the end screen, screenshots, GIF |
 | `assets/` | CC0 pack catalog + licences; `fetch-assets.sh` downloads the packs (~120 MB, not committed) |
@@ -25,5 +25,9 @@ the writing and drawing. No local models, no servers.
    `<slot>.sprite` following `shared/prompts/sprite-style.md`: pick a CC0 base (`assets/CATALOG.md`),
    `pixel.py grab`, edit the grid, `pixel.py render --theme <theme>`, look at the review image, fix
    (max 3 passes), `pixel.py lint`. Slots you skip use the kit default in the theme's colours.
-5. **Build**: `bin/build-game <kit> <theme> --brief <brief> --art <sprite dir>`; read the check's
-   `contact.png`; play it locally; host the `out/` folder.
+5. **Splash logo**: every game opens on a splash screen. By default it shows the 8-bit PostHog logo. To use the
+   prospect's own logo with "powered by PostHog" under it, follow `shared/prompts/logo.md`. In short: download their
+   real logo and run `pixel.py logo` to get 4 pixel options (`logo-options.png`). Show the person 2-4 good ones and copy
+   the chosen `logo-X.sprite` to `<sprite dir>/logo.sprite`.
+6. **Build**: `bin/build-game <kit> <theme> --brief <brief> --art <sprite dir>`; read the check's
+   `contact.png` (it includes the splash screen); play it locally; host the `out/` folder.

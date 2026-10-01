@@ -22,5 +22,9 @@
   { "id": "icon_web_analytics", "w": 16, "h": 16, "frames": 1 },
   { "id": "icon_data_warehouse", "w": 16, "h": 16, "frames": 1 },
   { "id": "props", "w": 16, "h": 16, "frames": 7, "fps": 1, "kind": "sheet" },
-  { "id": "miniboss", "w": 32, "h": 32, "frames": 2, "fps": 3 }
+  { "id": "miniboss", "w": 32, "h": 32, "frames": 2, "fps": 3 },
+  {"id": "posthog_logo", "w": 39, "h": 21, "frames": 1, "shared": true},
+  {"id": "posthog_mark", "w": 15, "h": 8, "frames": 1, "shared": true},
+  {"id": "posthog_wordmark", "w": 66, "h": 14, "frames": 1, "shared": true},
+  {"id": "logo", "w": 128, "h": 48, "frames": 1, "optional": true, "prompt": "the prospect's own logo for the splash screen: made with pixel.py logo from their real logo (see shared/prompts/logo.md); leave it out and the splash shows the PostHog logo"}
 ]
