@@ -1,5 +1,7 @@
 // Build every kit (or the ones named): compose theme.schema.json from the shared base + the kit's
 // game schema, render default sprites, stage the default theme, then vite build to <kit>/dist.
+// site.json (where the games and the relay live) is baked in as __SITE__ and stamped into dist/site.json, so
+// build-game can tell when a dist was built for another site.
 //   node build-kits.mjs [kit ...]
 import { build } from 'vite';
 import { execFileSync } from 'node:child_process';
@@ -11,6 +13,8 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SHARED = path.join(ROOT, 'shared');
 const read = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const write = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2) + '\n');
+
+const SITE = read(path.join(ROOT, 'site.json'));
 
 const all = fs.readdirSync(ROOT).filter((d) => fs.existsSync(path.join(ROOT, d, 'kit.json')));
 const kits = process.argv.slice(2).length ? process.argv.slice(2) : all;
@@ -54,8 +58,10 @@ for (const id of kits) {
     logLevel: 'warn',
     configFile: false,
     resolve: { alias: { '@shared': path.join(SHARED, 'src') } },
+    define: { __SITE__: JSON.stringify(SITE) },
     build: { outDir: path.join(dir, 'dist'), emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000,
       reportCompressedSize: false },
   });
+  write(path.join(dir, 'dist', 'site.json'), SITE);
   console.log(`[${id}] built in ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${path.relative(ROOT, path.join(dir, 'dist'))}`);
 }

@@ -5,6 +5,8 @@ the writing and drawing. No local models, no servers.
 
 | Path | What |
 |---|---|
+| `bin/make-prospect` | company + domain -> the whole loop below, headless (`claude -p` on `prompts/make-prospect.md`), then checks the build itself |
+| `prompts/make-prospect.md` | the unattended prompt: fill gaps from their website, make every call, write `prospects/<name>-result.json` |
 | `bin/build-game` | kit + theme (+ brief, + your sprites) -> checked static site in `out/` |
 | `tools/check_theme.py` | validate a theme: kit schema, content filter (competitors, blocklist, emoji), brief-fixed fields |
 | `tools/theme_rules.py` | the rules behind check_theme (shared by any theme author) |
@@ -15,6 +17,9 @@ the writing and drawing. No local models, no servers.
 | `prospect-examples/` | example briefs, paired with each kit's `themes/examples/` |
 
 ## The loop Claude runs for a prospect
+`bin/make-prospect` runs steps 1-6 with nobody to ask: it researches whatever the rep didn't give, picks the logo
+option itself and lists its guesses in the result file. Step 7 is still done by hand.
+
 1. **Brief**: copy a file from `prospect-examples/`; fill in name, domain, brand colours, 2-3 pains,
    PostHog products, buyer, notes (tone, things to avoid).
 2. **Pick a kit** from the table in the top-level README.
@@ -37,4 +42,4 @@ the writing and drawing. No local models, no servers.
    the folder's `.htpasswd`, plus `Header always set Cache-Control "private, no-store"` and
    `Header always set CDN-Cache-Control "no-store"`, or Cloudflare caches the files for everyone) and an `.htpasswd`
    in the folder, and give the person the URL, user and passphrase. Bug Survivors' co-op and leaderboards need nothing
-   extra: they use play.funglass.es/mp (`mp-server/`) from any host, and each game gets its own boards.
+   extra: they use the relay in `site.json` (`mp-server/`) from any host, and each game gets its own boards.
