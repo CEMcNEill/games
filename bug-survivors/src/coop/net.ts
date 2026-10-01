@@ -5,7 +5,7 @@ import { hash32 } from '@shared/meta';
 import { K } from '@shared/kit';
 
 /** Bump when anything in the co-op sim changes: players on different versions can't share a room (they'd desync). */
-export const SIM_VERSION = 'coop-5';
+export const SIM_VERSION = 'coop-6';
 const PROTO = 1;
 
 export interface HogInfo {
