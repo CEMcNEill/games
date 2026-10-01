@@ -9,6 +9,8 @@
   render <in.sprite> <out.png> [--preview p.png]  sprite sheet (frames side by side) + zoomed review image
   lint <in.sprite> [--bg #000000]                 quality checks: size, palette, stray pixels, outline, contrast
   palette <in.sprite>                             print the legend with usage counts
+  logo <logo.png|.svg> <out_dir> [--theme t.json] the prospect's real logo -> 4 pixel options for the splash screen
+                                                  (logo-a..d.sprite, 128x48) + logo-options.png to choose from
 
 .sprite format (plain text, edit it directly). A legend colour may be a brand token instead of hex:
 @1 primary, @2 secondary, @3 accent, @4 dark primary, @5 light primary; add d or l for a shadow or
@@ -30,6 +32,7 @@ highlight step (@2d). Kit default art uses tokens so every prospect's game gets 
 '.' is transparent. Each legend entry is one character, a hex colour and an optional note.
 """
 import argparse
+import json
 import os
 import re
 import string
@@ -178,6 +181,133 @@ def from_images(ims, meta):
         frames.append(rows)
     w, h = ims[0].size
     return {"w": w, "h": h, "legend": legend, "frames": frames, "meta": meta}
+
+
+# ---------- the splash-screen logo ----------
+LOGO_W, LOGO_H = 128, 48
+
+
+def rel_lum(h):
+    def ch(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = rgb(h)
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+
+def contrast(a, b):
+    la, lb = sorted((rel_lum(a), rel_lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def splash_bg(theme):
+    """The splash background for a theme: the game's own UI background (deriveUi in shared/src/palette.ts)."""
+    if not theme:
+        return "#000000"
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import sprites  # noqa: E402 (shared/sprites.py: the master-palette snap)
+    p = theme["palette"]
+    pairs = [(p["primary"], sprites.snap(p["primary"])), (p["secondary"], sprites.snap(p["secondary"]))]
+    orig, darker = sorted(pairs, key=lambda t: rel_lum(t[1]))[0]
+    return darker if rel_lum(darker) <= 0.08 and sprites.dist(orig, darker) < 120 else "#000000"
+
+
+def load_logo(path):
+    """Any logo file -> RGBA, trimmed. SVGs are rasterised with Chromium (needs --with playwright). A logo on a flat
+    opaque background (a JPG, a PNG without alpha) gets that background keyed out."""
+    if path.lower().endswith(".svg"):
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise SystemExit("an SVG logo needs Chromium: run with  uv run --with pillow --with playwright python pixel.py logo ...")
+        import tempfile
+        svg = open(path).read()
+        out = tempfile.mktemp(suffix=".png")
+        with sync_playwright() as pw:
+            b = pw.chromium.launch(channel="chromium")
+            pg = b.new_page(viewport={"width": 1200, "height": 1200})
+            pg.set_content("<html><body style='margin:0;background:transparent'><div id=l style='width:1000px;display:inline-block'>"
+                           + svg.replace("<svg ", "<svg width=\"100%\" ", 1) + "</div></body></html>")
+            pg.locator("#l").screenshot(path=out, omit_background=True)
+            b.close()
+        path = out
+    im = Image.open(path).convert("RGBA")
+    px = im.load()
+    corners = [px[0, 0], px[im.width - 1, 0], px[0, im.height - 1], px[im.width - 1, im.height - 1]]
+    if all(c[3] > 250 for c in corners):  # opaque background: key out the corner colour
+        bgc = max(set(corners), key=corners.count)[:3]
+        data = [(r, g, b, 0) if abs(r - bgc[0]) + abs(g - bgc[1]) + abs(b - bgc[2]) < 40 else (r, g, b, a) for r, g, b, a in im.getdata()]
+        im.putdata(data)
+    box = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
+    return im.crop(box) if box else im
+
+
+def fit(im, w, h):
+    k = min(w / im.width, h / im.height)
+    return im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.BOX)
+
+
+def flatten(im, colours):
+    """Hard pixels: alpha in or out, at most `colours` colours."""
+    # Quantize the true colours (not blended onto black: soft edges would turn into a dark fringe), opaque pixels only.
+    a = im.getchannel("A")
+    rgbim = im.convert("RGB")
+    solid = [p for p, al in zip(rgbim.getdata(), a.getdata()) if al >= 128] or [(0, 0, 0)]
+    probe = Image.new("RGB", (len(solid), 1)); probe.putdata(solid)
+    pal_im = probe.quantize(colors=colours, method=Image.Quantize.MEDIANCUT)
+    q = rgbim.quantize(palette=pal_im, dither=Image.Dither.NONE).convert("RGB")
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    for y in range(im.height):
+        for x in range(im.width):
+            if a.getpixel((x, y)) >= 128:
+                out.putpixel((x, y), q.getpixel((x, y)) + (255,))
+    return out
+
+
+def recolour(im, fn):
+    out = im.copy()
+    for y in range(im.height):
+        for x in range(im.width):
+            p = im.getpixel((x, y))
+            if p[3]:
+                out.putpixel((x, y), rgb(fn(hexc(p[:3]))) + (255,))
+    return out
+
+
+def centred(im):
+    c = Image.new("RGBA", (LOGO_W, LOGO_H), (0, 0, 0, 0))
+    c.paste(im, ((LOGO_W - im.width) // 2, (LOGO_H - im.height) // 2))
+    return c
+
+
+def cmd_logo(a):
+    theme = json.load(open(a.theme)) if a.theme else None
+    bg = a.bg or splash_bg(theme)
+    src = load_logo(a.logo)
+    light = "#eeefe9"
+    accent = (theme or {}).get("palette", {}).get("accent", light)
+    mono = accent if contrast(accent, bg) >= 3 else light
+    detailed = flatten(fit(src, LOGO_W - 4, LOGO_H - 4), 8)
+    half = flatten(fit(src, (LOGO_W - 4) // 2, (LOGO_H - 4) // 2), 5)
+    chunky = half.resize((half.width * 2, half.height * 2), Image.NEAREST)
+    options = [
+        ("a", "detailed", "own colours, full detail", detailed),
+        ("b", "chunky", "half resolution, doubled", chunky),
+        ("c", "light", "dark colours made light", recolour(detailed, lambda h: h if contrast(h, bg) >= 2.2 else light)),
+        ("d", "one colour", f"silhouette in {mono}", recolour(detailed, lambda h: mono)),
+    ]
+    os.makedirs(a.out_dir, exist_ok=True)
+    sheet = Image.new("RGBA", (LOGO_W * 2 * 2 + 48, (LOGO_H * 2 + 40) * 2 + 16), rgb(bg) + (255,))
+    for i, (key, name, why, im) in enumerate(options):
+        spr = from_images([centred(im)], {"concept": f"splash logo option {key.upper()} ({name}): {why}", "base": os.path.basename(a.logo)})
+        save(os.path.join(a.out_dir, f"logo-{key}.sprite"), spr)
+        x, y = 16 + (i % 2) * (LOGO_W * 2 + 16), 12 + (i // 2) * (LOGO_H * 2 + 40)
+        sheet.alpha_composite(centred(im).resize((LOGO_W * 2, LOGO_H * 2), Image.NEAREST), (x, y))
+        ImageDraw.Draw(sheet).text((x, y + LOGO_H * 2 + 6), f"{key.upper()}  {name}: {why}", fill=(200, 200, 200, 255))
+    sheet_path = os.path.join(a.out_dir, "logo-options.png")
+    sheet.convert("RGB").save(sheet_path)
+    print(f"wrote logo-a..d.sprite and {sheet_path} (shown on the splash background {bg}, 2x).")
+    print("Show the sheet to the person and let them choose; copy their choice to <art dir>/logo.sprite before building.")
 
 
 # ---------- commands ----------
@@ -386,8 +516,13 @@ def main():
     li.add_argument("--tile", action="store_true", help="floor/terrain tile: skip outline and floor-contrast checks")
     p = sub.add_parser("palette")
     p.add_argument("sprite")
+    lo = sub.add_parser("logo")
+    lo.add_argument("logo", help="the prospect's logo: png/jpg/webp, or svg (needs --with playwright)")
+    lo.add_argument("out_dir")
+    lo.add_argument("--theme", help="theme.json: the splash background and the one-colour option come from its palette")
+    lo.add_argument("--bg", help="splash background colour to judge against (default: from --theme, else black)")
     a = ap.parse_args()
-    {"browse": cmd_browse, "grab": cmd_grab, "render": cmd_render, "lint": cmd_lint, "palette": cmd_palette}[a.cmd](a)
+    {"browse": cmd_browse, "grab": cmd_grab, "render": cmd_render, "lint": cmd_lint, "palette": cmd_palette, "logo": cmd_logo}[a.cmd](a)
 
 
 if __name__ == "__main__":

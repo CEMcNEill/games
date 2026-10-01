@@ -8,7 +8,7 @@ import { hooks, sharedDebug } from './hooks';
 import { initAnalytics, capture } from './analytics';
 import { Sfx, ZzfxParams } from './zzfx';
 import { W, H, TOUCH, APP, PX, fitView } from './ui';
-import { BootScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
+import { BootScene, SplashScene, TitleScene, HowToScene, EndScene, EndData } from './scenes';
 import { meta, initMeta, achieve, dailySeed, randomSeed, AchievementDef, RunResult } from './meta';
 import { OverlayScene, toast, burst, floatText, shake, hitstop } from './juice';
 
@@ -21,6 +21,10 @@ export interface Slot {
   /** Art brief (sprite prompt) template with {theme.path} placeholders; absent = fixed kit art, never generated. */
   prompt?: string;
   kind?: string; // 'sprite' (default) or 'tile'
+  /** No default art: only a game that installs one has it (the prospect's logo on the splash screen). */
+  optional?: boolean;
+  /** Art every kit shares (shared/sprites/<id>.sprite), e.g. the PostHog logo. */
+  shared?: boolean;
 }
 
 export interface Manifest {
@@ -182,7 +186,7 @@ export async function startKit(kit: KitDef) {
     input: { keyboard: true, gamepad: false, ...(APP ? { touch: { target: 'game' } } : {}) },
     audio: { disableWebAudio: false },
     fps: { target: 60 },
-    scene: [BootScene, TitleScene, HowToScene, ...kit.scenes, EndScene, OverlayScene],
+    scene: [BootScene, SplashScene, TitleScene, HowToScene, ...kit.scenes, EndScene, OverlayScene],
   });
   window.addEventListener('resize', () => {
     // Scenes follow a resize through the scale manager's 'resize' event (menus re-centre, the game re-anchors its HUD).

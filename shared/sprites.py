@@ -2,7 +2,8 @@
 """Render kit default sprites from text grids, recoloured with a theme palette.
 
 A kit slot's default art is <kit>/sprites/<slot>.sprite when that file exists (see pixel.py; '@' legend
-tokens take the theme's brand colours), else <kit>/art.py.
+tokens take the theme's brand colours), else shared/sprites/<slot>.sprite (art every kit shares, like the PostHog
+logo), else <kit>/art.py. An "optional" slot (the prospect's logo) may have no default at all.
 Kits describe their older default art in <kit>/art.py as SPRITES = {slot_id: [frame_rows, ...]} (each
 frame a list of equal-length strings) plus optional PROCEDURAL = {slot_id: fn(pal) -> [Image]}.
 Letters map to fixed master-palette colours (LEGEND); the digits 1-5 are brand colours from the
@@ -118,6 +119,10 @@ def build(kit_dir, out_dir, theme=None, only=None):
         if only and sid not in only:
             continue
         sprite_file = os.path.join(kit_dir, "sprites", f"{sid}.sprite")
+        if not os.path.exists(sprite_file):  # art every kit shares (the PostHog logo for the splash screen)
+            sprite_file = os.path.join(HERE, "sprites", f"{sid}.sprite")
+        if slot.get("optional") and not os.path.exists(sprite_file):
+            continue  # an optional slot (the prospect's logo) has no default: the game does without it
         if os.path.exists(sprite_file):  # Claude-drawn art (CC0 base + edits) wins over art.py
             import pixel
             frames = pixel.to_images(pixel.load(sprite_file), pixel.brand_palette(theme))

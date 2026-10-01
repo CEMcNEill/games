@@ -115,6 +115,11 @@ class Session:
         self.shots_dir, self.tag, self.shots = shots_dir, tag, []
         self.page.goto(url)
         self.page.wait_for_function("window.__game && window.__game.ready", timeout=20000)
+        # The splash screen (PostHog or the prospect's logo): keep a shot of it, then wait for the title.
+        self.page.wait_for_timeout(700)
+        if self.g("__game.scene") == "Splash":
+            self.shot("splash")
+            self.page.wait_for_function("__game.scene !== 'Splash'", timeout=8000)
 
     def g(self, expr):
         return self.page.evaluate(expr)

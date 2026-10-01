@@ -62,16 +62,19 @@ PostHog products to feature: <e.g. product analytics, session replay, surveys, f
 Who will play it: <role, how technical>
 Tone and things to avoid: <e.g. friendly, nothing violent, no jokes about privacy>
 Template: <one from the table, or "pick the best one">
+Splash: <"their logo" (Claude finds it on their site), a logo URL, or "PostHog">
 
 Write the brief to prospects/<name>.yaml, write the theme and check it until OK, draw the
 company-specific sprites following shared/prompts/sprite-style.md (look at every review image),
+make the splash logo options following shared/prompts/logo.md and let me pick one,
 build with pipeline/bin/build-game, read the check screenshots, fix anything that looks off,
 then tell me how to play it.
 ```
 
 Claude writes a short brief, writes the theme (all the game's words, colours and difficulty),
-draws 5-15 custom sprites on top of public-domain pixel art, builds the game and runs a headless
-playthrough to check it. The result is a folder in `out/<company>-<template>/`.
+draws 5-15 custom sprites on top of public-domain pixel art, turns the company's logo into 2-4 pixel
+options for the opening splash screen (you pick one, or keep the 8-bit PostHog logo), builds the game
+and runs a headless playthrough to check it. The result is a folder in `out/<company>-<template>/`.
 
 ### 3. Play it, then share it
 ```sh

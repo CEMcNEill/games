@@ -122,7 +122,7 @@ export class BootScene extends Phaser.Scene {
     });
     const themed = K.manifest.sprites ?? {};
     for (const s of K.kit.slots) {
-      this.load.spritesheet(`d:${s.id}`, `assets/default/${s.id}.png`, { frameWidth: s.w, frameHeight: s.h });
+      if (!s.optional) this.load.spritesheet(`d:${s.id}`, `assets/default/${s.id}.png`, { frameWidth: s.w, frameHeight: s.h });
       if (themed[s.id]) this.load.spritesheet(`t:${s.id}`, themed[s.id], { frameWidth: s.w, frameHeight: s.h });
     }
     K.kit.preload?.(this);
@@ -142,6 +142,7 @@ export class BootScene extends Phaser.Scene {
     for (const s of K.kit.slots) {
       const t = `t:${s.id}`;
       let key = `d:${s.id}`;
+      if (s.optional && !this.textures.exists(t)) continue; // an optional slot the game doesn't have (no logo)
       if (this.textures.exists(t)) {
         const img = this.textures.get(t).getSourceImage() as HTMLImageElement;
         if (img.width === s.w * s.frames && img.height === s.h) key = t;
@@ -155,7 +156,56 @@ export class BootScene extends Phaser.Scene {
     }
     hooks.ready = true;
     this.scene.launch('Overlay');
-    this.scene.start('Title');
+    this.scene.start('Splash');
+  }
+}
+
+/** The splash screen, between loading and the title: the prospect's pixel logo with "powered by PostHog" under it
+ * when the game has one (the optional `logo` slot), else the 8-bit PostHog logo. About 2 s; a key or tap skips it. */
+export class SplashScene extends Phaser.Scene {
+  constructor() { super('Splash'); }
+
+  create() {
+    enter(this, 'Splash', 'splash');
+    screen(this, () => {});
+    const ui = K.ui;
+    const custom = this.textures.exists('t:logo');
+    this.cameras.main.setBackgroundColor(custom ? ui.bg : '#000000');
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    if (custom) {
+      // The prospect's logo (128x48, padded), as big as fits in whole pixels, with the small PostHog credit under it.
+      const s = Math.max(1, Math.floor(Math.min((W * 0.8) / 128, (H * 0.45) / 48)));
+      const cy = Math.round(H / 2 - 10);
+      parts.push(this.add.image(W / 2, cy, 't:logo').setScale(s));
+      const y = cy + 24 * s + 12;
+      const label = 'powered by', w = label.length * CHAR_W + 4 + 15 + 4 + 7 * CHAR_W;
+      let x = Math.round(W / 2 - w / 2);
+      parts.push(text(this, x, y, label, { color: ui.dimInt }));
+      x += label.length * CHAR_W + 4;
+      parts.push(this.add.image(x, y - 1, K.sprites.posthog_mark ?? 'd:posthog_mark').setOrigin(0, 0));
+      x += 15 + 4;
+      parts.push(text(this, x, y, 'PostHog', { color: ui.textInt }));
+    } else {
+      // The 8-bit PostHog lockup: the logomark, and the wordmark sitting on its baseline (the g hangs below).
+      const s = W >= 400 ? 3 : 2;
+      const w = (39 + 7 + 66) * s, x0 = Math.round(W / 2 - w / 2), y0 = Math.round(H / 2 - (21 * s) / 2);
+      const mark = this.add.image(x0, y0, K.sprites.posthog_logo ?? 'd:posthog_logo').setOrigin(0, 0).setScale(s);
+      const word = this.add.image(x0 + (39 + 7) * s, y0 + (21 - 12) * s, K.sprites.posthog_wordmark ?? 'd:posthog_wordmark').setOrigin(0, 0).setScale(s);
+      parts.push(mark, word);
+      // A little hop, like the logo in the PostHog app.
+      this.tweens.add({ targets: mark, y: y0 - 4 * s, duration: 180, delay: 450, yoyo: true, ease: 'Quad.Out' });
+    }
+    parts.forEach((o) => (o as unknown as Phaser.GameObjects.Components.Alpha).setAlpha(0));
+    this.tweens.add({ targets: parts, alpha: 1, duration: 280 });
+    let gone = false;
+    const go = () => {
+      if (gone) return;
+      gone = true;
+      this.tweens.add({ targets: parts, alpha: 0, duration: 220, onComplete: () => this.scene.start('Title') });
+    };
+    this.time.delayedCall(1900, go);
+    onKeys(this, ['Enter', 'Space', 'NumpadEnter', 'Escape'], go, 200);
+    onTap(this, go, 200);
   }
 }
 
