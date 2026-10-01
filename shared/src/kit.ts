@@ -248,6 +248,7 @@ function appBridge(game: Phaser.Game) {
   Object.assign(window, {
     /** Back button: true when the game used it (ESC: pause, or back to the title); false on the title = leave the app. */
     __appBack: () => {
+      if ((window as any).__overlayBack?.()) return true; // a page open over the game (Bug Survivors' guide) closes first
       if (hooks.scene === 'Title') return false;
       key('Escape', 27);
       return true;
